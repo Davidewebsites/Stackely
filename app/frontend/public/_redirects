@@ -1,0 +1,7 @@
+# Serve static files directly - bypass SPA fallback
+/sitemap.xml    /sitemap.xml    200
+/robots.txt     /robots.txt     200
+
+
+# SPA fallback - all other routes
+/*    /index.html   200

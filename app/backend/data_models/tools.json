@@ -1,0 +1,121 @@
+{
+    "title": "tools",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Primary key, auto-increment"
+        },
+        "name": {
+            "type": "string",
+            "description": "Tool name"
+        },
+        "slug": {
+            "type": "string",
+            "description": "URL-friendly slug"
+        },
+        "short_description": {
+            "type": "string",
+            "description": "Brief description of the tool"
+        },
+        "full_description": {
+            "type": "string",
+            "description": "Detailed description"
+        },
+        "category": {
+            "type": "string",
+            "description": "Tool category (ads, design, copywriting, video, landing_pages, analytics, automation, email_marketing)"
+        },
+        "subcategory": {
+            "type": "string",
+            "description": "Tool subcategory"
+        },
+        "tags": {
+            "type": "string",
+            "description": "Comma-separated tags"
+        },
+        "pricing_model": {
+            "type": "string",
+            "description": "Pricing model: free, freemium, or paid"
+        },
+        "starting_price": {
+            "type": "string",
+            "description": "Starting price info"
+        },
+        "skill_level": {
+            "type": "string",
+            "description": "Required skill level: beginner, intermediate, advanced"
+        },
+        "website_url": {
+            "type": "string",
+            "description": "Official website URL"
+        },
+        "logo_url": {
+            "type": "string",
+            "description": "Logo image URL"
+        },
+        "affiliate_url": {
+            "type": "string",
+            "description": "Affiliate link URL"
+        },
+        "internal_score": {
+            "type": "integer",
+            "description": "Internal quality score 0-100"
+        },
+        "is_featured": {
+            "type": "boolean",
+            "description": "Whether the tool is featured on homepage"
+        },
+        "pros": {
+            "type": "string",
+            "description": "Advantages of the tool"
+        },
+        "cons": {
+            "type": "string",
+            "description": "Disadvantages of the tool"
+        },
+        "best_use_cases": {
+            "type": "string",
+            "description": "Best use cases description"
+        },
+        "active": {
+            "type": "boolean",
+            "description": "Whether the tool is active"
+        },
+        "use_cases": {
+            "type": "string",
+            "description": "Comma-separated use cases"
+        },
+        "target_audience": {
+            "type": "string",
+            "description": "Target audience description"
+        },
+        "difficulty_score": {
+            "type": "integer",
+            "description": "Difficulty score 1-10"
+        },
+        "recommended_for": {
+            "type": "string",
+            "description": "Recommended user types"
+        },
+        "popularity_score": {
+            "type": "integer",
+            "description": "Popularity score 1-10"
+        },
+        "beginner_friendly": {
+            "type": "boolean",
+            "description": "Whether beginner friendly"
+        },
+        "tool_type": {
+            "type": "string",
+            "description": "Tool type: traditional, ai, or hybrid"
+        }
+    },
+    "required": [
+        "id",
+        "name",
+        "slug",
+        "category",
+        "pricing_model"
+    ]
+}

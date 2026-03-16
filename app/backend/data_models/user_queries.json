@@ -1,0 +1,41 @@
+{
+    "title": "user_queries",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Primary key, auto-increment"
+        },
+        "raw_query": {
+            "type": "string",
+            "description": "The raw search query from the user"
+        },
+        "detected_goal": {
+            "type": "string",
+            "description": "The detected goal from AI classification"
+        },
+        "detected_categories": {
+            "type": "string",
+            "description": "Comma-separated detected categories"
+        },
+        "budget_preference": {
+            "type": "string",
+            "description": "User pricing preference"
+        },
+        "suggested_tools": {
+            "type": "string",
+            "description": "Comma-separated suggested tool names"
+        },
+        "visitor_id": {
+            "type": "string",
+            "description": "Anonymous visitor tracking ID"
+        },
+        "created_date": {
+            "type": "string",
+            "description": "ISO date string of when the query was made"
+        }
+    },
+    "required": [
+        "id"
+    ]
+}

@@ -20,6 +20,7 @@ import {
   PRICING_OPTIONS,
   fetchToolsByCategories,
   saveStack,
+  searchTools,
   type Tool,
   type PricingPreference,
 } from '@/lib/api';
@@ -42,6 +43,9 @@ export default function Results() {
 
   const [directTools, setDirectTools] = useState<Tool[]>([]);
   const [directLoading, setDirectLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<Tool[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [pricingFilter, setPricingFilter] = useState('all');
   const [skillFilter, setSkillFilter] = useState('all');
   const [linkCopied, setLinkCopied] = useState(false);
@@ -57,14 +61,27 @@ export default function Results() {
   }, [categoryParam, query]);
 
   useEffect(() => {
-    if (query) {
-      classify(query, pricingParam);
-    }
-  }, [query, pricingParam, classify]);
+    if (!query) return;
+
+    setSearchLoading(true);
+    setSearchError(null);
+
+    searchTools(query, pricingParam, categoryParam || undefined, 24)
+      .then((data) => {
+        setSearchResults(data);
+      })
+      .catch((err) => {
+        console.error(err);
+        setSearchError('Search failed');
+        setSearchResults([]);
+      })
+      .finally(() => setSearchLoading(false));
+  }, [query, pricingParam, categoryParam]);
 
   const isDirectBrowse = !!categoryParam && !query;
-  const isStackMode = !isDirectBrowse && stack.length > 0;
-  const loading = isDirectBrowse ? directLoading : isLoading;
+  const isKeywordSearch = !!query;
+  const isStackMode = false;
+  const loading = isDirectBrowse ? directLoading : isKeywordSearch ? searchLoading : isLoading;
 
   const activePricingOption = PRICING_OPTIONS.find((o) => o.id === activePricing);
 
@@ -130,6 +147,25 @@ export default function Results() {
     setTimeout(() => setStackSaved(false), 2500);
   };
 
+  const handleRetry = () => {
+    if (isKeywordSearch) {
+      setSearchLoading(true);
+      setSearchError(null);
+      searchTools(query, pricingParam, categoryParam || undefined, 24)
+        .then((data) => {
+          setSearchResults(data);
+        })
+        .catch((err) => {
+          console.error(err);
+          setSearchError('Search failed');
+          setSearchResults([]);
+        })
+        .finally(() => setSearchLoading(false));
+    } else {
+      query && classify(query, pricingParam);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white relative overflow-hidden">
       {/* Brand atmosphere */}
@@ -180,13 +216,13 @@ export default function Results() {
         )}
 
         {/* Error */}
-        {error && !loading && (
+        {(error || (isKeywordSearch && searchError)) && !loading && (
           <div className="flex flex-col items-center justify-center py-36">
             <div className="w-14 h-14 rounded-xl bg-red-50 flex items-center justify-center mb-5">
               <AlertCircle className="w-6 h-6 text-red-500" />
             </div>
             <h2 className="text-[18px] font-medium text-slate-900 mb-1.5">Something went wrong</h2>
-            <p className="text-[14px] text-slate-500 mb-7 text-center max-w-md">{error}</p>
+            <p className="text-[14px] text-slate-500 mb-7 text-center max-w-md">{isKeywordSearch && searchError ? searchError : error}</p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -196,7 +232,7 @@ export default function Results() {
                 Change goal
               </Button>
               <Button
-                onClick={() => query && classify(query, pricingParam)}
+                onClick={handleRetry}
                 className="h-10 text-[13px] text-white shadow-none"
                 style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
               >
@@ -432,6 +468,34 @@ export default function Results() {
                     ))}
                   </div>
                 </div>
+              </>
+            )}
+
+            {/* Keyword Search Mode */}
+            {isKeywordSearch && !isStackMode && (
+              <>
+                <div className="mb-14">
+                  <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-4">
+                    Search results for "{query}"
+                  </h1>
+                  <p className="text-[16px] text-slate-500">
+                    {searchResults.length} tool{searchResults.length !== 1 ? 's' : ''} found
+                  </p>
+                </div>
+
+                {searchResults.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {searchResults.map((tool) => (
+                      <ToolCard key={tool.id} tool={tool} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-36">
+                    <AlertCircle className="w-8 h-8 text-slate-300 mb-4" />
+                    <h2 className="text-[18px] font-medium text-slate-900 mb-1.5">No tools found</h2>
+                    <p className="text-[14px] text-slate-500">Try a different search query</p>
+                  </div>
+                )}
               </>
             )}
 

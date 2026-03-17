@@ -489,6 +489,30 @@ export async function saveUserQuery(data: {
   }
 }
 
+export async function searchTools(
+  searchQuery: string,
+  pricingPreference: PricingPreference = 'any',
+  category?: string,
+  limit = 24
+): Promise<Tool[]> {
+  const cleanQuery = searchQuery.trim();
+  if (!cleanQuery) return [];
+
+  const { data, error } = await supabase.rpc('search_tools', {
+    search_query: cleanQuery,
+    pricing_filter: pricingPreference,
+    category_filter: category || null,
+    limit_count: limit,
+  });
+
+  if (error) {
+    console.error('Error searching tools:', error);
+    throw error;
+  }
+
+  return (data ?? []) as Tool[];
+}
+
 // ---- Stack sharing utilities ----
 
 const SAVED_STACKS_KEY = 'stackely_saved_stacks';

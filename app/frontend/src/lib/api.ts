@@ -1,5 +1,6 @@
 import { createClient } from '@metagptx/web-sdk';
 import { LOCAL_TOOLS } from '@/data/tools';
+import { supabase } from './supabase';
 
 const client = createClient();
 
@@ -400,12 +401,16 @@ export async function fetchAIAcceleratorTools(
 }
 
 // Fetch tools by categories from local data
-export async function fetchToolsByCategories(categories: string[]): Promise<Tool[]> {
-  const catSet = new Set(categories);
-  const filtered = LOCAL_TOOLS.filter(
-    (t) => t.active !== false && catSet.has(t.category)
-  );
-  return dedupeTools(filtered);
+export async function fetchToolsByCategories(categories: string[]) {
+  const { data, error } = await supabase
+    .from('tools')
+    .select('*')
+    .in('category', categories)
+    .eq('active', true)
+    .order('internal_score', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
 }
 
 /**
@@ -414,25 +419,30 @@ export async function fetchToolsByCategories(categories: string[]): Promise<Tool
  * Featured tools (is_featured=true) are prioritized; if fewer than 8,
  * top-scoring non-featured tools fill the remaining slots.
  */
-export async function fetchFeaturedTools(): Promise<Tool[]> {
-  const active = LOCAL_TOOLS.filter((t) => t.active !== false);
-  const featured = active.filter((t) => t.is_featured);
-  const nonFeatured = active.filter((t) => !t.is_featured);
+export async function fetchFeaturedTools() {
+  const { data, error } = await supabase
+    .from('tools')
+    .select('*')
+    .eq('active', true)
+    .order('is_featured', { ascending: false })
+    .order('internal_score', { ascending: false })
+    .limit(8);
 
-  const sorted = [
-    ...featured.sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0)),
-    ...nonFeatured.sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0)),
-  ];
-
-  return dedupeTools(sorted).slice(0, 8);
+  if (error) throw error;
+  return data ?? [];
 }
 
 // Fetch single tool by slug from local data
-export async function fetchToolBySlug(slug: string): Promise<Tool | null> {
-  const tool = LOCAL_TOOLS.find(
-    (t) => t.slug === slug && t.active !== false
-  );
-  return tool || null;
+export async function fetchToolBySlug(slug: string) {
+  const { data, error } = await supabase
+    .from('tools')
+    .select('*')
+    .eq('slug', slug)
+    .eq('active', true)
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 // Fetch all tools (for admin) — no dedup here so admin can see duplicates

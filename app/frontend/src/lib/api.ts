@@ -1,4 +1,5 @@
 import { createClient } from '@metagptx/web-sdk';
+import { LOCAL_TOOLS } from '@/data/tools';
 
 const client = createClient();
 
@@ -398,74 +399,40 @@ export async function fetchAIAcceleratorTools(
   return ranked.slice(0, 3).map((r) => r.tool);
 }
 
-// Fetch tools by categories
+// Fetch tools by categories from local data
 export async function fetchToolsByCategories(categories: string[]): Promise<Tool[]> {
-  const allTools: Tool[] = [];
-
-  for (const category of categories) {
-    try {
-      const response = await client.entities.tools.query({
-        query: { category, active: true },
-        sort: '-internal_score',
-        limit: 20,
-      });
-      if (response?.data?.items) {
-        allTools.push(...response.data.items);
-      }
-    } catch (error) {
-      console.error(`Error fetching tools for category ${category}:`, error);
-    }
-  }
-
-  const seenIds = new Set<number>();
-  const idUnique = allTools.filter((tool) => {
-    if (seenIds.has(tool.id)) return false;
-    seenIds.add(tool.id);
-    return true;
-  });
-  return dedupeTools(idUnique);
+  const catSet = new Set(categories);
+  const filtered = LOCAL_TOOLS.filter(
+    (t) => t.active !== false && catSet.has(t.category)
+  );
+  return dedupeTools(filtered);
 }
 
 /**
- * Fetch all featured tools with deduplication.
- * Uniqueness is determined by slug (fallback: name).
- * If duplicates exist, the record with the highest internal_score is kept.
+ * Fetch all featured tools from local data.
+ * Returns active tools sorted by internal_score desc, up to 8.
+ * Featured tools (is_featured=true) are prioritized; if fewer than 8,
+ * top-scoring non-featured tools fill the remaining slots.
  */
 export async function fetchFeaturedTools(): Promise<Tool[]> {
-  try {
-    const response = await client.entities.tools.query({
-      query: { is_featured: true, active: true },
-      sort: '-internal_score',
-      limit: 16,
-    });
-    const items: Tool[] = response?.data?.items || [];
+  const active = LOCAL_TOOLS.filter((t) => t.active !== false);
+  const featured = active.filter((t) => t.is_featured);
+  const nonFeatured = active.filter((t) => !t.is_featured);
 
-    // Deduplicate using the shared dedupeTools utility
-    const unique = dedupeTools(items);
+  const sorted = [
+    ...featured.sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0)),
+    ...nonFeatured.sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0)),
+  ];
 
-    // Return up to 8 unique tools, sorted by internal_score desc
-    return unique
-      .sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0))
-      .slice(0, 8);
-  } catch (error) {
-    console.error('Error fetching featured tools:', error);
-    return [];
-  }
+  return dedupeTools(sorted).slice(0, 8);
 }
 
-// Fetch single tool by slug
+// Fetch single tool by slug from local data
 export async function fetchToolBySlug(slug: string): Promise<Tool | null> {
-  try {
-    const response = await client.entities.tools.query({
-      query: { slug, active: true },
-      limit: 1,
-    });
-    const items = response?.data?.items;
-    return items && items.length > 0 ? items[0] : null;
-  } catch (error) {
-    console.error('Error fetching tool:', error);
-    return null;
-  }
+  const tool = LOCAL_TOOLS.find(
+    (t) => t.slug === slug && t.active !== false
+  );
+  return tool || null;
 }
 
 // Fetch all tools (for admin) — no dedup here so admin can see duplicates

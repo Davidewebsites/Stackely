@@ -8,7 +8,7 @@ export default function SiteFooter() {
         <div className="flex justify-center mb-6">
           <Link to="/" className="opacity-60 hover:opacity-100 transition-opacity">
             <img
-              src="/logo.png?v=11"
+              src="/logo-main.png"
               alt="Stackely"
               style={{ width: 100, height: 'auto' }}
               className="rounded-md object-contain"

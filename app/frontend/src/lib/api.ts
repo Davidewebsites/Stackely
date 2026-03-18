@@ -498,19 +498,118 @@ export async function searchTools(
   const cleanQuery = searchQuery.trim();
   if (!cleanQuery) return [];
 
-  const { data, error } = await supabase.rpc('search_tools', {
-    search_query: cleanQuery,
-    pricing_filter: pricingPreference,
-    category_filter: category || null,
-    limit_count: limit,
+  // Use local tools data for search
+  const results = LOCAL_TOOLS.filter(tool => {
+    // Skip inactive tools
+    if (!tool.active) return false;
+
+    // Apply category filter
+    if (category && tool.category !== category) return false;
+
+    // Apply pricing filter
+    const allowedModels = getAllowedPricingModels(pricingPreference);
+    if (!allowedModels.includes(tool.pricing_model)) return false;
+
+    // Search in multiple fields
+    const searchFields = [
+      tool.name,
+      tool.short_description || '',
+      tool.full_description || '',
+      tool.tags || '',
+      tool.category,
+      tool.subcategory || '',
+      tool.use_cases || '',
+      tool.target_audience || '',
+      tool.recommended_for || '',
+    ].join(' ').toLowerCase();
+
+    const query = cleanQuery.toLowerCase();
+    return searchFields.includes(query);
   });
 
-  if (error) {
-    console.error('Error searching tools:', error);
-    throw error;
+  // Calculate relevance scores and sort
+  const resultsWithScores = results.map(tool => ({
+    tool,
+    relevanceScore: calculateRelevanceScore(tool, cleanQuery)
+  }));
+
+  resultsWithScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+  return resultsWithScores.slice(0, limit).map(item => item.tool);
+}
+
+// Calculate relevance score for a tool based on query matching
+function calculateRelevanceScore(tool: Tool, query: string): number {
+  const baseScore = tool.internal_score || 0;
+  let relevanceMultiplier = 1.0;
+  const lowerQuery = query.toLowerCase();
+
+  // Detect query intent
+  const queryIntent = detectQueryIntent(lowerQuery);
+
+  // Category matching boost
+  if (queryIntent === 'automation' && tool.category === 'automation') {
+    // Penalize workspace tools for automation queries
+    const workspaceTools = ['slack', 'trello', 'asana'];
+    if (workspaceTools.some(name => tool.name.toLowerCase().includes(name))) {
+      relevanceMultiplier *= 0.6; // Strong penalty for workspace tools
+    } else {
+      relevanceMultiplier *= 1.3; // Boost real automation tools
+    }
+  } else if (queryIntent === 'email_marketing' && tool.category === 'email_marketing') {
+    relevanceMultiplier *= 1.4; // Strong boost for email marketing tools
+  } else if (queryIntent === 'writing' && tool.category === 'copywriting') {
+    relevanceMultiplier *= 1.3; // Boost copywriting tools for writing queries
+  } else if (queryIntent === 'video' && tool.category === 'video') {
+    relevanceMultiplier *= 1.4; // Strong boost for video tools
   }
 
-  return (data ?? []) as Tool[];
+  // Use cases and tags matching
+  const useCasesMatch = (tool.use_cases || '').toLowerCase().includes(lowerQuery);
+  const tagsMatch = (tool.tags || '').toLowerCase().includes(lowerQuery);
+  const descriptionMatch = (tool.short_description || '').toLowerCase().includes(lowerQuery);
+
+  if (useCasesMatch || tagsMatch) {
+    relevanceMultiplier *= 1.2; // Boost for strong use case/tag matches
+  } else if (descriptionMatch) {
+    relevanceMultiplier *= 1.1; // Moderate boost for description matches
+  }
+
+  // Penalize weak matches (only found in generic fields)
+  const genericFields = [
+    tool.name.toLowerCase(),
+    tool.category,
+    tool.subcategory || '',
+    tool.target_audience || '',
+    tool.recommended_for || ''
+  ].join(' ');
+
+  const onlyGenericMatch = genericFields.includes(lowerQuery) &&
+                          !useCasesMatch && !tagsMatch && !descriptionMatch;
+
+  if (onlyGenericMatch) {
+    relevanceMultiplier *= 0.8; // Slight penalty for weak matches
+  }
+
+  return baseScore * relevanceMultiplier;
+}
+
+// Detect query intent for relevance scoring
+function detectQueryIntent(query: string): string {
+  const intentKeywords = {
+    automation: ['automate', 'automation', 'workflow', 'process', 'integrate', 'sync'],
+    email_marketing: ['email', 'newsletter', 'campaign', 'audience', 'marketing', 'subscribe'],
+    writing: ['write', 'writing', 'copy', 'content', 'text', 'article', 'blog'],
+    video: ['video', 'film', 'media', 'production', 'broadcast', 'stream']
+  };
+
+  for (const [intent, keywords] of Object.entries(intentKeywords)) {
+    if (keywords.some(keyword => query.includes(keyword))) {
+      return intent;
+    }
+  }
+
+  return 'general'; // No specific intent detected
 }
 
 // ---- Stack sharing utilities ----

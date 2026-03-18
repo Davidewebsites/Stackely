@@ -2,853 +2,181 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://stackely.com/</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://stackely.com/tools/canva</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/google-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/chatgpt</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/google-analytics</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/zapier</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/shopify</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/figma</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://stackely.com/tools/claude</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/hubspot</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/meta-ads-manager</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/midjourney</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/grammarly</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/adobe-premiere-pro</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/mailchimp</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/semrush</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/adobe-illustrator</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/notion</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/ahrefs</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/slack</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/wordpress</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/unbounce</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/adobe-photoshop</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/webflow</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/davinci-resolve</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/jasper</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/activecampaign</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/amazon-advertising</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/klaviyo</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/jasper-ai</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/make</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/capcut</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/hotjar</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/asana</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/google-tag-manager</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/dall-e</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/airtable</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/convertkit</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/squarespace</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/runway</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/make-integromat</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/descript</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/framer</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/surfer-seo</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/mixpanel</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/perplexity</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/elementor</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/tiktok-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/copy-ai</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/amplitude</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://stackely.com/tools/instapage</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/hootsuite</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/adcreative-ai</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/wix</loc>
-    <lastmod>2026-03-16</lastmod>
+    <loc>https://stackely.com/tools/squarespace</loc>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/trello</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/substack</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://stackely.com/tools/looker-studio</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/linkedin-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/synthesia</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/loom</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/power-automate</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/clearscope</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/typeform</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/workato</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/fullstory</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/brevo</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/n8n</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/photopea</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/buffer</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/frase</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/mailerlite</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/beehiiv</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/sketch</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/leadpages</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/moz-pro</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/vimeo</loc>
-    <lastmod>2026-03-16</lastmod>
+    <loc>https://stackely.com/tools/wix</loc>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/semrush-content-marketing</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://stackely.com/tools/moz-pro</loc>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/canva-video</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/heap</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/riverside</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/riverside-fm</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/anyword</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/plausible</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/opus-clip</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/later</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/tray-io</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/writesonic</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/supermetrics</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/omnisend</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/matomo</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/carrd</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/airtable-automations</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/drip</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/hemingway-editor</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/microsoft-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/plausible-analytics</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/microsoft-advertising</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/invideo</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/contentshake-ai</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/wordtune</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/crazy-egg</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/pictory</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/ifttt</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/constant-contact</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/databox</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/bardeen</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/visme</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stackely.com/tools/phantombuster</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/adroll</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/zapier-tables</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/piktochart</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/vistacreate</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/aweber</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/swipe-pages</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/pabbly-connect</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/rytr</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/pinterest-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/landingi</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/removal-ai</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/snappa</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/animoto</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/twitter-x-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/dorik</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/adespresso</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/snapchat-ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/tools/taboola</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/categories/ads</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/categories/analytics</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/categories/automation</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/categories/copywriting</loc>
-    <lastmod>2026-03-16</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://stackely.com/categories/design</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/categories/email_marketing</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/categories/landing_pages</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/categories/video</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/create-instagram-ads</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/start-youtube-channel</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/launch-ecommerce-store</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/automate-marketing</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/create-website</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/build-saas-landing-page</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/grow-newsletter</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://stackely.com/goals/create-social-media-content</loc>
-    <lastmod>2026-03-16</lastmod>
+    <lastmod>2026-03-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

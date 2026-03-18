@@ -1,0 +1,51 @@
+[
+  {
+    "query": "build a marketing funnel",
+    "expected_mode": "stack",
+    "expected_intent": "marketing",
+    "expected_categories": ["landing_pages", "automation", "email_marketing"]
+  },
+  {
+    "query": "create a landing page",
+    "expected_mode": "stack",
+    "expected_intent": "creation",
+    "expected_categories": ["landing_pages"]
+  },
+  {
+    "query": "automate lead capture",
+    "expected_mode": "stack",
+    "expected_intent": "automation"
+  },
+  {
+    "query": "make product demo video",
+    "expected_mode": "stack",
+    "expected_intent": "video"
+  },
+  {
+    "query": "write blog content",
+    "expected_mode": "stack",
+    "expected_intent": "content"
+  },
+  {
+    "query": "best ai tools for writing",
+    "expected_mode": "search"
+  },
+  {
+    "query": "email marketing tools",
+    "expected_mode": "search"
+  },
+  {
+    "query": "tools for startups",
+    "expected_mode": "search"
+  },
+  {
+    "query": "track website analytics",
+    "expected_mode": "stack",
+    "expected_intent": "analytics"
+  },
+  {
+    "query": "design a product page",
+    "expected_mode": "stack",
+    "expected_intent": "creation"
+  }
+]

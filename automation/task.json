@@ -1,0 +1,82 @@
+{
+  "title": "Implement keyword search with RPC",
+  "goal": "Enable real database search when user provides ?q=<query> parameter",
+  "scope": [
+    "app/frontend/src/api/searchTools",
+    "app/frontend/src/lib/api.ts",
+    "app/frontend/src/pages/Results.tsx"
+  ],
+  "constraints": [
+    "Do NOT modify UI components",
+    "Do NOT change existing ToolCard component",
+    "Do NOT remove or disable AI classification system",
+    "Do NOT modify routing or navigation logic",
+    "Do NOT change .env configuration",
+    "Only use Supabase RPC, not .from('tools')"
+  ],
+  "acceptance_criteria": [
+    "searchTools function exists in src/lib/api.ts",
+    "searchTools uses supabase.rpc('search_tools', {...})",
+    "When ?q=<query> present, searchTools is called instead of classify",
+    "Results displayed in same ToolCard grid as before",
+    "Error handling shows searchError when search fails",
+    "Retry button calls searchTools again for keyword search",
+    "No lint errors when running pnpm lint",
+    "pnpm build succeeds"
+  ],
+  "checks": [
+    {
+      "name": "Function exists",
+      "command": "grep -r 'export async function searchTools' app/frontend/src/lib/api.ts",
+      "expected": "searchTools function found"
+    },
+    {
+      "name": "Uses correct RPC",
+      "command": "grep -n 'supabase.rpc.*search_tools' app/frontend/src/lib/api.ts",
+      "expected": "RPC call found with correct parameters"
+    },
+    {
+      "name": "State defined",
+      "command": "grep -n 'searchResults\\|searchLoading\\|searchError' app/frontend/src/pages/Results.tsx",
+      "expected": "All search state variables present"
+    },
+    {
+      "name": "Effect triggers search",
+      "command": "grep -n 'searchTools.*query.*pricingParam' app/frontend/src/pages/Results.tsx",
+      "expected": "Effect calls searchTools with correct parameters"
+    },
+    {
+      "name": "Render search results",
+      "command": "grep -n 'isKeywordSearch.*searchResults' app/frontend/src/pages/Results.tsx",
+      "expected": "Search results rendered in UI"
+    },
+    {
+      "name": "Build passes",
+      "command": "cd app/frontend && pnpm build",
+      "expected": "Build completes without errors"
+    },
+    {
+      "name": "Lint passes",
+      "command": "cd app/frontend && pnpm lint",
+      "expected": "No lint errors"
+    }
+  ],
+  "notes": [
+    "This task implements a working keyword search feature",
+    "The old AI classification system remains untouched (isStackMode = false for now)",
+    "Race condition risk is low because navigation is on-click, not live",
+    "Future improvement: add timeout handling on searchTools",
+    "Search results use same ToolCard component, no UI changes needed"
+  ],
+  "related_files": {
+    "frontend": {
+      "api": "app/frontend/src/api/searchTools",
+      "lib": "app/frontend/src/lib/api.ts",
+      "pages": "app/frontend/src/pages/Results.tsx"
+    },
+    "supabase": {
+      "function": "search_tools (RPC)",
+      "parameters": ["search_query", "pricing_filter", "category_filter", "limit_count"]
+    }
+  }
+}

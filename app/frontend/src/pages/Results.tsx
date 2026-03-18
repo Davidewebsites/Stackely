@@ -162,7 +162,9 @@ export default function Results() {
         })
         .finally(() => setSearchLoading(false));
     } else {
-      query && classify(query, pricingParam);
+      if (query) {
+        classify(query, pricingParam);
+      }
     }
   };
 

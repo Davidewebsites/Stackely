@@ -38,3 +38,5 @@ out/
 __pycache__/
 *.py[cod]
 *$py.class
+app/backend/body.json
+app/backend/*.db

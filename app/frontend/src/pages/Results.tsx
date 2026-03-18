@@ -31,6 +31,22 @@ import StackelyLogo from '@/components/StackelyLogo';
 import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 
+interface StackResponse {
+  goal: string;
+  stack: Array<{
+    tool: string;
+    role: string;
+    why: string;
+  }>;
+  comparison: Array<{
+    toolA: string;
+    toolB: string;
+    winner: string;
+    reason: string;
+  }>;
+  notes: string[];
+}
+
 export default function Results() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -50,6 +66,8 @@ export default function Results() {
   const [skillFilter, setSkillFilter] = useState('all');
   const [linkCopied, setLinkCopied] = useState(false);
   const [stackSaved, setStackSaved] = useState(false);
+  const [stackData, setStackData] = useState<StackResponse | null>(null);
+  const [stackLoading, setStackLoading] = useState(false);
 
   useEffect(() => {
     if (categoryParam && !query) {
@@ -63,20 +81,28 @@ export default function Results() {
   useEffect(() => {
     if (!query) return;
 
-    setSearchLoading(true);
+    // Clear stale stack data before new request
+    setStackData(null);
+    setStackLoading(true);
     setSearchError(null);
 
-    searchTools(query, pricingParam, categoryParam || undefined, 24)
-      .then((data) => {
-        setSearchResults(data);
+    // Call stack recommendation endpoint directly for goal-based searches
+    fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal: query }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
       })
+      .then((stack) => setStackData(stack))
       .catch((err) => {
-        console.error(err);
-        setSearchError('Search failed');
-        setSearchResults([]);
+        console.error('Stack recommendation failed:', err);
+        setSearchError('Failed to generate stack recommendation');
       })
-      .finally(() => setSearchLoading(false));
-  }, [query, pricingParam, categoryParam]);
+      .finally(() => setStackLoading(false));
+  }, [query]);
 
   const isDirectBrowse = !!categoryParam && !query;
   const isKeywordSearch = !!query;
@@ -148,23 +174,33 @@ export default function Results() {
   };
 
   const handleRetry = () => {
-    if (isKeywordSearch) {
-      setSearchLoading(true);
+    if (query) {
+      // Clear stale stack data before retry
+      setStackData(null);
+      setStackLoading(true);
       setSearchError(null);
-      searchTools(query, pricingParam, categoryParam || undefined, 24)
-        .then((data) => {
-          setSearchResults(data);
+
+      // Retry stack recommendation
+      fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: query }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
         })
+        .then((stack) => setStackData(stack))
         .catch((err) => {
-          console.error(err);
-          setSearchError('Search failed');
-          setSearchResults([]);
+          console.error('Stack recommendation retry failed:', err);
+          setSearchError('Failed to generate stack recommendation');
         })
-        .finally(() => setSearchLoading(false));
-    } else {
-      if (query) {
-        classify(query, pricingParam);
-      }
+        .finally(() => setStackLoading(false));
+    } else if (categoryParam) {
+      setDirectLoading(true);
+      fetchToolsByCategories([categoryParam])
+        .then(setDirectTools)
+        .finally(() => setDirectLoading(false));
     }
   };
 
@@ -258,7 +294,7 @@ export default function Results() {
         {!loading && !error && (
           <>
             {/* Stack Mode */}
-            {isStackMode && classification && (
+            {isStackMode && stackData && (
               <>
                 {/* Header */}
                 <div className="mb-14">
@@ -277,23 +313,8 @@ export default function Results() {
                   </div>
 
                   <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-4">
-                    {classification.goal}
+                    {stackData.goal}
                   </h1>
-                  <p className="text-[16px] text-slate-500 leading-relaxed mb-5 max-w-4xl">{classification.reasoning}</p>
-
-                  {classification.use_cases && classification.use_cases.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {classification.use_cases.map((uc) => (
-                        <Badge
-                          key={uc}
-                          variant="outline"
-                          className="text-[11px] text-slate-500 border-slate-200 font-normal px-2.5 py-1"
-                        >
-                          {uc.replace(/_/g, ' ')}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Stack header with actions */}
@@ -303,7 +324,7 @@ export default function Results() {
                       Recommended stack
                     </h2>
                     <p className="text-[13px] text-slate-400 mt-1">
-                      {stack.length} tool{stack.length !== 1 ? 's' : ''} — one per role
+                      {stackData.stack.length} tool{stackData.stack.length !== 1 ? 's' : ''} — one per role
                     </p>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -328,7 +349,7 @@ export default function Results() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => query && classify(query, pricingParam)}
+                      onClick={handleRetry}
                       className="h-9 text-[12px] text-slate-500 hover:text-[#2F80ED] hover:border-[#2F80ED]/40 border-slate-200 shadow-none px-4"
                     >
                       <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
@@ -339,79 +360,41 @@ export default function Results() {
 
                 {/* Stack cards */}
                 <div className="space-y-3.5">
-                  {stack.map((tool, index) => (
-                    <StackCard key={tool.id} tool={tool} position={index + 1} />
+                  {stackData.stack.map((item, index) => (
+                    <div
+                      key={item.tool}
+                      className="group relative flex gap-5 p-6 rounded-xl border border-slate-200 bg-white hover:border-[#2F80ED]/40 hover:bg-blue-50/10 transition-all"
+                    >
+                      {/* Position */}
+                      <div
+                        className="flex-shrink-0 w-9 h-9 rounded-lg text-white flex items-center justify-center text-[13px] font-semibold"
+                        style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                      >
+                        {index + 1}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Top row: role */}
+                        <div className="flex items-center gap-2 mb-2.5">
+                          <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
+                            {item.role}
+                          </span>
+                        </div>
+
+                        {/* Tool name */}
+                        <h3 className="text-[16px] font-semibold text-slate-900 mb-2">
+                          {item.tool}
+                        </h3>
+
+                        {/* Why selected */}
+                        <p className="text-[14px] text-slate-600 leading-relaxed">
+                          {item.why}
+                        </p>
+                      </div>
+                    </div>
                   ))}
                 </div>
-
-                {/* AI Accelerator Section */}
-                {aiAccelerators.length > 0 && (
-                  <div className="mt-16">
-                    <div className="flex items-center gap-3 mb-7">
-                      <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
-                        <Sparkles className="w-5 h-5 text-violet-600" />
-                      </div>
-                      <div>
-                        <h2 className="text-[20px] font-semibold text-slate-900">
-                          AI tools that can accelerate this stack
-                        </h2>
-                        <p className="text-[13px] text-slate-400 mt-0.5">
-                          AI-powered tools that can speed up your workflow
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3.5">
-                      {aiAccelerators.map((tool) => (
-                        <div
-                          key={tool.id}
-                          className="group flex items-start gap-4 p-6 rounded-xl border border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/20 transition-all cursor-pointer"
-                          onClick={() => navigate(`/tools/${tool.slug}`)}
-                        >
-                          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <h3 className="text-[16px] font-semibold text-slate-900 group-hover:text-violet-700 transition-colors">
-                                {tool.name}
-                              </h3>
-                              <Badge className="text-[10px] bg-violet-100 text-violet-700 border-violet-200 font-medium">
-                                {tool.tool_type === 'hybrid' ? 'AI-enhanced' : 'AI'}
-                              </Badge>
-                            </div>
-                            <p className="text-[14px] text-slate-500 leading-relaxed">
-                              {tool.use_it_for}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Alternative Tools Section */}
-                {alternatives.length > 0 && (
-                  <div className="mt-16">
-                    <div className="flex items-center gap-3 mb-7">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                        <Layers className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div>
-                        <h2 className="text-[20px] font-semibold text-slate-900">
-                          Alternative tools
-                        </h2>
-                        <p className="text-[13px] text-slate-400 mt-0.5">
-                          Other relevant tools for this goal
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {alternatives.map((tool) => (
-                        <ToolCard key={tool.id} tool={tool} relevanceScore={tool.relevance_score} />
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Share this stack */}
                 <div className="mt-16 p-7 rounded-xl border border-[#2F80ED]/20 bg-blue-50/30">
@@ -587,6 +570,54 @@ export default function Results() {
                   )
                 )}
               </>
+            )}
+
+            {/* Stack Recommendation Section */}
+            {stackData && (
+              <div className="mt-16">
+                <div className="flex items-center gap-3 mb-7">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Layers className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-[20px] font-semibold text-slate-900">
+                      Recommended Stack
+                    </h2>
+                    <p className="text-[13px] text-slate-400 mt-0.5">
+                      {stackData.stack.length} tool{stackData.stack.length !== 1 ? 's' : ''} for your goal
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3.5">
+                  {stackData.stack.map((item, index) => (
+                    <div
+                      key={item.tool}
+                      className="group relative flex gap-5 p-6 rounded-xl border border-slate-200 bg-white"
+                    >
+                      <div
+                        className="flex-shrink-0 w-9 h-9 rounded-lg text-white flex items-center justify-center text-[13px] font-semibold"
+                        style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                      >
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2.5">
+                          <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
+                            {item.role}
+                          </span>
+                        </div>
+                        <h3 className="text-[16px] font-semibold text-slate-900 mb-2">
+                          {item.tool}
+                        </h3>
+                        <p className="text-[14px] text-slate-600 leading-relaxed">
+                          {item.why}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* No results fallback */}

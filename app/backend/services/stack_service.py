@@ -178,6 +178,29 @@ class StackService:
 
         return intent_category_map.get(intent, ["landing_pages", "copywriting"])
 
+    def _extract_logo_url(self, tool: Dict[str, Any]) -> str | None:
+        """Return the most reliable logo URL for a tool."""
+        # Prefer explicit fields, fall back to Clearbit using website domain.
+        logo_url = tool.get("logo_url") or tool.get("logo")
+        if logo_url:
+            return logo_url
+
+        website = tool.get("website_url")
+        if not website:
+            return None
+
+        try:
+            from urllib.parse import urlparse
+
+            hostname = urlparse(website).hostname or ""
+            hostname = hostname.lstrip("www.")
+            if hostname:
+                return f"https://logo.clearbit.com/{hostname}"
+        except Exception:
+            pass
+
+        return None
+
     def _calculate_relevance_score(self, tool: Dict[str, Any], intent: str) -> float:
         """Calculate relevance-adjusted score for tool ranking."""
         base_score = tool.get("internal_score") or 0
@@ -250,7 +273,10 @@ class StackService:
                     "category": "automation",
                     "use_cases": "project management, documentation, knowledge base",
                     "target_audience": "teams and individuals",
-                    "recommended_for": "organizing work and information"
+                    "recommended_for": "organizing work and information",
+                    "website_url": "https://www.notion.so",
+                    "logo_url": "https://logo.clearbit.com/notion.so",
+                    "logo": "https://logo.clearbit.com/notion.so"
                 },
                 {
                     "name": "Zapier",
@@ -259,7 +285,10 @@ class StackService:
                     "category": "automation",
                     "use_cases": "workflow automation, app integration, process optimization",
                     "target_audience": "businesses and teams",
-                    "recommended_for": "connecting tools and automating processes"
+                    "recommended_for": "connecting tools and automating processes",
+                    "website_url": "https://zapier.com",
+                    "logo_url": "https://logo.clearbit.com/zapier.com",
+                    "logo": "https://logo.clearbit.com/zapier.com"
                 },
                 {
                     "name": "Figma",
@@ -268,7 +297,10 @@ class StackService:
                     "category": "design",
                     "use_cases": "ui design, prototyping, collaboration",
                     "target_audience": "designers and teams",
-                    "recommended_for": "creating visual designs and prototypes"
+                    "recommended_for": "creating visual designs and prototypes",
+                    "website_url": "https://www.figma.com",
+                    "logo_url": "https://logo.clearbit.com/figma.com",
+                    "logo": "https://logo.clearbit.com/figma.com"
                 },
             ]
             tools = (tools + fallback_tools)[:3]
@@ -337,7 +369,15 @@ class StackService:
         for idx, tool in enumerate(selected_tools[:3]):
             role = self._get_role_for_tool(tool, intent, idx)
             why = self._generate_why_explanation(tool, intent, role)
-            stack.append({"tool": tool.get("name"), "role": role, "why": why})
+            logo_url = self._extract_logo_url(tool)
+            stack.append({
+                "tool": tool.get("name"),
+                "role": role,
+                "why": why,
+                "logo_url": logo_url,
+                "logo": tool.get("logo") or logo_url,
+                "website_url": tool.get("website_url"),
+            })
 
         return stack
 

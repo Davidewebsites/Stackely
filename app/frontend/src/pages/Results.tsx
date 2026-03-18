@@ -37,6 +37,7 @@ interface StackResponse {
     tool: string;
     role: string;
     why: string;
+    logo_url?: string;
   }>;
   comparison: Array<{
     toolA: string;
@@ -49,19 +50,28 @@ interface StackResponse {
 
 // Helper function to classify query mode
 function classifyQueryMode(query: string): 'stack' | 'search' {
-  const goalVerbs = ['build', 'create', 'automate', 'launch', 'start', 'improve', 'set up', 'grow', 'develop', 'manage', 'run', 'setup'];
   const lowerQuery = query.toLowerCase();
-  
+
+  // Check for tool discovery keywords - force search mode
+  const discoveryKeywords = ['best', 'top', 'tools', 'software', 'platforms'];
+  const isToolDiscovery = discoveryKeywords.some(keyword => lowerQuery.includes(keyword));
+
+  if (isToolDiscovery) {
+    return 'search';
+  }
+
+  const goalVerbs = ['build', 'create', 'automate', 'launch', 'start', 'improve', 'set up', 'grow', 'develop', 'manage', 'run', 'setup'];
+
   // Check for goal verbs
   const hasGoalVerb = goalVerbs.some(verb => lowerQuery.includes(verb));
-  
+
   // Check for longer goal-style sentences (more than 3 words or contains "how to", "i want", etc.)
-  const isGoalStyle = lowerQuery.split(' ').length > 3 || 
-                     lowerQuery.includes('how to') || 
-                     lowerQuery.includes('i want') || 
+  const isGoalStyle = lowerQuery.split(' ').length > 3 ||
+                     lowerQuery.includes('how to') ||
+                     lowerQuery.includes('i want') ||
                      lowerQuery.includes('i need') ||
                      lowerQuery.includes('help me');
-  
+
   return hasGoalVerb || isGoalStyle ? 'stack' : 'search';
 }
 
@@ -140,8 +150,8 @@ export default function Results() {
           setSearchResults(data);
         })
         .catch((err) => {
-          console.error(err);
-          setSearchError('Search failed');
+          console.error('Search error:', err);
+          setSearchError(`Search failed: ${err.message || 'Unknown error'}`);
           setSearchResults([]);
         })
         .finally(() => setSearchLoading(false));
@@ -510,14 +520,24 @@ export default function Results() {
                         {index + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2.5">
-                          <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
-                            {item.role}
-                          </span>
+                        <div className="flex items-center gap-3 mb-2.5">
+                          <ToolLogo
+                            logoUrl={item.logo_url || item.logo}
+                            websiteUrl={item.website_url}
+                            toolName={item.tool}
+                            size={36}
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-2.5">
+                              <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
+                                {item.role}
+                              </span>
+                            </div>
+                            <h3 className="text-[16px] font-semibold text-slate-900 mb-2 truncate">
+                              {item.tool}
+                            </h3>
+                          </div>
                         </div>
-                        <h3 className="text-[16px] font-semibold text-slate-900 mb-2">
-                          {item.tool}
-                        </h3>
                         <p className="text-[14px] text-slate-600 leading-relaxed">
                           {item.why}
                         </p>

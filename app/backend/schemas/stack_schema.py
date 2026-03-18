@@ -17,6 +17,9 @@ class StackTool(BaseModel):
     tool: str = Field(..., description="Tool name")
     role: str = Field(..., description="Role of the tool in the suggested stack")
     why: str = Field(..., description="Why this tool is recommended")
+    logo_url: str | None = Field(None, description="Optional URL for the tool logo")
+    logo: str | None = Field(None, description="Optional logo URL (legacy / alternate field)")
+    website_url: str | None = Field(None, description="Optional tool website URL, used for logo fallbacks")
 
 
 class StackComparison(BaseModel):

@@ -47,6 +47,24 @@ interface StackResponse {
   notes: string[];
 }
 
+// Helper function to classify query mode
+function classifyQueryMode(query: string): 'stack' | 'search' {
+  const goalVerbs = ['build', 'create', 'automate', 'launch', 'start', 'improve', 'set up', 'grow', 'develop', 'manage', 'run', 'setup'];
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for goal verbs
+  const hasGoalVerb = goalVerbs.some(verb => lowerQuery.includes(verb));
+  
+  // Check for longer goal-style sentences (more than 3 words or contains "how to", "i want", etc.)
+  const isGoalStyle = lowerQuery.split(' ').length > 3 || 
+                     lowerQuery.includes('how to') || 
+                     lowerQuery.includes('i want') || 
+                     lowerQuery.includes('i need') ||
+                     lowerQuery.includes('help me');
+  
+  return hasGoalVerb || isGoalStyle ? 'stack' : 'search';
+}
+
 export default function Results() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -68,6 +86,7 @@ export default function Results() {
   const [stackSaved, setStackSaved] = useState(false);
   const [stackData, setStackData] = useState<StackResponse | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
+  const [queryMode, setQueryMode] = useState<'stack' | 'search'>('search');
 
   useEffect(() => {
     if (categoryParam && !query) {
@@ -81,33 +100,58 @@ export default function Results() {
   useEffect(() => {
     if (!query) return;
 
-    // Clear stale stack data before new request
-    setStackData(null);
-    setStackLoading(true);
-    setSearchError(null);
+    const mode = classifyQueryMode(query);
+    setQueryMode(mode);
 
-    // Call stack recommendation endpoint directly for goal-based searches
-    fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal: query }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
+    // Clear stale state when switching modes
+    if (mode === 'stack') {
+      setStackData(null);
+      setSearchResults([]);
+      setSearchLoading(false);
+      setSearchError(null);
+      setStackLoading(true);
+
+      // Call stack recommendation endpoint
+      fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: query }),
       })
-      .then((stack) => setStackData(stack))
-      .catch((err) => {
-        console.error('Stack recommendation failed:', err);
-        setSearchError('Failed to generate stack recommendation');
-      })
-      .finally(() => setStackLoading(false));
-  }, [query]);
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((stack) => setStackData(stack))
+        .catch((err) => {
+          console.error('Stack recommendation failed:', err);
+          setSearchError('Failed to generate stack recommendation');
+        })
+        .finally(() => setStackLoading(false));
+    } else {
+      // Search mode - use existing tool search flow
+      setSearchResults([]);
+      setStackData(null);
+      setStackLoading(false);
+      setSearchError(null);
+      setSearchLoading(true);
+
+      searchTools(query, pricingParam, categoryParam || undefined, 24)
+        .then((data) => {
+          setSearchResults(data);
+        })
+        .catch((err) => {
+          console.error(err);
+          setSearchError('Search failed');
+          setSearchResults([]);
+        })
+        .finally(() => setSearchLoading(false));
+    }
+  }, [query, pricingParam, categoryParam]);
 
   const isDirectBrowse = !!categoryParam && !query;
-  const isKeywordSearch = !!query;
-  const isStackMode = false;
-  const loading = isDirectBrowse ? directLoading : isKeywordSearch ? searchLoading : isLoading;
+  const isKeywordSearch = !!query && queryMode === 'search';
+  const isStackMode = !!query && queryMode === 'stack';
+  const loading = isDirectBrowse ? directLoading : isStackMode ? stackLoading : searchLoading;
 
   const activePricingOption = PRICING_OPTIONS.find((o) => o.id === activePricing);
 
@@ -175,27 +219,43 @@ export default function Results() {
 
   const handleRetry = () => {
     if (query) {
-      // Clear stale stack data before retry
-      setStackData(null);
-      setStackLoading(true);
-      setSearchError(null);
+      if (queryMode === 'stack') {
+        // Clear stale stack data before retry
+        setStackData(null);
+        setStackLoading(true);
+        setSearchError(null);
 
-      // Retry stack recommendation
-      fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: query }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
+        // Retry stack recommendation
+        fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal: query }),
         })
-        .then((stack) => setStackData(stack))
-        .catch((err) => {
-          console.error('Stack recommendation retry failed:', err);
-          setSearchError('Failed to generate stack recommendation');
-        })
-        .finally(() => setStackLoading(false));
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          })
+          .then((stack) => setStackData(stack))
+          .catch((err) => {
+            console.error('Stack recommendation retry failed:', err);
+            setSearchError('Failed to generate stack recommendation');
+          })
+          .finally(() => setStackLoading(false));
+      } else {
+        // Retry search
+        setSearchLoading(true);
+        setSearchError(null);
+        searchTools(query, pricingParam, categoryParam || undefined, 24)
+          .then((data) => {
+            setSearchResults(data);
+          })
+          .catch((err) => {
+            console.error(err);
+            setSearchError('Search failed');
+            setSearchResults([]);
+          })
+          .finally(() => setSearchLoading(false));
+      }
     } else if (categoryParam) {
       setDirectLoading(true);
       fetchToolsByCategories([categoryParam])
@@ -238,29 +298,40 @@ export default function Results() {
       </header>
 
       <div className="max-w-7xl mx-auto px-8 py-14 relative">
+        {/* Mode indicator */}
+        {query && (
+          <div className="mb-6 flex items-center gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
+              {queryMode === 'stack' ? 'AI Stack Mode' : 'Tool Search Mode'}
+            </span>
+            <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-blue-500' : 'bg-green-500'}`} />
+          </div>
+        )}
         {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-36">
             <Loader2 className="w-6 h-6 animate-spin mb-5" style={{ color: '#2F80ED' }} />
             <h2 className="text-[18px] font-medium text-slate-900 mb-1.5">
-              {isDirectBrowse ? 'Loading tools...' : 'Building your stack'}
+              {isDirectBrowse ? 'Loading tools...' : isStackMode ? 'Building your stack' : 'Searching tools'}
             </h2>
             <p className="text-[14px] text-slate-500">
               {isDirectBrowse
                 ? 'Fetching tools from the database'
-                : 'Stackely is analyzing your goal and selecting the best tools'}
+                : isStackMode
+                ? 'Stackely is analyzing your goal and selecting the best tools'
+                : 'Finding the most relevant tools for your query'}
             </p>
           </div>
         )}
 
         {/* Error */}
-        {(error || (isKeywordSearch && searchError)) && !loading && (
+        {(error || searchError) && !loading && (
           <div className="flex flex-col items-center justify-center py-36">
             <div className="w-14 h-14 rounded-xl bg-red-50 flex items-center justify-center mb-5">
               <AlertCircle className="w-6 h-6 text-red-500" />
             </div>
             <h2 className="text-[18px] font-medium text-slate-900 mb-1.5">Something went wrong</h2>
-            <p className="text-[14px] text-slate-500 mb-7 text-center max-w-md">{isKeywordSearch && searchError ? searchError : error}</p>
+            <p className="text-[14px] text-slate-500 mb-7 text-center max-w-md">{searchError || error}</p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -293,171 +364,8 @@ export default function Results() {
         {/* Results */}
         {!loading && !error && (
           <>
-            {/* Stack Mode */}
-            {isStackMode && stackData && (
-              <>
-                {/* Header */}
-                <div className="mb-14">
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className="text-[11px] font-medium uppercase tracking-widest" style={{ color: '#2F80ED' }}>
-                      AI-curated stack
-                    </span>
-                    {activePricingOption && (
-                      <>
-                        <span className="text-slate-200">·</span>
-                        <span className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">
-                          {activePricingOption.label}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-4">
-                    {stackData.goal}
-                  </h1>
-                </div>
-
-                {/* Stack header with actions */}
-                <div className="flex items-center justify-between mb-7">
-                  <div>
-                    <h2 className="text-[20px] font-semibold text-slate-900">
-                      Recommended stack
-                    </h2>
-                    <p className="text-[13px] text-slate-400 mt-1">
-                      {stackData.stack.length} tool{stackData.stack.length !== 1 ? 's' : ''} — one per role
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSaveStack}
-                      className="h-9 text-[12px] text-slate-500 hover:text-[#2F80ED] hover:border-[#2F80ED]/40 border-slate-200 shadow-none px-4"
-                    >
-                      {stackSaved ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-500" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <Bookmark className="w-3.5 h-3.5 mr-1.5" />
-                          Save stack
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRetry}
-                      className="h-9 text-[12px] text-slate-500 hover:text-[#2F80ED] hover:border-[#2F80ED]/40 border-slate-200 shadow-none px-4"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                      Regenerate
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Stack cards */}
-                <div className="space-y-3.5">
-                  {stackData.stack.map((item, index) => (
-                    <div
-                      key={item.tool}
-                      className="group relative flex gap-5 p-6 rounded-xl border border-slate-200 bg-white hover:border-[#2F80ED]/40 hover:bg-blue-50/10 transition-all"
-                    >
-                      {/* Position */}
-                      <div
-                        className="flex-shrink-0 w-9 h-9 rounded-lg text-white flex items-center justify-center text-[13px] font-semibold"
-                        style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
-                      >
-                        {index + 1}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        {/* Top row: role */}
-                        <div className="flex items-center gap-2 mb-2.5">
-                          <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
-                            {item.role}
-                          </span>
-                        </div>
-
-                        {/* Tool name */}
-                        <h3 className="text-[16px] font-semibold text-slate-900 mb-2">
-                          {item.tool}
-                        </h3>
-
-                        {/* Why selected */}
-                        <p className="text-[14px] text-slate-600 leading-relaxed">
-                          {item.why}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Share this stack */}
-                <div className="mt-16 p-7 rounded-xl border border-[#2F80ED]/20 bg-blue-50/30">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2.5">
-                      <Share2 className="w-5 h-5" style={{ color: '#2F80ED' }} />
-                      <h3 className="text-[16px] font-semibold text-slate-900">Share this stack</h3>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleShareStack}
-                      className="h-9 text-[12px] border-[#2F80ED]/30 text-[#2F80ED] hover:bg-blue-100 hover:border-[#2F80ED]/50 shadow-none px-4"
-                    >
-                      {linkCopied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-500" />
-                          Link copied
-                        </>
-                      ) : (
-                        <>
-                          <Link2 className="w-3.5 h-3.5 mr-1.5" />
-                          Copy stack link
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  <p className="text-[14px] text-slate-500 leading-relaxed mb-4">
-                    This {stack.length}-tool stack covers{' '}
-                    {stack.map((t) => t.role).join(', ')}. Each tool was selected as the
-                    highest-ranked option for its role based on your goal
-                    {activePricingOption && activePricing !== 'any'
-                      ? ` and "${activePricingOption.label}" preference`
-                      : ''}.
-                    {aiAccelerators.length > 0 &&
-                      ` Plus ${aiAccelerators.length} AI tool${aiAccelerators.length !== 1 ? 's' : ''} to accelerate your workflow.`}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {stack.map((t) => (
-                      <span
-                        key={t.id}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white text-[12px] font-medium text-slate-700 border border-slate-200"
-                      >
-                        {t.name}
-                      </span>
-                    ))}
-                    {aiAccelerators.map((t) => (
-                      <span
-                        key={t.id}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-50 text-[12px] font-medium text-violet-700 border border-violet-200"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        {t.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
             {/* Keyword Search Mode */}
-            {isKeywordSearch && !isStackMode && (
+            {isKeywordSearch && (
               <>
                 <div className="mb-14">
                   <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-4">
@@ -573,7 +481,7 @@ export default function Results() {
             )}
 
             {/* Stack Recommendation Section */}
-            {stackData && (
+            {queryMode === 'stack' && stackData && (
               <div className="mt-16">
                 <div className="flex items-center gap-3 mb-7">
                   <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
@@ -617,11 +525,47 @@ export default function Results() {
                     </div>
                   ))}
                 </div>
+
+                {/* Comparison Section */}
+                {stackData.comparison && stackData.comparison.length > 0 && (
+                  <div className="mt-12">
+                    <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Tool Comparisons</h3>
+                    <div className="space-y-4">
+                      {stackData.comparison.map((comp, index) => (
+                        <div key={index} className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[12px] font-medium text-slate-600">
+                              {comp.toolA} vs {comp.toolB}
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">
+                              Winner: {comp.winner}
+                            </Badge>
+                          </div>
+                          <p className="text-[14px] text-slate-700">{comp.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes Section */}
+                {stackData.notes && stackData.notes.length > 0 && (
+                  <div className="mt-12">
+                    <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Additional Notes</h3>
+                    <div className="space-y-3">
+                      {stackData.notes.map((note, index) => (
+                        <div key={index} className="p-4 rounded-lg border border-amber-200 bg-amber-50">
+                          <p className="text-[14px] text-amber-800">{note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* No results fallback */}
-            {!isDirectBrowse && !isStackMode && !loading && !error && (
+            {!isDirectBrowse && !isKeywordSearch && !isStackMode && !loading && !error && (
               <div className="text-center py-24">
                 <p className="text-[15px] text-slate-500 mb-5">No matching tools found. Try a different goal.</p>
                 <Button

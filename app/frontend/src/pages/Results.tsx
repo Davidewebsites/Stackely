@@ -322,6 +322,32 @@ export default function Results() {
     });
   }, [stackData, catalogTools]);
 
+  const stackPricingLabel = useMemo(() => {
+    const option = PRICING_OPTIONS.find((o) => o.id === pricingParam);
+    return option?.label || 'Best options regardless of price';
+  }, [pricingParam]);
+
+  const cleanedStackNotes = useMemo(() => {
+    const rawNotes = (stackData?.notes || [])
+      .map((note) => note.trim())
+      .filter(Boolean);
+
+    const filtered = rawNotes.filter((note) => {
+      const lower = note.toLowerCase();
+      return (
+        !lower.includes('generated from active supabase') &&
+        !lower.includes('pricing mode:') &&
+        !lower.includes('stack filtered to:') &&
+        !lower.includes('all pricing tiers considered') &&
+        !lower.includes('recommendations are generated from active supabase')
+      );
+    });
+
+    const deduped = Array.from(new Set(filtered));
+    const source = deduped.length > 0 ? deduped : rawNotes;
+    return source.slice(0, 3);
+  }, [stackData]);
+
   const handleShareStack = async () => {
     if (!query || stack.length === 0) return;
     const stackId = saveStack(
@@ -679,24 +705,85 @@ export default function Results() {
             {/* Stack Recommendation Section */}
             {queryMode === 'stack' && stackData && (
               <div className="mt-16">
-                <div className="flex items-center gap-3 mb-7">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <Layers className="w-5 h-5 text-blue-600" />
+                <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <Layers className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-[24px] font-semibold text-slate-900 tracking-tight">
+                        Stack for: {query}
+                      </h2>
+                      <p className="text-[13px] text-slate-500 mt-0.5">
+                        Workflow recommendation with {stackData.stack.length} structured step{stackData.stack.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-[20px] font-semibold text-slate-900">
-                      Recommended Stack
-                    </h2>
-                    <p className="text-[13px] text-slate-400 mt-0.5">
-                      {stackData.stack.length} tool{stackData.stack.length !== 1 ? 's' : ''} for your goal
-                    </p>
+
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <Badge variant="outline" className="text-[11px] border-slate-300 bg-white">
+                      Pricing: {stackPricingLabel}
+                    </Badge>
+                    <Badge variant="outline" className="text-[11px] border-blue-200 text-blue-700 bg-blue-50">
+                      Workflow Mode
+                    </Badge>
+                  </div>
+
+                  <p className="text-[14px] text-slate-600">
+                    This stack is ordered as a workflow so each tool plays a clear role from setup to optimization.
+                  </p>
+                </div>
+
+                <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    {['Setup', 'Automate', 'Optimize'].map((label, index) => (
+                      <div key={label} className="flex items-center flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold text-white"
+                            style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                          >
+                            {index + 1}
+                          </span>
+                          <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-700">{label}</span>
+                        </div>
+                        {index < 2 && <div className="h-px bg-slate-200 flex-1 ml-3" />}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-3.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {aiStackItems.map((item) => (
-                      <div key={`${item.tool.id}-${item.rank}`} className="space-y-1.5">
+                <div className="space-y-5">
+                  {aiStackItems.map((item, index) => (
+                    <div key={`${item.tool.id}-${item.rank}`} className="relative pl-0 sm:pl-16">
+                      <div className="hidden sm:flex absolute left-0 top-2 flex-col items-center">
+                        <span
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-[12px] font-semibold"
+                          style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                        >
+                          {index + 1}
+                        </span>
+                        {index < aiStackItems.length - 1 && <span className="w-px h-[140px] bg-slate-200 mt-2" />}
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="sm:hidden inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-[11px] font-semibold"
+                              style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                            >
+                              {index + 1}
+                            </span>
+                            <span className="text-[12px] font-semibold uppercase tracking-wide text-[#2F80ED]">
+                              Step {index + 1}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50">
+                            {item.role}
+                          </Badge>
+                        </div>
+
                         <ToolCard
                           tool={item.tool}
                           isSelectedForCompare={selectedForCompare.some((t) => t.id === item.tool.id)}
@@ -706,28 +793,17 @@ export default function Results() {
                           disableNavigation={item.isSynthesized}
                         />
 
-                        <div className="px-1 pb-0.5">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span
-                              className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-md text-white text-[10px] font-semibold"
-                              style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
-                            >
-                              {item.rank}
-                            </span>
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-[#2F80ED]">
-                              {item.role}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">{item.why}</p>
+                        <div className="pt-3 px-1">
+                          <p className="text-[13px] text-slate-600 leading-relaxed">{item.why}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Comparison Section */}
                 {stackData.comparison && stackData.comparison.length > 0 && (
-                  <div className="mt-12">
+                  <div className="mt-12 pt-8 border-t border-slate-200">
                     <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Tool Comparisons</h3>
                     <div className="space-y-4">
                       {stackData.comparison.map((comp, index) => (
@@ -748,11 +824,11 @@ export default function Results() {
                 )}
 
                 {/* Notes Section */}
-                {stackData.notes && stackData.notes.length > 0 && (
-                  <div className="mt-12">
+                {cleanedStackNotes.length > 0 && (
+                  <div className="mt-12 pt-8 border-t border-slate-200">
                     <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Additional Notes</h3>
                     <div className="space-y-3">
-                      {stackData.notes.map((note, index) => (
+                      {cleanedStackNotes.map((note, index) => (
                         <div key={index} className="p-4 rounded-lg border border-amber-200 bg-amber-50">
                           <p className="text-[14px] text-amber-800">{note}</p>
                         </div>

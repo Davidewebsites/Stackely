@@ -26,7 +26,10 @@ interface ScoredTool {
   tool: Tool;
   score: number;
   slotCategory: string;
+  stage: WorkflowStage;
 }
+
+type WorkflowStage = 'acquire' | 'convert' | 'nurture' | 'analyze';
 
 interface WorkflowSlot {
   /** Semantic label shown in the UI */
@@ -35,6 +38,8 @@ interface WorkflowSlot {
   categories: string[];
   /** Optional extra context used in the "why" sentence */
   purpose: string;
+  /** Workflow stage covered by this slot */
+  stage: WorkflowStage;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,34 +120,34 @@ export function detectIntentFromGoal(goal: string): string {
  */
 export const WORKFLOW_BLUEPRINTS: Record<string, WorkflowSlot[]> = {
   creation: [
-    { role: 'Page Builder', categories: ['landing_pages', 'design'], purpose: 'build and publish your pages' },
-    { role: 'Copywriter', categories: ['copywriting', 'content'], purpose: 'craft compelling copy and messaging' },
-    { role: 'Analytics', categories: ['analytics', 'automation'], purpose: 'measure performance from day one' },
+    { role: 'Page Builder', categories: ['landing_pages', 'design'], purpose: 'build and publish your pages', stage: 'convert' },
+    { role: 'Copywriter', categories: ['copywriting', 'email_marketing'], purpose: 'craft compelling copy and messaging', stage: 'nurture' },
+    { role: 'Analytics', categories: ['analytics', 'automation'], purpose: 'measure performance from day one', stage: 'analyze' },
   ],
   marketing: [
-    { role: 'Traffic Engine', categories: ['ads', 'email_marketing', 'automation'], purpose: 'drive qualified traffic to your offer' },
-    { role: 'Conversion Layer', categories: ['landing_pages', 'copywriting'], purpose: 'turn visitors into leads or customers' },
-    { role: 'Measurement', categories: ['analytics', 'automation'], purpose: 'track ROI and optimise spend' },
+    { role: 'Traffic Engine', categories: ['ads', 'email_marketing', 'automation'], purpose: 'drive qualified traffic to your offer', stage: 'acquire' },
+    { role: 'Conversion Layer', categories: ['landing_pages', 'copywriting'], purpose: 'turn visitors into leads or customers', stage: 'convert' },
+    { role: 'Measurement', categories: ['analytics', 'automation'], purpose: 'track ROI and optimise spend', stage: 'analyze' },
   ],
   automation: [
-    { role: 'Orchestrator', categories: ['automation'], purpose: 'connect your apps and trigger actions automatically' },
-    { role: 'Data Destination', categories: ['analytics', 'email_marketing'], purpose: 'store and act on enriched data' },
-    { role: 'Content Layer', categories: ['copywriting', 'landing_pages'], purpose: 'surface automated outputs to users' },
+    { role: 'Orchestrator', categories: ['automation'], purpose: 'connect your apps and trigger actions automatically', stage: 'acquire' },
+    { role: 'Data Destination', categories: ['analytics', 'email_marketing'], purpose: 'store and act on enriched data', stage: 'nurture' },
+    { role: 'Content Layer', categories: ['copywriting', 'landing_pages'], purpose: 'surface automated outputs to users', stage: 'convert' },
   ],
   analytics: [
-    { role: 'Tracking Core', categories: ['analytics'], purpose: 'capture every meaningful event' },
-    { role: 'Automation Trigger', categories: ['automation', 'email_marketing'], purpose: 'act on data signals in real time' },
-    { role: 'Reporting Surface', categories: ['landing_pages', 'design'], purpose: 'present insights to your team' },
+    { role: 'Tracking Core', categories: ['analytics'], purpose: 'capture every meaningful event', stage: 'analyze' },
+    { role: 'Automation Trigger', categories: ['automation', 'email_marketing'], purpose: 'act on data signals in real time', stage: 'nurture' },
+    { role: 'Reporting Surface', categories: ['landing_pages', 'design'], purpose: 'present insights to your team', stage: 'convert' },
   ],
   content: [
-    { role: 'Writing Engine', categories: ['copywriting'], purpose: 'create high-quality content at scale' },
-    { role: 'Distribution', categories: ['email_marketing', 'automation'], purpose: 'publish and distribute to your audience' },
-    { role: 'Visual Layer', categories: ['design', 'video'], purpose: 'bring content to life with visuals' },
+    { role: 'Writing Engine', categories: ['copywriting'], purpose: 'create high-quality content at scale', stage: 'nurture' },
+    { role: 'Distribution', categories: ['email_marketing', 'automation'], purpose: 'publish and distribute to your audience', stage: 'acquire' },
+    { role: 'Visual Layer', categories: ['design', 'video'], purpose: 'bring content to life with visuals', stage: 'convert' },
   ],
   video: [
-    { role: 'Production Suite', categories: ['video'], purpose: 'record, edit and produce your video' },
-    { role: 'Script & Copy', categories: ['copywriting'], purpose: 'write scripts and on-screen text' },
-    { role: 'Distribution', categories: ['email_marketing', 'landing_pages', 'automation'], purpose: 'publish and promote finished content' },
+    { role: 'Production Suite', categories: ['video'], purpose: 'record, edit and produce your video', stage: 'convert' },
+    { role: 'Script & Copy', categories: ['copywriting'], purpose: 'write scripts and on-screen text', stage: 'nurture' },
+    { role: 'Distribution', categories: ['email_marketing', 'landing_pages', 'automation'], purpose: 'publish and promote finished content', stage: 'acquire' },
   ],
 };
 
@@ -156,6 +161,10 @@ function tokenize(value: string): string[] {
     .replace(/[^a-z0-9\s]+/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length >= 3);
+}
+
+function getPricingTier(model: string): number {
+  return model === 'free' ? 0 : model === 'freemium' ? 1 : 2;
 }
 
 /**
@@ -175,7 +184,9 @@ function scoreToolForSlot(
   tool: Tool,
   slot: WorkflowSlot,
   goalTokens: string[],
-  selectedCategories: Set<string>
+  selectedCategoriesCount: Map<string, number>,
+  coveredStages: Set<WorkflowStage>,
+  selectedPricingTiers: number[]
 ): number {
   let score = tool.internal_score || 0;
 
@@ -212,11 +223,21 @@ function scoreToolForSlot(
   // Popularity signal (scaled to max +5)
   score += Math.min((tool.popularity_score || 0) / 2, 5);
 
-  // Overlap penalty: penalise category already claimed by another slot selection
-  if (selectedCategories.has(cat)) score -= 30;
+  // Coverage bonus: reward stages not yet represented in the stack
+  if (!coveredStages.has(slot.stage)) score += 15;
 
-  // Coverage bonus: reward categories not yet represented
-  if (!selectedCategories.has(cat)) score += 15;
+  // Category overlap penalty: -25 per duplicate already selected
+  const duplicateCount = selectedCategoriesCount.get(cat) || 0;
+  if (duplicateCount > 0) {
+    score -= 25 * duplicateCount;
+  }
+
+  // Pricing inconsistency penalty: deviation from current stack average pricing tier
+  if (selectedPricingTiers.length > 0) {
+    const avgTier = selectedPricingTiers.reduce((acc, t) => acc + t, 0) / selectedPricingTiers.length;
+    const deviation = Math.abs(getPricingTier(tool.pricing_model) - avgTier);
+    score -= deviation * 10;
+  }
 
   return score;
 }
@@ -246,10 +267,13 @@ function fillBlueprint(
 ): ScoredTool[] {
   const goalTokens = tokenize(goal);
   const selectedIds = new Set<number>();
-  const selectedCategories = new Set<string>();
+  const selectedCategoriesCount = new Map<string, number>();
+  const coveredStages = new Set<WorkflowStage>();
+  const selectedPricingTiers: number[] = [];
   const result: ScoredTool[] = [];
 
-  for (const slot of blueprint) {
+  // Strict slot fill: process slots in defined order, one winner per slot, max 3 tools.
+  for (const slot of blueprint.slice(0, 3)) {
     // Candidates: tools whose category is in the slot's category list
     const candidates = tools.filter(
       (t) => slot.categories.includes(t.category) && !selectedIds.has(t.id)
@@ -260,14 +284,24 @@ function fillBlueprint(
     const scored = candidates
       .map((tool) => ({
         tool,
-        score: scoreToolForSlot(tool, slot, goalTokens, selectedCategories),
+        score: scoreToolForSlot(
+          tool,
+          slot,
+          goalTokens,
+          selectedCategoriesCount,
+          coveredStages,
+          selectedPricingTiers
+        ),
         slotCategory: tool.category,
+        stage: slot.stage,
       }))
       .sort((a, b) => b.score - a.score);
 
     const best = scored[0];
     selectedIds.add(best.tool.id);
-    selectedCategories.add(best.tool.category);
+    selectedCategoriesCount.set(best.tool.category, (selectedCategoriesCount.get(best.tool.category) || 0) + 1);
+    coveredStages.add(slot.stage);
+    selectedPricingTiers.push(getPricingTier(best.tool.pricing_model));
     result.push(best);
   }
 
@@ -279,33 +313,26 @@ function fillBlueprint(
 // ---------------------------------------------------------------------------
 
 function buildWhyText(tool: Tool, slot: WorkflowSlot): string {
-  // Prefer use_cases first, then short_description, then a generic fallback
-  const useCases = (tool.use_cases || '')
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const stagePhrase: Record<WorkflowStage, string> = {
+    acquire: 'capture layer',
+    convert: 'conversion layer',
+    nurture: 'nurture layer',
+    analyze: 'measurement layer',
+  };
 
-  const primaryUseCase = useCases[0];
+  const stageStep: Record<WorkflowStage, string> = {
+    acquire: 'before conversion and follow-up workflows begin',
+    convert: 'before lead nurturing and reporting loops take over',
+    nurture: 'after acquisition and before final performance analysis',
+    analyze: 'after acquisition, conversion, and nurturing signals are generated',
+  };
 
-  const base =
-    tool.short_description ||
-    tool.recommended_for ||
-    `A strong choice to ${slot.purpose}.`;
-
-  if (primaryUseCase) {
-    return `${base} Suited for: ${primaryUseCase}.`;
-  }
-
-  return base;
+  return `${tool.name} acts as the ${stagePhrase[slot.stage]} in the ${slot.role} role, enabling you to ${slot.purpose} ${stageStep[slot.stage]}.`;
 }
 
 // ---------------------------------------------------------------------------
 // Comparison builder
 // ---------------------------------------------------------------------------
-
-function getPricingTier(model: string): number {
-  return model === 'free' ? 0 : model === 'freemium' ? 1 : 2;
-}
 
 function buildComparison(
   selected: ScoredTool[]
@@ -330,43 +357,21 @@ function buildComparison(
   const aTool = a.tool;
   const bTool = b.tool;
 
-  // Build strategic reasoning
-  const factors: string[] = [];
+  // Required comparison factors
+  const scoreDelta = Math.abs(aScore - bScore).toFixed(1);
 
-  // Score differential
-  if (Math.abs(aScore - bScore) > 20) {
-    const stronger = aScore > bScore ? aTool.name : bTool.name;
-    factors.push(`${stronger} scores meaningfully higher on category fit and goal relevance`);
-  }
-
-  // Pricing
   const aTier = getPricingTier(aTool.pricing_model);
   const bTier = getPricingTier(bTool.pricing_model);
-  if (aTier !== bTier) {
-    const cheaper = aTier < bTier ? aTool.name : bTool.name;
-    factors.push(`${cheaper} has a lower pricing tier, reducing initial cost`);
-  }
+  const pricingDiff = aTier === bTier
+    ? 'Both tools are in the same pricing tier'
+    : `${aTier < bTier ? aTool.name : bTool.name} is in a lower pricing tier`;
 
-  // Beginner-friendly
-  if (aTool.beginner_friendly && !bTool.beginner_friendly) {
-    factors.push(`${aTool.name} is rated beginner-friendly, lowering the ramp-up time`);
-  } else if (bTool.beginner_friendly && !aTool.beginner_friendly) {
-    factors.push(`${bTool.name} is rated beginner-friendly, lowering the ramp-up time`);
-  }
-
-  // Internal score
-  const aInternal = aTool.internal_score || 0;
-  const bInternal = bTool.internal_score || 0;
-  if (Math.abs(aInternal - bInternal) > 10) {
-    const higher = aInternal >= bInternal ? aTool.name : bTool.name;
-    factors.push(`${higher} carries a higher internal quality score`);
-  }
+  const beginnerDiff = aTool.beginner_friendly === bTool.beginner_friendly
+    ? 'both are similar in beginner suitability'
+    : `${aTool.beginner_friendly ? aTool.name : bTool.name} is better suited for beginners`;
 
   const winner = aScore >= bScore ? aTool.name : bTool.name;
-  const reason =
-    factors.length > 0
-      ? factors.join('; ') + '.'
-      : `${winner} is recommended as the stronger choice for this goal based on overall fit.`;
+  const reason = `${winner} leads with a score delta of ${scoreDelta}; ${pricingDiff.toLowerCase()}; ${beginnerDiff}.`;
 
   return [{ toolA: aTool.name, toolB: bTool.name, winner, reason }];
 }
@@ -410,14 +415,21 @@ const INTENT_NOTE_TEMPLATES: Record<string, (goal: string) => string[]> = {
 
 function buildNotes(intent: string, goal: string, pricingPreference: PricingPreference): string[] {
   const templateFn = INTENT_NOTE_TEMPLATES[intent];
-  const intentNotes = templateFn ? templateFn(goal) : [`Goal: ${goal}`];
+  const intentNotes = templateFn
+    ? templateFn(goal)
+    : [
+        `Detected intent for "${goal}" is a compositional workflow build.`,
+        'Prioritize one tool per workflow stage to reduce stack overlap.',
+        'Review first-week data to rebalance category coverage as needed.',
+      ];
 
   const pricingNote =
     pricingPreference === 'any'
-      ? 'All pricing tiers considered — tools with free tiers are ranked favourably when scores are equal.'
+      ? 'Pricing mode: any tier; consistency penalty still favors coherent pricing across selected tools.'
       : `Stack filtered to: "${pricingPreference.replace(/_/g, ' ')}" pricing only.`;
 
-  return [...intentNotes, pricingNote];
+  // Keep max 3 notes while always including pricing guidance.
+  return [intentNotes[0], intentNotes[1], pricingNote];
 }
 
 // ---------------------------------------------------------------------------
@@ -451,8 +463,8 @@ export async function recommendStackFromGoal(
 
   const uniqueTools = dedupeByIdAndSlug(tools);
 
-  // Fill blueprint slots
-  const filledSlots = fillBlueprint(blueprint, uniqueTools, goal);
+  // Fill blueprint slots strictly and cap at 3 results.
+  const filledSlots = fillBlueprint(blueprint, uniqueTools, goal).slice(0, 3);
 
   // Build stack response items
   const stack: StackResponse['stack'] = filledSlots.map((entry, index) => {

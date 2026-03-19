@@ -498,18 +498,39 @@ export async function searchTools(
   const cleanQuery = searchQuery.trim();
   if (!cleanQuery) return [];
 
-  // Use local tools data for search
-  const results = LOCAL_TOOLS.filter(tool => {
-    // Skip inactive tools
-    if (!tool.active) return false;
+  const allowedModels = getAllowedPricingModels(pricingPreference);
+  let sourceTools: Tool[] = [];
 
-    // Apply category filter
-    if (category && tool.category !== category) return false;
+  // Primary source of truth for search: same tools table used by detail/category fetches.
+  try {
+    let queryBuilder = supabase
+      .from('tools')
+      .select('*')
+      .eq('active', true)
+      .in('pricing_model', allowedModels)
+      .limit(2000);
 
-    // Apply pricing filter
-    const allowedModels = getAllowedPricingModels(pricingPreference);
-    if (!allowedModels.includes(tool.pricing_model)) return false;
+    if (category) {
+      queryBuilder = queryBuilder.eq('category', category);
+    }
 
+    const { data, error } = await queryBuilder;
+    if (error) throw error;
+    sourceTools = (data ?? []) as Tool[];
+  } catch (error) {
+    console.warn('Search source fallback to LOCAL_TOOLS due to tools-table fetch issue:', error);
+  }
+
+  if (sourceTools.length === 0) {
+    sourceTools = LOCAL_TOOLS.filter((tool) => {
+      if (!tool.active) return false;
+      if (category && tool.category !== category) return false;
+      return allowedModels.includes(tool.pricing_model);
+    });
+  }
+
+  // Strict search first: deterministic includes match across core fields.
+  const strictResults = sourceTools.filter(tool => {
     // Search in multiple fields
     const searchFields = [
       tool.name,
@@ -527,8 +548,24 @@ export async function searchTools(
     return searchFields.includes(query);
   });
 
+  if (strictResults.length > 0) {
+    const resultsWithScores = strictResults.map(tool => ({
+      tool,
+      relevanceScore: calculateRelevanceScore(tool, cleanQuery)
+    }));
+
+    resultsWithScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    return resultsWithScores.slice(0, limit).map(item => item.tool);
+  }
+
+  // Lightweight typo-tolerance fallback on name/slug and semantic keywords.
+  const fuzzyResults = getFuzzyFallbackResults(sourceTools, cleanQuery, limit);
+  if (fuzzyResults.length > 0) {
+    return fuzzyResults;
+  }
+
   // Calculate relevance scores and sort
-  const resultsWithScores = results.map(tool => ({
+  const resultsWithScores = strictResults.map(tool => ({
     tool,
     relevanceScore: calculateRelevanceScore(tool, cleanQuery)
   }));
@@ -536,6 +573,102 @@ export async function searchTools(
   resultsWithScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
   return resultsWithScores.slice(0, limit).map(item => item.tool);
+}
+
+function normalizeForFuzzy(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  const prev = new Array(b.length + 1);
+  const curr = new Array(b.length + 1);
+
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + cost
+      );
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+  }
+
+  return prev[b.length];
+}
+
+function buildFuzzyTokens(tool: Tool): string[] {
+  const canonicalName = normalizeForFuzzy(tool.name || '');
+  const canonicalSlug = normalizeForFuzzy((tool.slug || '').replace(/-/g, ' '));
+
+  const bag = normalizeForFuzzy(
+    [
+      tool.name,
+      tool.slug,
+      tool.tags,
+      tool.use_cases,
+      tool.target_audience,
+      tool.recommended_for,
+      tool.short_description,
+      tool.category,
+      tool.subcategory,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  const tokens = new Set<string>();
+  if (canonicalName) tokens.add(canonicalName);
+  if (canonicalSlug) tokens.add(canonicalSlug);
+
+  for (const token of bag.split(/\s+/)) {
+    if (token.length >= 3) tokens.add(token);
+  }
+
+  return Array.from(tokens);
+}
+
+function getFuzzyFallbackResults(tools: Tool[], rawQuery: string, limit: number): Tool[] {
+  const query = normalizeForFuzzy(rawQuery);
+  if (!query) return [];
+
+  const threshold = query.length <= 5 ? 1 : query.length <= 8 ? 2 : 3;
+
+  const scored = tools
+    .map((tool) => {
+      const tokens = buildFuzzyTokens(tool);
+      let bestDistance = Number.POSITIVE_INFINITY;
+
+      for (const token of tokens) {
+        const distance = token.includes(query) || query.includes(token)
+          ? 0
+          : levenshteinDistance(query, token);
+        if (distance < bestDistance) bestDistance = distance;
+        if (bestDistance === 0) break;
+      }
+
+      return {
+        tool,
+        distance: bestDistance,
+        score: tool.internal_score || 0,
+      };
+    })
+    .filter((entry) => Number.isFinite(entry.distance) && entry.distance <= threshold)
+    .sort((a, b) => {
+      if (a.distance !== b.distance) return a.distance - b.distance;
+      if (a.score !== b.score) return b.score - a.score;
+      return a.tool.name.localeCompare(b.tool.name);
+    });
+
+  return scored.slice(0, limit).map((entry) => entry.tool);
 }
 
 // Calculate relevance score for a tool based on query matching

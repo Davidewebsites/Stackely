@@ -42,6 +42,7 @@ export default function ToolCard({
   const navigate = useNavigate();
   const categoryInfo = CATEGORIES.find((c) => c.id === tool.category);
   const isAI = tool.tool_type === 'ai' || tool.tool_type === 'hybrid';
+  const isNavigable = !disableNavigation;
 
   const bestFor = getBestFor(tool);
   const whyRec = getWhyRecommended(tool);
@@ -50,12 +51,16 @@ export default function ToolCard({
 
   return (
     <div
-      className={`group flex flex-col p-5 rounded-xl border bg-white hover:bg-blue-50/10 transition-all cursor-pointer ${
+      className={`group flex flex-col p-5 rounded-xl border bg-white transition-all ${
         isSelectedForCompare
           ? 'border-[#2F80ED] ring-1 ring-[#2F80ED]/30'
           : isInStack
           ? 'border-violet-400 ring-1 ring-violet-300/30'
-          : 'border-slate-200 hover:border-[#2F80ED]/40'
+          : isNavigable
+          ? 'border-slate-200 hover:border-[#2F80ED]/40 hover:bg-blue-50/10'
+          : 'border-slate-200'
+      } ${
+        isNavigable ? 'cursor-pointer' : 'cursor-default'
       }`}
       onClick={() => {
         if (disableNavigation) return;
@@ -68,7 +73,11 @@ export default function ToolCard({
           <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h3 className="text-[15px] font-semibold text-slate-900 truncate group-hover:text-[#2F80ED] transition-colors">
+              <h3
+                className={`text-[15px] font-semibold text-slate-900 truncate transition-colors ${
+                  isNavigable ? 'group-hover:text-[#2F80ED]' : ''
+                }`}
+              >
                 {tool.name}
               </h3>
               {isAI && (
@@ -207,7 +216,11 @@ export default function ToolCard({
               <ExternalLink className="w-3 h-3" />
             </Button>
           )}
-          <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-[#2F80ED] transition-colors" />
+          {isNavigable ? (
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-[#2F80ED] transition-colors" />
+          ) : (
+            <span className="text-[10px] text-slate-400 font-medium">Preview only</span>
+          )}
         </div>
       </div>
     </div>

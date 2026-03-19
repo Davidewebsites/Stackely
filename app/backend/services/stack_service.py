@@ -1,31 +1,23 @@
 """Service layer for stack recommendation logic."""
 
-import json
-from pathlib import Path
 from typing import Any, Dict, List
+
+from sqlalchemy import select
+
+from models.tools import Tools
 
 
 class StackService:
     """Provides stack recommendation logic."""
 
     def __init__(self, db: Any = None):
-        # Database is optional; the recommendation logic is deterministic and file-based.
+        # Database is optional; recommendations use the DB-backed tools catalog when available.
         self.db = db
 
     async def recommend(self, goal: str) -> Dict[str, Any]:
         """Recommend a tool stack based on the provided goal."""
 
-        # Load tool catalog from local mock data (quick, deterministic, no DB calls).
-        # This file exists in the repository and is used by mock-data loader.
-        tools_file = Path(__file__).resolve().parent.parent / "mock_data" / "tools.json"
-        tools_data = []
-        try:
-            tools_data = json.loads(tools_file.read_text(encoding="utf-8"))
-        except Exception:
-            tools_data = []
-
-        # Filter active tools only for deterministic output
-        tools = [t for t in tools_data if t.get("active")]
+        tools = await self._load_active_tools()
 
         normalized_goal = (goal or "").strip().lower()
 
@@ -63,6 +55,49 @@ class StackService:
             "stack": stack,
             "comparison": comparison,
             "notes": notes,
+        }
+
+    async def _load_active_tools(self) -> List[Dict[str, Any]]:
+        """Load active tools from the primary DB-backed catalog."""
+        if self.db is None:
+            return []
+
+        result = await self.db.execute(
+            select(Tools)
+            .where(Tools.active.is_(True))
+            .order_by(Tools.internal_score.desc().nullslast(), Tools.name.asc())
+        )
+        return [self._serialize_tool(tool) for tool in result.scalars().all()]
+
+    def _serialize_tool(self, tool: Tools) -> Dict[str, Any]:
+        """Convert ORM tool rows into the dict shape used by recommendation helpers."""
+        return {
+            "name": tool.name,
+            "slug": tool.slug,
+            "short_description": tool.short_description,
+            "full_description": tool.full_description,
+            "category": tool.category,
+            "subcategory": tool.subcategory,
+            "tags": tool.tags,
+            "pricing_model": tool.pricing_model,
+            "starting_price": tool.starting_price,
+            "skill_level": tool.skill_level,
+            "website_url": tool.website_url,
+            "logo_url": tool.logo_url,
+            "affiliate_url": tool.affiliate_url,
+            "internal_score": tool.internal_score,
+            "is_featured": tool.is_featured,
+            "pros": tool.pros,
+            "cons": tool.cons,
+            "best_use_cases": tool.best_use_cases,
+            "active": tool.active,
+            "use_cases": tool.use_cases,
+            "target_audience": tool.target_audience,
+            "difficulty_score": tool.difficulty_score,
+            "recommended_for": tool.recommended_for,
+            "popularity_score": tool.popularity_score,
+            "beginner_friendly": tool.beginner_friendly,
+            "tool_type": tool.tool_type,
         }
 
     def _detect_intent(self, goal: str) -> str:
@@ -558,47 +593,3 @@ class StackService:
             "paid": 50
         }
         return pricing_scores.get(pricing_model, 50)
-
-        # Build stack recommendations (at least 3 tools)
-        stack: List[Dict[str, Any]] = []
-        for idx, tool in enumerate(tools[:3]):
-            role = "Primary tool" if idx == 0 else "Secondary tool" if idx == 1 else "Supporting tool"
-            why = tool.short_description or tool.full_description or f"{tool.name} is suited for {goal}."
-            stack.append({"tool": tool.name, "role": role, "why": why})
-
-        # Comparison (at least one entry)
-        comparison: List[Dict[str, Any]] = []
-        if len(tools) >= 2:
-            a = tools[0]
-            b = tools[1]
-            score_a = getattr(a, "internal_score", 0) or 0
-            score_b = getattr(b, "internal_score", 0) or 0
-            if score_a >= score_b:
-                winner = a.name
-                reason = f"{a.name} has a higher internal score ({score_a}) than {b.name} ({score_b})."
-            else:
-                winner = b.name
-                reason = f"{b.name} has a higher internal score ({score_b}) than {a.name} ({score_a})."
-            comparison.append({"toolA": a.name, "toolB": b.name, "winner": winner, "reason": reason})
-        elif tools:
-            # Only one tool available
-            comparison.append(
-                {
-                    "toolA": tools[0].name,
-                    "toolB": tools[0].name,
-                    "winner": tools[0].name,
-                    "reason": "Only one tool available for this recommendation.",
-                }
-            )
-
-        notes: List[str] = [
-            f"Goal: {goal}",
-            "Recommendations are generated based on tool metadata and internal scoring.",
-        ]
-
-        return {
-            "goal": goal,
-            "stack": stack,
-            "comparison": comparison,
-            "notes": notes,
-        }

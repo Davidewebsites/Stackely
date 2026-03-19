@@ -25,7 +25,7 @@ import {
   type Tool,
   type PricingPreference,
 } from '@/lib/api';
-import { LOCAL_TOOLS } from '@/data/tools';
+import { supabase } from '@/lib/supabase';
 import { useToolRecommendation } from '@/hooks/useToolRecommendation';
 import StackCard from '@/components/StackCard';
 import ToolCard from '@/components/ToolCard';
@@ -95,13 +95,22 @@ function inferCategoryFromRole(role: string): string {
   return 'automation';
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasBoundedPhrase(text: string, phrase: string): boolean {
+  const pattern = `\\b${escapeRegex(phrase).replace(/\\\s+/g, '\\s+')}\\b`;
+  return new RegExp(pattern, 'i').test(text);
+}
+
 // Helper function to classify query mode
 function classifyQueryMode(query: string): 'stack' | 'search' {
   const lowerQuery = query.toLowerCase();
 
   // Check for tool discovery keywords - force search mode
   const discoveryKeywords = ['best', 'top', 'tools', 'software', 'platforms'];
-  const isToolDiscovery = discoveryKeywords.some(keyword => lowerQuery.includes(keyword));
+  const isToolDiscovery = discoveryKeywords.some((keyword) => hasBoundedPhrase(lowerQuery, keyword));
 
   if (isToolDiscovery) {
     return 'search';
@@ -110,7 +119,7 @@ function classifyQueryMode(query: string): 'stack' | 'search' {
   const goalVerbs = ['build', 'create', 'automate', 'launch', 'start', 'improve', 'set up', 'grow', 'develop', 'manage', 'run', 'setup'];
 
   // Check for goal verbs
-  const hasGoalVerb = goalVerbs.some(verb => lowerQuery.includes(verb));
+  const hasGoalVerb = goalVerbs.some((verb) => hasBoundedPhrase(lowerQuery, verb));
 
   // Check for longer goal-style sentences (more than 3 words or contains "how to", "i want", etc.)
   const isGoalStyle = lowerQuery.split(' ').length > 3 ||
@@ -143,6 +152,7 @@ export default function Results() {
   const [stackSaved, setStackSaved] = useState(false);
   const [stackData, setStackData] = useState<StackResponse | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
+  const [catalogTools, setCatalogTools] = useState<Tool[]>([]);
   const [queryMode, setQueryMode] = useState<'stack' | 'search'>('search');
 
   // Compare & temporary stack state
@@ -210,6 +220,38 @@ export default function Results() {
     }
   }, [query, pricingParam, categoryParam]);
 
+  useEffect(() => {
+    if (queryMode !== 'stack' || !query) return;
+
+    let cancelled = false;
+
+    const loadCatalogTools = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tools')
+          .select('*')
+          .eq('active', true)
+          .limit(2000);
+
+        if (error) throw error;
+        if (!cancelled) {
+          setCatalogTools((data ?? []) as Tool[]);
+        }
+      } catch (err) {
+        console.error('Failed to load catalog tools for AI stack matching:', err);
+        if (!cancelled) {
+          setCatalogTools([]);
+        }
+      }
+    };
+
+    loadCatalogTools();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryMode, query]);
+
   const isDirectBrowse = !!categoryParam && !query;
   const isKeywordSearch = !!query && queryMode === 'search';
   const isStackMode = !!query && queryMode === 'stack';
@@ -265,13 +307,17 @@ export default function Results() {
   const aiStackItems = useMemo<AdaptedStackItem[]>(() => {
     if (!stackData?.stack?.length) return [];
 
-    const localByName = new Map<string, Tool>();
-    for (const localTool of LOCAL_TOOLS) {
-      localByName.set(normalizeToolName(localTool.name), localTool);
+    const catalogByName = new Map<string, Tool>();
+    const catalogBySlug = new Map<string, Tool>();
+    for (const catalogTool of catalogTools) {
+      catalogByName.set(normalizeToolName(catalogTool.name), catalogTool);
+      catalogBySlug.set((catalogTool.slug || '').toLowerCase(), catalogTool);
     }
 
     return stackData.stack.map((item, index) => {
-      const matched = localByName.get(normalizeToolName(item.tool));
+      const normalizedName = normalizeToolName(item.tool);
+      const normalizedSlug = slugifyToolName(item.tool);
+      const matched = catalogByName.get(normalizedName) || catalogBySlug.get(normalizedSlug);
 
       const adaptedTool: Tool = matched
         ? {
@@ -299,7 +345,7 @@ export default function Results() {
         isSynthesized: !matched,
       };
     });
-  }, [stackData]);
+  }, [stackData, catalogTools]);
 
   const handleShareStack = async () => {
     if (!query || stack.length === 0) return;

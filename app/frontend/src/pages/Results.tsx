@@ -33,6 +33,7 @@ import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 import SelectedStackBar from '@/components/SelectedStackBar';
 import CompareDrawer from '@/components/CompareDrawer';
+import SmartEmptyState from '@/components/SmartEmptyState';
 import { getStackCoverage, getMissingCategories, getSuggestedTools, getSuggestionReason } from '@/lib/stackInsights';
 
 interface StackResponse {
@@ -280,6 +281,18 @@ export default function Results() {
     setStackSelection([]);
   };
 
+  const handleSmartStackSelect = (tools: Tool[]) => {
+    const seen = new Set(stackSelection.map((t) => t.id));
+    const merged: Tool[] = [...stackSelection];
+    for (const tool of tools) {
+      if (!seen.has(tool.id) && merged.length < 5) {
+        merged.push(tool);
+        seen.add(tool.id);
+      }
+    }
+    setStackSelection(merged);
+  };
+
   const handleRetry = () => {
     if (query) {
       if (queryMode === 'stack') {
@@ -439,7 +452,7 @@ export default function Results() {
                   </p>
                 </div>
 
-                {searchResults.length > 0 ? (
+                {searchResults.length >= 3 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {searchResults.map((tool) => (
                       <ToolCard
@@ -452,12 +465,26 @@ export default function Results() {
                       />
                     ))}
                   </div>
+                ) : searchResults.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+                      {searchResults.map((tool) => (
+                        <ToolCard
+                          key={tool.id}
+                          tool={tool}
+                          isSelectedForCompare={selectedForCompare.some((t) => t.id === tool.id)}
+                          isInStack={stackSelection.some((t) => t.id === tool.id)}
+                          onToggleCompare={toggleCompare}
+                          onToggleStack={toggleStack}
+                        />
+                      ))}
+                    </div>
+                    <div className="border-t border-slate-200 pt-12">
+                      <SmartEmptyState onSelectStack={handleSmartStackSelect} />
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-36">
-                    <AlertCircle className="w-8 h-8 text-slate-300 mb-4" />
-                    <h2 className="text-[18px] font-medium text-slate-900 mb-1.5">No tools found</h2>
-                    <p className="text-[14px] text-slate-500">Try a different search query</p>
-                  </div>
+                  <SmartEmptyState onSelectStack={handleSmartStackSelect} />
                 )}
               </>
             )}

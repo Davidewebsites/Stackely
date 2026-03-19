@@ -1,0 +1,261 @@
+import { Button } from '@/components/ui/button';
+import { Sparkles, Zap, Rocket } from 'lucide-react';
+import { type Tool } from '@/lib/api';
+
+interface SmartEmptyStateProps {
+  onSelectStack: (tools: Tool[]) => void;
+}
+
+// Predefined minimal Tool objects for suggested stacks
+const PREDEFINED_TOOLS: Record<string, Tool> = {
+  webflow: {
+    id: 1001,
+    name: 'Webflow',
+    slug: 'webflow',
+    short_description: 'Visual web builder, no code required',
+    category: 'landing_pages',
+    pricing_model: 'paid',
+    skill_level: 'intermediate',
+    website_url: 'https://webflow.com',
+    logo_url: 'https://logo.clearbit.com/webflow.com',
+  },
+  carrd: {
+    id: 1002,
+    name: 'Carrd',
+    slug: 'carrd',
+    short_description: 'Simple one-page sites in minutes',
+    category: 'landing_pages',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://carrd.co',
+    logo_url: 'https://logo.clearbit.com/carrd.co',
+  },
+  framer: {
+    id: 1003,
+    name: 'Framer',
+    slug: 'framer',
+    short_description: 'Design-to-site with interactions',
+    category: 'landing_pages',
+    pricing_model: 'freemium',
+    skill_level: 'intermediate',
+    website_url: 'https://framer.com',
+    logo_url: 'https://logo.clearbit.com/framer.com',
+  },
+  mailchimp: {
+    id: 1004,
+    name: 'Mailchimp',
+    slug: 'mailchimp',
+    short_description: 'Email campaigns & marketing automation',
+    category: 'email_marketing',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://mailchimp.com',
+    logo_url: 'https://logo.clearbit.com/mailchimp.com',
+  },
+  convertkit: {
+    id: 1005,
+    name: 'ConvertKit',
+    slug: 'convertkit',
+    short_description: 'Email platform for creators',
+    category: 'email_marketing',
+    pricing_model: 'paid',
+    skill_level: 'beginner',
+    website_url: 'https://convertkit.com',
+    logo_url: 'https://logo.clearbit.com/convertkit.com',
+  },
+  brevo: {
+    id: 1006,
+    name: 'Brevo',
+    slug: 'brevo',
+    short_description: 'Email marketing with automation',
+    category: 'email_marketing',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://brevo.com',
+    logo_url: 'https://logo.clearbit.com/brevo.com',
+  },
+  googleanalytics: {
+    id: 1007,
+    name: 'Google Analytics',
+    slug: 'google-analytics',
+    short_description: 'Industry-standard web analytics',
+    category: 'analytics',
+    pricing_model: 'free',
+    skill_level: 'intermediate',
+    website_url: 'https://analytics.google.com',
+    logo_url: 'https://logo.clearbit.com/google.com',
+  },
+  plausible: {
+    id: 1008,
+    name: 'Plausible',
+    slug: 'plausible',
+    short_description: 'Lightweight, privacy-first analytics',
+    category: 'analytics',
+    pricing_model: 'paid',
+    skill_level: 'beginner',
+    website_url: 'https://plausible.io',
+    logo_url: 'https://logo.clearbit.com/plausible.io',
+  },
+  hotjar: {
+    id: 1009,
+    name: 'Hotjar',
+    slug: 'hotjar',
+    short_description: 'Heatmaps, session recordings & feedback',
+    category: 'analytics',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://hotjar.com',
+    logo_url: 'https://logo.clearbit.com/hotjar.com',
+  },
+  zapier: {
+    id: 1010,
+    name: 'Zapier',
+    slug: 'zapier',
+    short_description: 'Connect apps and automate workflows',
+    category: 'automation',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://zapier.com',
+    logo_url: 'https://logo.clearbit.com/zapier.com',
+  },
+  pabbi_connect: {
+    id: 1011,
+    name: 'Pabbly Connect',
+    slug: 'pabbly-connect',
+    short_description: 'Affordable automation for businesses',
+    category: 'automation',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://pabbly.com',
+    logo_url: 'https://logo.clearbit.com/pabbly.com',
+  },
+  make: {
+    id: 1012,
+    name: 'Make',
+    slug: 'make',
+    short_description: 'Visual workflow automation',
+    category: 'automation',
+    pricing_model: 'freemium',
+    skill_level: 'intermediate',
+    website_url: 'https://make.com',
+    logo_url: 'https://logo.clearbit.com/make.com',
+  },
+};
+
+interface StackOption {
+  icon: typeof Sparkles;
+  title: string;
+  subtitle: string;
+  description: string;
+  tools: Tool[];
+}
+
+const STACK_OPTIONS: StackOption[] = [
+  {
+    icon: Sparkles,
+    title: 'Best Overall',
+    subtitle: 'Complete & powerful',
+    description: 'Premium stack with full features across all categories',
+    tools: [
+      PREDEFINED_TOOLS.webflow,
+      PREDEFINED_TOOLS.convertkit,
+      PREDEFINED_TOOLS.googleanalytics,
+      PREDEFINED_TOOLS.zapier,
+    ],
+  },
+  {
+    icon: Zap,
+    title: 'Cheapest Setup',
+    subtitle: 'Free & freemium tools',
+    description: 'Save money while covering all essentials',
+    tools: [
+      PREDEFINED_TOOLS.carrd,
+      PREDEFINED_TOOLS.brevo,
+      PREDEFINED_TOOLS.hotjar,
+      PREDEFINED_TOOLS.pabbi_connect,
+    ],
+  },
+  {
+    icon: Rocket,
+    title: 'Fastest to Launch',
+    subtitle: 'Quick & beginner-friendly',
+    description: 'Get started in minutes with minimal learning curve',
+    tools: [
+      PREDEFINED_TOOLS.framer,
+      PREDEFINED_TOOLS.mailchimp,
+      PREDEFINED_TOOLS.plausible,
+      PREDEFINED_TOOLS.make,
+    ],
+  },
+];
+
+export default function SmartEmptyState({ onSelectStack }: SmartEmptyStateProps) {
+  return (
+    <div className="py-20 px-6">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h2 className="text-[28px] sm:text-[32px] font-bold text-slate-900 tracking-tight mb-2">
+            Get Started with a Starter Stack
+          </h2>
+          <p className="text-[15px] text-slate-500">
+            Choose a prebuilt stack tailored to your needs
+          </p>
+        </div>
+
+        {/* Stack Options Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {STACK_OPTIONS.map((option) => {
+            const IconComponent = option.icon;
+            return (
+              <div
+                key={option.title}
+                className="flex flex-col p-5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+              >
+                {/* Icon & Header */}
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <IconComponent className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-[15px] font-semibold text-slate-900">{option.title}</h3>
+                    <p className="text-[12px] text-slate-400">{option.subtitle}</p>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p className="text-[13px] text-slate-600 leading-relaxed mb-4">
+                  {option.description}
+                </p>
+
+                {/* Tool List */}
+                <div className="mb-4 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                    Includes
+                  </p>
+                  <ul className="space-y-1.5">
+                    {option.tools.map((tool) => (
+                      <li key={tool.id} className="text-[12px] text-slate-600 flex items-start gap-2">
+                        <span className="w-1 h-1 rounded-full bg-slate-300 flex-shrink-0 mt-1.5" />
+                        <span>{tool.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* CTA Button */}
+                <Button
+                  onClick={() => onSelectStack(option.tools)}
+                  className="w-full h-9 text-[13px] font-medium text-white shadow-none"
+                  style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                >
+                  Use this stack
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

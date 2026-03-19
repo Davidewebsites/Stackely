@@ -19,6 +19,7 @@ import type { Tool, PricingPreference, StackResponse } from './api';
 import { getAllowedPricingModels } from './api';
 
 export type StackResponseWithAlternatives = StackResponse & {
+  summary: string;
   alternatives: Record<string, Tool[]>;
   internal_stack_score?: number;
 };
@@ -603,15 +604,41 @@ function buildNotes(intent: string, goal: string, pricingPreference: PricingPref
   return [intentNotes[0], intentNotes[1], pricingNote];
 }
 
+function buildSummary(
+  stack: StackResponse['stack'],
+  selectedTools: Tool[],
+  pricingPreference: PricingPreference
+): string {
+  const step1 = stack[0]?.tool || 'the first tool';
+  const step2 = stack[1]?.tool || 'the second tool';
+  const step3 = stack[2]?.tool || 'the third tool';
+
+  const beginnerCount = selectedTools.filter((tool) => tool.beginner_friendly).length;
+  const paidCount = selectedTools.filter((tool) => tool.pricing_model === 'paid').length;
+
+  const tradeoff =
+    pricingPreference === 'free_only' || pricingPreference === 'free_freemium'
+      ? 'It favors cost efficiency over maximum feature depth, trading some power for budget control.'
+      : beginnerCount >= 2
+      ? 'It is optimized for speed and ease of execution rather than deep customization flexibility.'
+      : paidCount >= 2
+      ? 'It prioritizes feature power and scalability, accepting a higher setup cost for more control.'
+      : 'It balances speed and flexibility, so you can launch quickly without locking into a rigid setup.';
+
+  return `This stack follows a setup -> automate -> optimize workflow to move from execution to continuous improvement. ${step1} drives setup outcomes, ${step2} automates the operational layer, and ${step3} handles optimization and feedback. ${tradeoff}`;
+}
+
 export function recomputeStackNarrativeFromTools(
   goal: string,
   pricingPreference: PricingPreference,
-  selectedTools: Tool[]
-): Pick<StackResponseWithAlternatives, 'comparison' | 'notes' | 'internal_stack_score'> {
+  selectedTools: Tool[],
+  stack: StackResponse['stack']
+): Pick<StackResponseWithAlternatives, 'comparison' | 'notes' | 'summary' | 'internal_stack_score'> {
   const intent = detectIntentFromGoal(goal);
   return {
     comparison: buildComparisonFromTools(selectedTools.slice(0, 3)),
     notes: buildNotes(intent, goal, pricingPreference),
+    summary: buildSummary(stack, selectedTools.slice(0, 3), pricingPreference),
     internal_stack_score: computeInternalStackScore(selectedTools.slice(0, 3)),
   };
 }
@@ -667,9 +694,10 @@ export async function recommendStackFromGoal(
 
   const comparison = buildComparison(filledSlots);
   const notes = buildNotes(intent, goal, pricingPreference);
+  const summary = buildSummary(stack, filledSlots.map((slot) => slot.tool), pricingPreference);
   const internal_stack_score = computeInternalStackScore(filledSlots.map((slot) => slot.tool));
 
-  return { goal, stack, comparison, notes, alternatives, internal_stack_score };
+  return { goal, stack, comparison, notes, summary, alternatives, internal_stack_score };
 }
 
 // Re-export helpers consumed by Results.tsx (kept for backward compat)

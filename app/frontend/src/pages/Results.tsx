@@ -504,7 +504,7 @@ export default function Results() {
         catalogTools
       );
 
-      const narrative = recomputeStackNarrativeFromTools(query, pricingParam, selectedTools);
+      const narrative = recomputeStackNarrativeFromTools(query, pricingParam, selectedTools, nextStack);
 
       setRecentlyReplacedToolId(replacement.id);
       setTimeout(() => setRecentlyReplacedToolId((current) => (current === replacement.id ? null : current)), 1400);
@@ -515,6 +515,7 @@ export default function Results() {
         alternatives: nextAlternatives,
         comparison: narrative.comparison,
         notes: narrative.notes,
+        summary: narrative.summary,
         internal_stack_score: narrative.internal_stack_score,
       };
     });
@@ -853,6 +854,18 @@ export default function Results() {
                     ))}
                   </div>
                 </div>
+
+                {stackData.summary && (
+                  <div className="mb-8 rounded-2xl border border-blue-200 bg-blue-50/70 p-5 sm:p-6">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Sparkles className="w-4 h-4 text-blue-600" />
+                      <h3 className="text-[14px] font-semibold uppercase tracking-wide text-blue-800">
+                        Why this stack is optimal
+                      </h3>
+                    </div>
+                    <p className="text-[15px] leading-relaxed text-slate-700">{stackData.summary}</p>
+                  </div>
+                )}
 
                 <div className="space-y-5">
                   {aiStackItems.map((item, index) => (

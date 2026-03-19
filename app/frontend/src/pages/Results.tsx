@@ -14,6 +14,7 @@ import {
   Bookmark,
   Check,
   Layers,
+  Plus,
 } from 'lucide-react';
 import {
   CATEGORIES,
@@ -32,6 +33,7 @@ import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 import SelectedStackBar from '@/components/SelectedStackBar';
 import CompareDrawer from '@/components/CompareDrawer';
+import { getStackCoverage, getMissingCategories, getSuggestedTools, getSuggestionReason } from '@/lib/stackInsights';
 
 interface StackResponse {
   goal: string;
@@ -199,6 +201,25 @@ export default function Results() {
   }, [groupedDirectTools]);
 
   const activeCategoryInfo = CATEGORIES.find((c) => c.id === categoryParam);
+
+  const stackCoverage = useMemo(() => getStackCoverage(stackSelection), [stackSelection]);
+  const stackMissing = useMemo(() => getMissingCategories(stackSelection), [stackSelection]);
+  const stackSuggested = useMemo(() => getSuggestedTools(stackMissing), [stackMissing]);
+
+  const suggestedToolLookup = useMemo(() => {
+    const all = [
+      ...searchResults,
+      ...directTools,
+      ...(stack as Tool[]),
+      ...(alternatives as Tool[]),
+      ...(aiAccelerators as Tool[]),
+    ];
+    const map = new Map<string, Tool>();
+    for (const tool of all) {
+      map.set(tool.name.toLowerCase(), tool);
+    }
+    return map;
+  }, [searchResults, directTools, stack, alternatives, aiAccelerators]);
 
   const handleShareStack = async () => {
     if (!query || stack.length === 0) return;
@@ -646,6 +667,115 @@ export default function Results() {
           </>
         )}
       </div>
+
+      {/* Draft stack summary */}
+      {stackSelection.length >= 2 && (
+        <div className="max-w-7xl mx-auto px-8 pb-10">
+          <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Layers className="w-4 h-4 text-violet-500" />
+              <h3 className="text-[14px] font-semibold text-slate-900">Your draft stack</h3>
+              <span className="text-[11px] text-slate-400 ml-1">{stackSelection.length} tools</span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {stackSelection.map((t) => (
+                <span
+                  key={t.id}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white border border-violet-200 text-violet-700"
+                >
+                  {t.name}
+                </span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Covers</p>
+                {stackCoverage.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {stackCoverage.map((label) => (
+                      <li key={label} className="text-[12px] text-slate-600 flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-emerald-400 flex-shrink-0" />
+                        {label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[12px] text-slate-400">—</p>
+                )}
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Potential gap</p>
+                {stackMissing.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {stackMissing.map((label) => (
+                      <li key={label} className="text-[12px] text-amber-600 flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-amber-400 flex-shrink-0" />
+                        {label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[12px] text-emerald-600 font-medium">Full coverage</p>
+                )}
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Suggested next tool</p>
+                {stackSuggested.length > 0 ? (
+                  <ul className="space-y-2">
+                    {stackSuggested.map((name, i) => {
+                      const alreadyAdded = stackSelection.some((t) => t.name.toLowerCase() === name.toLowerCase());
+                      const matchedTool = suggestedToolLookup.get(name.toLowerCase());
+                      const reason = getSuggestionReason(name, stackMissing[i] ?? '');
+                      return (
+                        <li key={name}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] text-slate-600 flex items-center gap-1.5 min-w-0">
+                              <span className="w-1 h-1 rounded-full bg-blue-400 flex-shrink-0" />
+                              <span className="truncate font-medium">{name}</span>
+                            </span>
+                            {alreadyAdded ? (
+                              <span className="text-[10px] font-medium text-emerald-600 flex items-center gap-0.5 flex-shrink-0">
+                                <Check className="w-3 h-3" />
+                                Added
+                              </span>
+                            ) : matchedTool && stackSelection.length < 5 ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] font-medium gap-0.5 text-violet-600 hover:text-violet-700 hover:bg-violet-50 flex-shrink-0"
+                                onClick={() => toggleStack(matchedTool)}
+                              >
+                                <Plus className="w-2.5 h-2.5" />
+                                Add
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] font-medium gap-0.5 text-slate-400 hover:text-[#2F80ED] hover:bg-blue-50 flex-shrink-0"
+                                onClick={() => navigate(`/results?q=${encodeURIComponent(name)}`)}
+                              >
+                                Search
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 ml-4 mt-0.5 leading-snug">{reason}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-[12px] text-slate-400">—</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <SiteFooter />

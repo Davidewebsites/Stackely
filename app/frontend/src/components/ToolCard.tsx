@@ -4,6 +4,7 @@ import { ExternalLink, ArrowUpRight, Sparkles, GitCompare, Layers } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES, type Tool } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
+import { getBestFor, getWhyRecommended, getAvoidIf } from '@/lib/toolInsights';
 
 interface ToolCardProps {
   tool: Tool;
@@ -39,6 +40,11 @@ export default function ToolCard({
   const navigate = useNavigate();
   const categoryInfo = CATEGORIES.find((c) => c.id === tool.category);
   const isAI = tool.tool_type === 'ai' || tool.tool_type === 'hybrid';
+
+  const bestFor = getBestFor(tool);
+  const whyRec = getWhyRecommended(tool);
+  const avoidIf = getAvoidIf(tool);
+  const hasInsights = bestFor !== '—' || whyRec !== '—' || avoidIf !== null;
 
   return (
     <div
@@ -94,6 +100,30 @@ export default function ToolCard({
       <p className="text-[13px] text-slate-500 leading-relaxed mb-3.5 line-clamp-2">
         {tool.short_description}
       </p>
+
+      {/* Insight rows (non-compact only) */}
+      {!compact && hasInsights && (
+        <div className="mb-3.5 space-y-1.5">
+          {bestFor !== '—' && (
+            <div className="flex gap-1.5 items-baseline">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-20 flex-shrink-0">Best for</span>
+              <span className="text-[12px] text-slate-600 leading-snug line-clamp-1">{bestFor}</span>
+            </div>
+          )}
+          {whyRec !== '—' && (
+            <div className="flex gap-1.5 items-baseline">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-20 flex-shrink-0">Why</span>
+              <span className="text-[12px] text-slate-600 leading-snug line-clamp-1">{whyRec}</span>
+            </div>
+          )}
+          {avoidIf !== null && (
+            <div className="flex gap-1.5 items-baseline">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-400 w-20 flex-shrink-0">Avoid if</span>
+              <span className="text-[12px] text-amber-600 leading-snug line-clamp-1">{avoidIf}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Use cases (non-compact only) */}
       {!compact && tool.use_cases && (

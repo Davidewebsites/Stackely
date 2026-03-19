@@ -6,6 +6,11 @@ import { CATEGORIES, type Tool } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
 import { getBestFor, getWhyRecommended, getAvoidIf } from '@/lib/toolInsights';
 
+export function trackToolClick(toolId: number): void {
+  // Placeholder hook for future analytics wiring.
+  console.debug('trackToolClick', { toolId, ts: Date.now() });
+}
+
 interface ToolCardProps {
   tool: Tool;
   compact?: boolean;
@@ -210,6 +215,7 @@ export default function ToolCard({
               className="h-6 w-6 p-0 text-slate-400 hover:text-[#2F80ED]"
               onClick={(e) => {
                 e.stopPropagation();
+                trackToolClick(tool.id);
                 window.open(tool.website_url, '_blank');
               }}
             >

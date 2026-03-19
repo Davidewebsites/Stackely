@@ -35,6 +35,7 @@ import { supabase } from '@/lib/supabase';
 import { useToolRecommendation } from '@/hooks/useToolRecommendation';
 import StackCard from '@/components/StackCard';
 import ToolCard from '@/components/ToolCard';
+import { trackToolClick } from '@/components/ToolCard';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
 import SelectedStackBar from '@/components/SelectedStackBar';
@@ -884,6 +885,8 @@ export default function Results() {
                         className={`rounded-2xl border bg-white p-4 sm:p-5 transition-all duration-300 ${
                           recentlyReplacedToolId === item.tool.id
                             ? 'border-emerald-300 ring-2 ring-emerald-100'
+                            : index === 0
+                            ? 'border-blue-300 ring-1 ring-blue-100 shadow-sm'
                             : 'border-slate-200'
                         }`}
                       >
@@ -899,9 +902,16 @@ export default function Results() {
                               Step {index + 1}
                             </span>
                           </div>
-                          <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50">
-                            {item.role}
-                          </Badge>
+                          <div className="flex items-center gap-1.5">
+                            {index === 0 && (
+                              <Badge className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-100">
+                                Best starting point
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50">
+                              {item.role}
+                            </Badge>
+                          </div>
                         </div>
 
                         <ToolCard
@@ -915,6 +925,41 @@ export default function Results() {
 
                         <div className="pt-3 px-1">
                           <p className="text-[13px] text-slate-600 leading-relaxed">{item.why}</p>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
+                              {item.tool.pricing_model}
+                            </Badge>
+                            {item.tool.beginner_friendly && (
+                              <Badge variant="outline" className="text-[10px] border-emerald-200 text-emerald-700 bg-emerald-50">
+                                Easy to use
+                              </Badge>
+                            )}
+                            {typeof item.tool.popularity_score === 'number' && item.tool.popularity_score > 0 && (
+                              <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50">
+                                Popular
+                              </Badge>
+                            )}
+                          </div>
+
+                          {(item.tool.affiliate_url || item.tool.website_url) && (
+                            <div className="mt-3">
+                              <Button
+                                size="sm"
+                                className="h-8 px-3 text-[11px] text-white"
+                                style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  trackToolClick(item.tool.id);
+                                  const url = item.tool.affiliate_url || item.tool.website_url;
+                                  if (!url) return;
+                                  window.open(url, '_blank', 'noopener,noreferrer');
+                                }}
+                              >
+                                Try this tool
+                              </Button>
+                            </div>
+                          )}
 
                           {(stackData.alternatives?.[item.tool.name] || []).slice(0, 2).length > 0 && (
                             <div className="mt-4 pt-3 border-t border-slate-100">

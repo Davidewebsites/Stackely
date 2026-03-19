@@ -60,6 +60,7 @@ interface AdaptedStackItem {
   role: string;
   why: string;
   rank: number;
+  isSynthesized: boolean;
 }
 
 function normalizeToolName(name: string): string {
@@ -76,6 +77,15 @@ function slugifyToolName(name: string): string {
 
 function inferCategoryFromRole(role: string): string {
   const lower = role.toLowerCase();
+  if (
+    lower.includes('ecommerce') ||
+    lower.includes('shop') ||
+    lower.includes('store') ||
+    lower.includes('checkout') ||
+    lower.includes('foundation') ||
+    lower.includes('builder')
+  ) return 'landing_pages';
+  if (lower.includes('traffic') || lower.includes('acquisition') || lower.includes('ads')) return 'ads';
   if (lower.includes('email')) return 'email_marketing';
   if (lower.includes('landing') || lower.includes('page')) return 'landing_pages';
   if (lower.includes('analytic') || lower.includes('insight') || lower.includes('report') || lower.includes('data')) return 'analytics';
@@ -286,6 +296,7 @@ export default function Results() {
         role: item.role,
         why: item.why,
         rank: index + 1,
+        isSynthesized: !matched,
       };
     });
   }, [stackData]);
@@ -679,6 +690,7 @@ export default function Results() {
                           isInStack={stackSelection.some((t) => t.id === item.tool.id)}
                           onToggleCompare={toggleCompare}
                           onToggleStack={toggleStack}
+                          disableNavigation={item.isSynthesized}
                         />
 
                         <div className="px-1 pb-0.5">

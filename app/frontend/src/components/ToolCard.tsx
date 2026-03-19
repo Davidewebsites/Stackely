@@ -14,6 +14,7 @@ interface ToolCardProps {
   isInStack?: boolean;
   onToggleCompare?: (tool: Tool) => void;
   onToggleStack?: (tool: Tool) => void;
+  disableNavigation?: boolean;
 }
 
 const pricingStyles: Record<string, string> = {
@@ -36,6 +37,7 @@ export default function ToolCard({
   isInStack = false,
   onToggleCompare,
   onToggleStack,
+  disableNavigation = false,
 }: ToolCardProps) {
   const navigate = useNavigate();
   const categoryInfo = CATEGORIES.find((c) => c.id === tool.category);
@@ -55,7 +57,10 @@ export default function ToolCard({
           ? 'border-violet-400 ring-1 ring-violet-300/30'
           : 'border-slate-200 hover:border-[#2F80ED]/40'
       }`}
-      onClick={() => navigate(`/tools/${tool.slug}`)}
+      onClick={() => {
+        if (disableNavigation) return;
+        navigate(`/tools/${tool.slug}`);
+      }}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3.5">

@@ -535,7 +535,7 @@ export default function Results() {
                   </div>
                 ) : searchResults.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
                       {searchResults.map((tool) => (
                         <ToolCard
                           key={tool.id}
@@ -547,8 +547,8 @@ export default function Results() {
                         />
                       ))}
                     </div>
-                    <div className="border-t border-slate-200 pt-12">
-                      <SmartEmptyState onSelectStack={handleSmartStackSelect} />
+                    <div className="border-t border-slate-200 pt-8">
+                      <SmartEmptyState onSelectStack={handleSmartStackSelect} compact />
                     </div>
                   </>
                 ) : (
@@ -672,7 +672,7 @@ export default function Results() {
                 <div className="space-y-3.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {aiStackItems.map((item) => (
-                      <div key={`${item.tool.id}-${item.rank}`} className="space-y-2">
+                      <div key={`${item.tool.id}-${item.rank}`} className="space-y-1.5">
                         <ToolCard
                           tool={item.tool}
                           isSelectedForCompare={selectedForCompare.some((t) => t.id === item.tool.id)}
@@ -681,10 +681,10 @@ export default function Results() {
                           onToggleStack={toggleStack}
                         />
 
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                          <div className="flex items-center gap-2 mb-1.5">
+                        <div className="px-1 pb-0.5">
+                          <div className="flex items-center gap-2 mb-1">
                             <span
-                              className="inline-flex items-center justify-center w-5 h-5 rounded-md text-white text-[10px] font-semibold"
+                              className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-md text-white text-[10px] font-semibold"
                               style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
                             >
                               {item.rank}
@@ -693,7 +693,7 @@ export default function Results() {
                               {item.role}
                             </span>
                           </div>
-                          <p className="text-[12px] text-slate-600 leading-relaxed">{item.why}</p>
+                          <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">{item.why}</p>
                         </div>
                       </div>
                     ))}
@@ -758,14 +758,14 @@ export default function Results() {
       {/* Draft stack summary */}
       {stackSelection.length >= 2 && (
         <div className="max-w-7xl mx-auto px-8 pb-10">
-          <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-5">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="rounded-xl border border-violet-100 bg-violet-50/20 p-4">
+            <div className="flex items-center gap-2 mb-3.5">
               <Layers className="w-4 h-4 text-violet-500" />
               <h3 className="text-[14px] font-semibold text-slate-900">Your draft stack</h3>
               <span className="text-[11px] text-slate-400 ml-1">{stackSelection.length} tools</span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-3.5">
               {stackSelection.map((t) => (
                 <span
                   key={t.id}

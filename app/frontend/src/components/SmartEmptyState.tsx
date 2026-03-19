@@ -4,6 +4,7 @@ import { type Tool } from '@/lib/api';
 
 interface SmartEmptyStateProps {
   onSelectStack: (tools: Tool[]) => void;
+  compact?: boolean;
 }
 
 // Predefined minimal Tool objects for suggested stacks
@@ -189,13 +190,13 @@ const STACK_OPTIONS: StackOption[] = [
   },
 ];
 
-export default function SmartEmptyState({ onSelectStack }: SmartEmptyStateProps) {
+export default function SmartEmptyState({ onSelectStack, compact = false }: SmartEmptyStateProps) {
   return (
-    <div className="py-20 px-6">
+    <div className={compact ? 'py-10 px-0' : 'py-20 px-6'}>
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h2 className="text-[28px] sm:text-[32px] font-bold text-slate-900 tracking-tight mb-2">
+        <div className={`text-center ${compact ? 'mb-8' : 'mb-12'}`}>
+          <h2 className={`font-bold text-slate-900 tracking-tight mb-2 ${compact ? 'text-[24px] sm:text-[28px]' : 'text-[28px] sm:text-[32px]'}`}>
             Get Started with a Starter Stack
           </h2>
           <p className="text-[15px] text-slate-500">
@@ -204,13 +205,13 @@ export default function SmartEmptyState({ onSelectStack }: SmartEmptyStateProps)
         </div>
 
         {/* Stack Options Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className={`grid grid-cols-1 sm:grid-cols-3 ${compact ? 'gap-4' : 'gap-5'}`}>
           {STACK_OPTIONS.map((option) => {
             const IconComponent = option.icon;
             return (
               <div
                 key={option.title}
-                className="flex flex-col p-5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+                className={`flex flex-col rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors ${compact ? 'p-4' : 'p-5'}`}
               >
                 {/* Icon & Header */}
                 <div className="flex items-start gap-3 mb-4">

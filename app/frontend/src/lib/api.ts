@@ -196,6 +196,267 @@ export interface AIAcceleratorTool extends Tool {
   use_it_for: string;
 }
 
+export interface StackResponse {
+  goal: string;
+  stack: Array<{
+    tool: string;
+    role: string;
+    why: string;
+    logo_url?: string;
+    logo?: string;
+    website_url?: string;
+  }>;
+  comparison: Array<{
+    toolA: string;
+    toolB: string;
+    winner: string;
+    reason: string;
+  }>;
+  notes: string[];
+}
+
+function normalizeGoalText(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+function splitTokens(value: string): string[] {
+  return normalizeGoalText(value)
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 3);
+}
+
+export function detectIntentFromGoal(goal: string): string {
+  const normalizedGoal = normalizeGoalText(goal);
+
+  const intentPhrases: Record<string, string[]> = {
+    marketing: ['marketing funnel', 'lead generation', 'customer acquisition', 'email campaign', 'brand awareness'],
+    creation: ['landing page', 'website', 'site builder', 'build page', 'launch website'],
+    automation: ['workflow automation', 'automate', 'integration', 'sync apps', 'connect tools'],
+    analytics: ['analytics', 'tracking', 'measure', 'insights', 'dashboard'],
+    content: ['copywriting', 'write content', 'blog', 'content strategy', 'article'],
+    video: ['video', 'editing', 'recording', 'demo video', 'tutorial'],
+  };
+
+  for (const [intent, phrases] of Object.entries(intentPhrases)) {
+    if (phrases.some((phrase) => normalizedGoal.includes(phrase))) {
+      return intent;
+    }
+  }
+
+  const intentKeywords: Record<string, string[]> = {
+    marketing: ['marketing', 'campaign', 'traffic', 'conversion', 'audience'],
+    creation: ['build', 'create', 'design', 'website', 'landing'],
+    automation: ['automate', 'automation', 'workflow', 'integration', 'pipeline'],
+    analytics: ['analytics', 'track', 'measure', 'report', 'metrics'],
+    content: ['content', 'copy', 'writing', 'blog'],
+    video: ['video', 'media', 'record', 'edit'],
+  };
+
+  let bestIntent = 'creation';
+  let bestScore = 0;
+
+  for (const [intent, keywords] of Object.entries(intentKeywords)) {
+    const score = keywords.reduce((acc, keyword) => (normalizedGoal.includes(keyword) ? acc + 1 : acc), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIntent = intent;
+    }
+  }
+
+  return bestIntent;
+}
+
+export function getIntentCategories(intent: string): string[] {
+  const categoryMap: Record<string, string[]> = {
+    creation: ['landing_pages', 'copywriting', 'design'],
+    marketing: ['landing_pages', 'email_marketing', 'analytics', 'automation'],
+    analytics: ['analytics', 'automation'],
+    automation: ['automation', 'email_marketing', 'analytics'],
+    content: ['copywriting', 'video', 'design'],
+    video: ['video', 'copywriting', 'design'],
+  };
+
+  return categoryMap[intent] || ['landing_pages', 'copywriting'];
+}
+
+function getRoleForCategory(category: string, index: number): string {
+  const roleByCategory: Record<string, string> = {
+    landing_pages: 'Foundation Builder',
+    copywriting: 'Content Creator',
+    automation: 'Workflow Engine',
+    email_marketing: 'Email Nurturer',
+    analytics: 'Performance Tracker',
+    video: 'Media Producer',
+    design: 'Design System',
+    ads: 'Traffic Driver',
+  };
+
+  if (roleByCategory[category]) return roleByCategory[category];
+  if (index === 0) return 'Primary Tool';
+  if (index === 1) return 'Secondary Tool';
+  return 'Supporting Tool';
+}
+
+function buildWhyText(tool: Tool, intent: string): string {
+  const base =
+    tool.short_description ||
+    tool.recommended_for ||
+    `Strong fit for ${intent.replace('_', ' ')} goals.`;
+
+  const useCaseText = (tool.use_cases || '').split(',').map((x) => x.trim()).filter(Boolean)[0];
+  if (useCaseText) {
+    return `${base} Useful for ${useCaseText}.`;
+  }
+
+  return base;
+}
+
+function scoreToolForGoal(tool: Tool, goal: string, intentCategories: string[]): number {
+  const goalTokens = splitTokens(goal);
+
+  let score = tool.internal_score || 0;
+
+  if (intentCategories.includes(tool.category)) {
+    score += 35;
+  }
+
+  if (tool.beginner_friendly) {
+    score += 8;
+  }
+
+  const searchable = normalizeGoalText(
+    [tool.name, tool.tags, tool.use_cases, tool.recommended_for, tool.short_description, tool.category]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  const tokenMatches = goalTokens.reduce((acc, token) => (searchable.includes(token) ? acc + 1 : acc), 0);
+  score += tokenMatches * 6;
+
+  return score;
+}
+
+function dedupeByIdAndSlug(tools: Tool[]): Tool[] {
+  const seenIds = new Set<number>();
+  const seenSlugs = new Set<string>();
+
+  return tools.filter((tool) => {
+    const slug = (tool.slug || '').toLowerCase();
+    if (seenIds.has(tool.id)) return false;
+    if (slug && seenSlugs.has(slug)) return false;
+    seenIds.add(tool.id);
+    if (slug) seenSlugs.add(slug);
+    return true;
+  });
+}
+
+export async function recommendStackFromGoal(
+  goal: string,
+  pricingPreference: PricingPreference
+): Promise<StackResponse> {
+  const intent = detectIntentFromGoal(goal);
+  const intentCategories = getIntentCategories(intent);
+  const allowedPricingModels = getAllowedPricingModels(pricingPreference);
+
+  let tools: Tool[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('tools')
+      .select('*')
+      .eq('active', true)
+      .in('pricing_model', allowedPricingModels)
+      .limit(2000);
+
+    if (error) throw error;
+    tools = (data ?? []) as Tool[];
+  } catch (error) {
+    console.error('Failed to fetch tools for stack recommendation:', error);
+    tools = [];
+  }
+
+  const uniqueTools = dedupeByIdAndSlug(tools);
+  const categoryRelevant = uniqueTools.filter((tool) => intentCategories.includes(tool.category));
+  const candidateTools = categoryRelevant.length > 0 ? categoryRelevant : uniqueTools;
+
+  const ranked = candidateTools
+    .map((tool) => ({ tool, score: scoreToolForGoal(tool, goal, intentCategories) }))
+    .sort((a, b) => b.score - a.score);
+
+  const selected: Tool[] = [];
+  const usedCategories = new Set<string>();
+
+  for (const { tool } of ranked) {
+    if (selected.length >= 3) break;
+    if (!usedCategories.has(tool.category)) {
+      selected.push(tool);
+      usedCategories.add(tool.category);
+    }
+  }
+
+  if (selected.length < 3) {
+    for (const { tool } of ranked) {
+      if (selected.length >= 3) break;
+      if (!selected.some((t) => t.id === tool.id)) {
+        selected.push(tool);
+      }
+    }
+  }
+
+  const stack = selected.map((tool, index) => {
+    const role = getRoleForCategory(tool.category, index);
+    const why = buildWhyText(tool, intent);
+    return {
+      tool: tool.name,
+      role,
+      why,
+      logo_url: tool.logo_url,
+      logo: tool.logo_url,
+      website_url: tool.website_url,
+    };
+  });
+
+  const comparison =
+    selected.length >= 2
+      ? [
+          {
+            toolA: selected[0].name,
+            toolB: selected[1].name,
+            winner:
+              (selected[0].internal_score || 0) >= (selected[1].internal_score || 0)
+                ? selected[0].name
+                : selected[1].name,
+            reason:
+              (selected[0].internal_score || 0) >= (selected[1].internal_score || 0)
+                ? `${selected[0].name} ranks higher for this goal based on category fit and internal score.`
+                : `${selected[1].name} ranks higher for this goal based on category fit and internal score.`,
+          },
+        ]
+      : selected.length === 1
+      ? [
+          {
+            toolA: selected[0].name,
+            toolB: selected[0].name,
+            winner: selected[0].name,
+            reason: 'Only one matching tool is currently available for this recommendation.',
+          },
+        ]
+      : [];
+
+  const notes = [
+    `Goal: ${goal}`,
+    `Detected intent: ${intent.replace('_', ' ')}`,
+    'Recommendations are generated from active Supabase tools filtered by your pricing preference.',
+  ];
+
+  return {
+    goal,
+    stack,
+    comparison,
+    notes,
+  };
+}
+
 // Compute relevance score for a tool based on classification
 export function computeRelevanceScore(
   tool: Tool,

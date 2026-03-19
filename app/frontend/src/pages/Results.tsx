@@ -17,12 +17,13 @@ import {
   Plus,
 } from 'lucide-react';
 import {
-  STACK_RECOMMENDATION_URL,
   CATEGORIES,
   PRICING_OPTIONS,
   fetchToolsByCategories,
+  recommendStackFromGoal,
   saveStack,
   searchTools,
+  type StackResponse,
   type Tool,
   type PricingPreference,
 } from '@/lib/api';
@@ -36,25 +37,6 @@ import SelectedStackBar from '@/components/SelectedStackBar';
 import CompareDrawer from '@/components/CompareDrawer';
 import SmartEmptyState from '@/components/SmartEmptyState';
 import { getStackCoverage, getMissingCategories, getSuggestedTools, getSuggestionReason } from '@/lib/stackInsights';
-
-interface StackResponse {
-  goal: string;
-  stack: Array<{
-    tool: string;
-    role: string;
-    why: string;
-    logo_url?: string;
-    logo?: string;
-    website_url?: string;
-  }>;
-  comparison: Array<{
-    toolA: string;
-    toolB: string;
-    winner: string;
-    reason: string;
-  }>;
-  notes: string[];
-}
 
 interface AdaptedStackItem {
   tool: Tool;
@@ -185,16 +167,7 @@ export default function Results() {
       setSearchError(null);
       setStackLoading(true);
 
-      // Call stack recommendation endpoint
-      fetch(STACK_RECOMMENDATION_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: query, pricing_preference: pricingParam }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
+      recommendStackFromGoal(query, pricingParam)
         .then((stack) => setStackData(stack))
         .catch((err) => {
           console.error('Stack recommendation failed:', err);
@@ -429,15 +402,7 @@ export default function Results() {
         setSearchError(null);
 
         // Retry stack recommendation
-        fetch(STACK_RECOMMENDATION_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ goal: query, pricing_preference: pricingParam }),
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-          })
+        recommendStackFromGoal(query, pricingParam)
           .then((stack) => setStackData(stack))
           .catch((err) => {
             console.error('Stack recommendation retry failed:', err);

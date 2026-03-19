@@ -562,20 +562,12 @@ export default function Results() {
   };
 
   return (
-    <div className="min-h-screen bg-white relative overflow-hidden">
-      {/* Brand atmosphere */}
-      <div
-        className="pointer-events-none fixed top-[-120px] right-[-100px] w-[550px] h-[550px] rounded-full opacity-[0.05]"
-        style={{ background: 'radial-gradient(circle, #2F80ED 0%, #4FD1C5 40%, transparent 70%)' }}
-      />
-      <div
-        className="pointer-events-none fixed bottom-[-180px] left-[-120px] w-[600px] h-[600px] rounded-full opacity-[0.04]"
-        style={{ background: 'radial-gradient(circle, #8A2BE2 0%, #2F80ED 50%, transparent 70%)' }}
-      />
+    <div className="min-h-screen bg-slate-50/60 relative overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.72),rgba(248,250,252,0.8))]" />
 
       {/* Header */}
-      <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8 h-[72px] flex items-center justify-between">
+      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -594,21 +586,21 @@ export default function Results() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-8 py-14 relative">
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14 lg:py-16 relative">
         {/* Mode indicator */}
         {query && (
-          <div className="mb-6 flex items-center gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
+          <div className="mb-8 flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               {queryMode === 'stack' ? 'AI Stack Mode' : 'Tool Search Mode'}
             </span>
-            <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-blue-500' : 'bg-green-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-slate-700' : 'bg-emerald-500'}`} />
           </div>
         )}
         {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-36">
-            <Loader2 className="w-6 h-6 animate-spin mb-5" style={{ color: '#2F80ED' }} />
-            <h2 className="text-[18px] font-medium text-slate-900 mb-1.5">
+            <Loader2 className="w-6 h-6 animate-spin mb-5 text-slate-700" />
+            <h2 className="text-[19px] font-semibold text-slate-900 mb-1.5">
               {isDirectBrowse ? 'Loading tools...' : isStackMode ? 'Building your stack' : 'Searching tools'}
             </h2>
             <p className="text-[14px] text-slate-500">
@@ -639,8 +631,7 @@ export default function Results() {
               </Button>
               <Button
                 onClick={handleRetry}
-                className="h-10 text-[13px] text-white shadow-none"
-                style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                className="h-10 text-[13px] text-white shadow-none bg-slate-900 hover:bg-slate-800"
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                 Try again
@@ -664,11 +655,11 @@ export default function Results() {
             {/* Keyword Search Mode */}
             {isKeywordSearch && (
               <>
-                <div className="mb-14">
-                  <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-4">
+                <div className="mb-16">
+                  <h1 className="text-[34px] sm:text-[42px] font-semibold text-slate-950 tracking-tight mb-3">
                     Search results for "{query}"
                   </h1>
-                  <p className="text-[16px] text-slate-500">
+                  <p className="text-[15px] text-slate-500">
                     {searchResults.length} tool{searchResults.length !== 1 ? 's' : ''} found
                   </p>
                 </div>
@@ -794,8 +785,7 @@ export default function Results() {
                       <p className="text-[15px] text-slate-500 mb-5">No tools found for this category.</p>
                       <Button
                         onClick={() => navigate('/')}
-                        className="h-10 text-[13px] text-white shadow-none"
-                        style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                        className="h-10 text-[13px] text-white shadow-none bg-slate-900 hover:bg-slate-800"
                       >
                         Go back
                       </Button>
@@ -808,16 +798,16 @@ export default function Results() {
             {/* Stack Recommendation Section */}
             {queryMode === 'stack' && stackData && (
               <div className="mt-16">
-                <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                      <Layers className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                      <Layers className="w-5 h-5 text-slate-700" />
                     </div>
                     <div>
-                      <h2 className="text-[24px] font-semibold text-slate-900 tracking-tight">
+                      <h2 className="text-[28px] font-semibold text-slate-950 tracking-tight">
                         Stack for: {query}
                       </h2>
-                      <p className="text-[13px] text-slate-500 mt-0.5">
+                      <p className="text-[14px] text-slate-500 mt-1">
                         Workflow recommendation with {stackData.stack.length} structured step{stackData.stack.length !== 1 ? 's' : ''}
                       </p>
                     </div>
@@ -827,24 +817,23 @@ export default function Results() {
                     <Badge variant="outline" className="text-[11px] border-slate-300 bg-white">
                       Pricing: {stackPricingLabel}
                     </Badge>
-                    <Badge variant="outline" className="text-[11px] border-blue-200 text-blue-700 bg-blue-50">
+                    <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
                       Workflow Mode
                     </Badge>
                   </div>
 
-                  <p className="text-[14px] text-slate-600">
+                  <p className="text-[14px] text-slate-600 leading-relaxed">
                     This stack is ordered as a workflow so each tool plays a clear role from setup to optimization.
                   </p>
                 </div>
 
-                <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                <div className="mb-10 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                   <div className="flex items-center justify-between gap-3">
                     {['Setup', 'Automate', 'Optimize'].map((label, index) => (
                       <div key={label} className="flex items-center flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold text-white"
-                            style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold text-white bg-slate-800"
                           >
                             {index + 1}
                           </span>
@@ -857,10 +846,10 @@ export default function Results() {
                 </div>
 
                 {stackData.summary && (
-                  <div className="mb-8 rounded-2xl border border-blue-200 bg-blue-50/70 p-5 sm:p-6">
+                  <div className="mb-10 rounded-2xl border border-slate-300 bg-slate-100/80 p-5 sm:p-6">
                     <div className="flex items-center gap-2 mb-2.5">
-                      <Sparkles className="w-4 h-4 text-blue-600" />
-                      <h3 className="text-[14px] font-semibold uppercase tracking-wide text-blue-800">
+                      <Sparkles className="w-4 h-4 text-slate-700" />
+                      <h3 className="text-[13px] font-semibold uppercase tracking-wide text-slate-700">
                         Why this stack is optimal
                       </h3>
                     </div>
@@ -868,13 +857,13 @@ export default function Results() {
                   </div>
                 )}
 
-                <div className="space-y-5">
+                <div className="space-y-6">
                   {aiStackItems.map((item, index) => (
                     <div key={`${item.tool.id}-${item.rank}`} className="relative pl-0 sm:pl-16">
                       <div className="hidden sm:flex absolute left-0 top-2 flex-col items-center">
                         <span
                           className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-[12px] font-semibold"
-                          style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                          style={{ background: '#0f172a' }}
                         >
                           {index + 1}
                         </span>
@@ -882,11 +871,11 @@ export default function Results() {
                       </div>
 
                       <div
-                        className={`rounded-2xl border bg-white p-4 sm:p-5 transition-all duration-300 ${
+                        className={`rounded-2xl border bg-white p-5 sm:p-6 transition-all duration-300 ${
                           recentlyReplacedToolId === item.tool.id
                             ? 'border-emerald-300 ring-2 ring-emerald-100'
                             : index === 0
-                            ? 'border-blue-300 ring-1 ring-blue-100 shadow-sm'
+                            ? 'border-slate-400 ring-1 ring-slate-200 shadow-sm'
                             : 'border-slate-200'
                         }`}
                       >
@@ -894,21 +883,21 @@ export default function Results() {
                           <div className="flex items-center gap-2">
                             <span
                               className="sm:hidden inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-[11px] font-semibold"
-                              style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                              style={{ background: '#0f172a' }}
                             >
                               {index + 1}
                             </span>
-                            <span className="text-[12px] font-semibold uppercase tracking-wide text-[#2F80ED]">
+                            <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-700">
                               Step {index + 1}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {index === 0 && (
-                              <Badge className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-100">
+                              <Badge className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50">
                                 Best starting point
                               </Badge>
                             )}
-                            <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50">
+                            <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-slate-50">
                               {item.role}
                             </Badge>
                           </div>
@@ -936,7 +925,7 @@ export default function Results() {
                               </Badge>
                             )}
                             {typeof item.tool.popularity_score === 'number' && item.tool.popularity_score > 0 && (
-                              <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 bg-blue-50">
+                              <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-slate-50">
                                 Popular
                               </Badge>
                             )}
@@ -946,8 +935,7 @@ export default function Results() {
                             <div className="mt-3">
                               <Button
                                 size="sm"
-                                className="h-8 px-3 text-[11px] text-white"
-                                style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                                className="h-8 px-3 text-[11px] text-white bg-slate-900 hover:bg-slate-800"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   trackToolClick(item.tool.id);
@@ -1022,7 +1010,7 @@ export default function Results() {
 
                 {/* Comparison Section */}
                 {stackData.comparison && stackData.comparison.length > 0 && (
-                  <div className="mt-12 pt-8 border-t border-slate-200">
+                  <div className="mt-14 pt-8 border-t border-slate-200">
                     <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Tool Comparisons</h3>
                     <div className="space-y-4">
                       {stackData.comparison.map((comp, index) => (
@@ -1044,7 +1032,7 @@ export default function Results() {
 
                 {/* Notes Section */}
                 {cleanedStackNotes.length > 0 && (
-                  <div className="mt-12 pt-8 border-t border-slate-200">
+                  <div className="mt-14 pt-8 border-t border-slate-200">
                     <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Additional Notes</h3>
                     <div className="space-y-3">
                       {cleanedStackNotes.map((note, index) => (
@@ -1064,8 +1052,7 @@ export default function Results() {
                 <p className="text-[15px] text-slate-500 mb-5">No matching tools found. Try a different goal.</p>
                 <Button
                   onClick={() => navigate('/')}
-                  className="h-10 text-[13px] text-white shadow-none"
-                  style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                  className="h-10 text-[13px] text-white shadow-none bg-slate-900 hover:bg-slate-800"
                 >
                   Try a different goal
                 </Button>
@@ -1163,7 +1150,7 @@ export default function Results() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] font-medium gap-0.5 text-slate-400 hover:text-[#2F80ED] hover:bg-blue-50 flex-shrink-0"
+                                className="h-5 px-1.5 text-[10px] font-medium gap-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex-shrink-0"
                                 onClick={() => navigate(`/results?q=${encodeURIComponent(name)}`)}
                               >
                                 Search

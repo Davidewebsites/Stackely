@@ -24,8 +24,8 @@ interface ToolCardProps {
 
 const pricingStyles: Record<string, string> = {
   free: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  freemium: 'bg-blue-50 text-blue-700 border-blue-200',
-  paid: 'bg-amber-50 text-amber-700 border-amber-200',
+  freemium: 'bg-sky-50 text-sky-700 border-sky-200',
+  paid: 'bg-slate-100 text-slate-700 border-slate-300',
 };
 
 const skillStyles: Record<string, string> = {
@@ -56,13 +56,13 @@ export default function ToolCard({
 
   return (
     <div
-      className={`group flex flex-col p-5 rounded-xl border bg-white transition-all ${
+      className={`group flex flex-col p-6 rounded-2xl border bg-white transition-all duration-200 ${
         isSelectedForCompare
-          ? 'border-[#2F80ED] ring-1 ring-[#2F80ED]/30'
+          ? 'border-slate-700 ring-1 ring-slate-200'
           : isInStack
-          ? 'border-violet-400 ring-1 ring-violet-300/30'
+          ? 'border-slate-500 ring-1 ring-slate-200'
           : isNavigable
-          ? 'border-slate-200 hover:border-[#2F80ED]/40 hover:bg-blue-50/10'
+          ? 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
           : 'border-slate-200'
       } ${
         isNavigable ? 'cursor-pointer' : 'cursor-default'
@@ -73,30 +73,30 @@ export default function ToolCard({
       }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-3.5">
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <h3
                 className={`text-[15px] font-semibold text-slate-900 truncate transition-colors ${
-                  isNavigable ? 'group-hover:text-[#2F80ED]' : ''
+                  isNavigable ? 'group-hover:text-slate-700' : ''
                 }`}
               >
                 {tool.name}
               </h3>
               {isAI && (
-                <Sparkles className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                <Sparkles className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
               )}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               {categoryInfo && (
-                <span className="text-[11px] text-slate-400">{categoryInfo.label}</span>
+                <span className="text-[11px] text-slate-500">{categoryInfo.label}</span>
               )}
               {isAI && (
                 <>
                   <span className="text-slate-200">·</span>
-                  <span className="text-[11px] text-violet-500 font-medium">
+                  <span className="text-[11px] text-slate-500 font-medium">
                     {tool.tool_type === 'hybrid' ? 'AI-enhanced' : 'AI'}
                   </span>
                 </>
@@ -104,7 +104,7 @@ export default function ToolCard({
               {relevanceScore !== undefined && relevanceScore > 0 && (
                 <>
                   <span className="text-slate-200">·</span>
-                  <span className="text-[11px] font-medium" style={{ color: '#2F80ED' }}>{relevanceScore.toFixed(0)}% match</span>
+                  <span className="text-[11px] font-medium text-slate-600">{relevanceScore.toFixed(0)}% match</span>
                 </>
               )}
             </div>
@@ -116,28 +116,28 @@ export default function ToolCard({
       </div>
 
       {/* Description */}
-      <p className="text-[13px] text-slate-500 leading-relaxed mb-3.5 line-clamp-2">
+      <p className="text-[13px] text-slate-600 leading-relaxed mb-4 line-clamp-2">
         {tool.short_description}
       </p>
 
       {/* Insight rows (non-compact only) */}
       {!compact && hasInsights && (
-        <div className="mb-3.5 space-y-1.5">
+        <div className="mb-4 space-y-2">
           {bestFor !== '—' && (
-            <div className="flex gap-1.5 items-baseline">
+            <div className="flex gap-2 items-baseline">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-20 flex-shrink-0">Best for</span>
               <span className="text-[12px] text-slate-600 leading-snug line-clamp-1">{bestFor}</span>
             </div>
           )}
           {whyRec !== '—' && (
-            <div className="flex gap-1.5 items-baseline">
+            <div className="flex gap-2 items-baseline">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-20 flex-shrink-0">Why</span>
               <span className="text-[12px] text-slate-600 leading-snug line-clamp-1">{whyRec}</span>
             </div>
           )}
           {avoidIf !== null && (
-            <div className="flex gap-1.5 items-baseline">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-400 w-20 flex-shrink-0">Avoid if</span>
+            <div className="flex gap-2 items-baseline">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500 w-20 flex-shrink-0">Avoid if</span>
               <span className="text-[12px] text-amber-600 leading-snug line-clamp-1">{avoidIf}</span>
             </div>
           )}
@@ -146,9 +146,9 @@ export default function ToolCard({
 
       {/* Use cases (non-compact only) */}
       {!compact && tool.use_cases && (
-        <div className="flex flex-wrap gap-1.5 mb-3.5">
+        <div className="flex flex-wrap gap-1.5 mb-4">
           {tool.use_cases.split(',').slice(0, 3).map((uc) => (
-            <span key={uc} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
+            <span key={uc} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
               {uc.trim().replace(/_/g, ' ')}
             </span>
           ))}
@@ -156,7 +156,7 @@ export default function ToolCard({
       )}
 
       {/* Footer */}
-      <div className="mt-auto flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
+      <div className="mt-auto flex items-center justify-between gap-2 pt-4 border-t border-slate-100">
         <div className="flex items-center gap-2">
           <span className={`text-[11px] font-medium capitalize ${skillStyles[tool.skill_level] || 'text-slate-500'}`}>
             {tool.skill_level}
@@ -176,8 +176,8 @@ export default function ToolCard({
               size="sm"
               className={`h-6 px-1.5 text-[10px] font-medium gap-0.5 ${
                 isSelectedForCompare
-                  ? 'text-[#2F80ED] bg-blue-50 hover:bg-blue-100'
-                  : 'text-slate-400 hover:text-[#2F80ED] hover:bg-blue-50'
+                  ? 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -195,8 +195,8 @@ export default function ToolCard({
               size="sm"
               className={`h-6 px-1.5 text-[10px] font-medium gap-0.5 ${
                 isInStack
-                  ? 'text-violet-600 bg-violet-50 hover:bg-violet-100'
-                  : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'
+                  ? 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -212,7 +212,7 @@ export default function ToolCard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-slate-400 hover:text-[#2F80ED]"
+              className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700"
               onClick={(e) => {
                 e.stopPropagation();
                 trackToolClick(tool.id);
@@ -223,7 +223,7 @@ export default function ToolCard({
             </Button>
           )}
           {isNavigable ? (
-            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-[#2F80ED] transition-colors" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 transition-colors" />
           ) : (
             <span className="text-[10px] text-slate-400 font-medium">Preview only</span>
           )}

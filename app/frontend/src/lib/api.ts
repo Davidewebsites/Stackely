@@ -3,8 +3,12 @@ import { LOCAL_TOOLS } from '@/data/tools';
 import { supabase } from './supabase';
 
 const client = createClient();
+const defaultApiBaseUrl = import.meta.env.DEV ? 'http://127.0.0.1:8000' : window.location.origin;
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl).replace(/\/+$/, '');
 
 export { client };
+export const API_BASE_URL = apiBaseUrl;
+export const STACK_RECOMMENDATION_URL = `${apiBaseUrl}/api/v1/stack/recommend`;
 
 // Pricing preference options — professional labels
 export const PRICING_OPTIONS = [
@@ -500,6 +504,11 @@ export async function searchTools(
 
   const allowedModels = getAllowedPricingModels(pricingPreference);
   let sourceTools: Tool[] = [];
+  const fallbackTools = LOCAL_TOOLS.filter((tool) => {
+    if (tool.active === false) return false;
+    if (category && tool.category !== category) return false;
+    return allowedModels.includes(tool.pricing_model);
+  });
 
   // Primary source of truth for search: same tools table used by detail/category fetches.
   try {
@@ -522,16 +531,24 @@ export async function searchTools(
   }
 
   if (sourceTools.length === 0) {
-    sourceTools = LOCAL_TOOLS.filter((tool) => {
-      if (!tool.active) return false;
-      if (category && tool.category !== category) return false;
-      return allowedModels.includes(tool.pricing_model);
-    });
+    sourceTools = fallbackTools;
   }
 
+  const primaryResults = searchInTools(sourceTools, cleanQuery, limit);
+  if (primaryResults.length > 0) {
+    return primaryResults;
+  }
+
+  if (sourceTools !== fallbackTools) {
+    return searchInTools(fallbackTools, cleanQuery, limit);
+  }
+
+  return [];
+}
+
+function searchInTools(tools: Tool[], query: string, limit: number): Tool[] {
   // Strict search first: deterministic includes match across core fields.
-  const strictResults = sourceTools.filter(tool => {
-    // Search in multiple fields
+  const strictResults = tools.filter(tool => {
     const searchFields = [
       tool.name,
       tool.short_description || '',
@@ -544,35 +561,25 @@ export async function searchTools(
       tool.recommended_for || '',
     ].join(' ').toLowerCase();
 
-    const query = cleanQuery.toLowerCase();
-    return searchFields.includes(query);
+    return searchFields.includes(query.toLowerCase());
   });
 
   if (strictResults.length > 0) {
     const resultsWithScores = strictResults.map(tool => ({
       tool,
-      relevanceScore: calculateRelevanceScore(tool, cleanQuery)
+      relevanceScore: calculateRelevanceScore(tool, query)
     }));
 
     resultsWithScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
     return resultsWithScores.slice(0, limit).map(item => item.tool);
   }
 
-  // Lightweight typo-tolerance fallback on name/slug and semantic keywords.
-  const fuzzyResults = getFuzzyFallbackResults(sourceTools, cleanQuery, limit);
+  const fuzzyResults = getFuzzyFallbackResults(tools, query, limit);
   if (fuzzyResults.length > 0) {
     return fuzzyResults;
   }
 
-  // Calculate relevance scores and sort
-  const resultsWithScores = strictResults.map(tool => ({
-    tool,
-    relevanceScore: calculateRelevanceScore(tool, cleanQuery)
-  }));
-
-  resultsWithScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
-
-  return resultsWithScores.slice(0, limit).map(item => item.tool);
+  return [];
 }
 
 function normalizeForFuzzy(value: string): string {

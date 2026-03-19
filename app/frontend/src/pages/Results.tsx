@@ -17,6 +17,7 @@ import {
   Plus,
 } from 'lucide-react';
 import {
+  STACK_RECOMMENDATION_URL,
   CATEGORIES,
   PRICING_OPTIONS,
   fetchToolsByCategories,
@@ -153,7 +154,11 @@ export default function Results() {
   const [stackData, setStackData] = useState<StackResponse | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
   const [catalogTools, setCatalogTools] = useState<Tool[]>([]);
-  const [queryMode, setQueryMode] = useState<'stack' | 'search'>('search');
+
+  const queryMode = useMemo<'stack' | 'search'>(() => {
+    if (!query) return 'search';
+    return classifyQueryMode(query);
+  }, [query]);
 
   // Compare & temporary stack state
   const [selectedForCompare, setSelectedForCompare] = useState<Tool[]>([]);
@@ -172,11 +177,8 @@ export default function Results() {
   useEffect(() => {
     if (!query) return;
 
-    const mode = classifyQueryMode(query);
-    setQueryMode(mode);
-
     // Clear stale state when switching modes
-    if (mode === 'stack') {
+    if (queryMode === 'stack') {
       setStackData(null);
       setSearchResults([]);
       setSearchLoading(false);
@@ -184,10 +186,10 @@ export default function Results() {
       setStackLoading(true);
 
       // Call stack recommendation endpoint
-      fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
+      fetch(STACK_RECOMMENDATION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: query }),
+        body: JSON.stringify({ goal: query, pricing_preference: pricingParam }),
       })
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -218,7 +220,7 @@ export default function Results() {
         })
         .finally(() => setSearchLoading(false));
     }
-  }, [query, pricingParam, categoryParam]);
+  }, [query, queryMode, pricingParam, categoryParam]);
 
   useEffect(() => {
     if (queryMode !== 'stack' || !query) return;
@@ -427,10 +429,10 @@ export default function Results() {
         setSearchError(null);
 
         // Retry stack recommendation
-        fetch('http://127.0.0.1:8000/api/v1/stack/recommend', {
+        fetch(STACK_RECOMMENDATION_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ goal: query }),
+          body: JSON.stringify({ goal: query, pricing_preference: pricingParam }),
         })
           .then((res) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);

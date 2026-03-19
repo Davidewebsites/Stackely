@@ -1,6 +1,6 @@
 """Schemas for Stack recommendation endpoint."""
 
-from typing import List
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,10 @@ class StackRequest(BaseModel):
     """Request payload for stack recommendation."""
 
     goal: str = Field(..., description="User goal describing what they want to achieve")
+    pricing_preference: Literal["free_only", "free_freemium", "freemium_paid", "any"] = Field(
+        "any",
+        description="Pricing preference used to constrain recommended tools",
+    )
 
 
 class StackTool(BaseModel):

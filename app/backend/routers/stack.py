@@ -22,7 +22,7 @@ async def recommend_stack(
     """Recommend a toolstack for a given user goal."""
     try:
         service = StackService(db)
-        return await service.recommend(request.goal)
+        return await service.recommend(request.goal, request.pricing_preference)
     except Exception as e:
         logger.error(f"Stack recommendation failed: {e}")
         raise HTTPException(

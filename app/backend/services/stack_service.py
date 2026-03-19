@@ -1,10 +1,13 @@
 """Service layer for stack recommendation logic."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from sqlalchemy import select
 
 from models.tools import Tools
+
+
+PricingPreference = Literal["free_only", "free_freemium", "freemium_paid", "any"]
 
 
 class StackService:
@@ -14,10 +17,10 @@ class StackService:
         # Database is optional; recommendations use the DB-backed tools catalog when available.
         self.db = db
 
-    async def recommend(self, goal: str) -> Dict[str, Any]:
+    async def recommend(self, goal: str, pricing_preference: PricingPreference = "any") -> Dict[str, Any]:
         """Recommend a tool stack based on the provided goal."""
 
-        tools = await self._load_active_tools()
+        tools = await self._load_active_tools(pricing_preference)
 
         normalized_goal = (goal or "").strip().lower()
 
@@ -38,7 +41,7 @@ class StackService:
         relevant_tools.sort(key=lambda t: self._calculate_relevance_score(t, intent), reverse=True)
 
         # Build diverse stack with role-based selection
-        stack = self._build_diverse_stack(relevant_tools, intent)
+        stack = self._build_diverse_stack(relevant_tools, intent, pricing_preference)
 
         # Enhanced comparison logic using multiple factors
         comparison = self._build_smart_comparison(relevant_tools, intent)
@@ -57,17 +60,37 @@ class StackService:
             "notes": notes,
         }
 
-    async def _load_active_tools(self) -> List[Dict[str, Any]]:
+    async def _load_active_tools(self, pricing_preference: PricingPreference) -> List[Dict[str, Any]]:
         """Load active tools from the primary DB-backed catalog."""
         if self.db is None:
             return []
 
+        allowed_models = self._get_allowed_pricing_models(pricing_preference)
+
         result = await self.db.execute(
             select(Tools)
             .where(Tools.active.is_(True))
+            .where(Tools.pricing_model.in_(allowed_models))
             .order_by(Tools.internal_score.desc().nullslast(), Tools.name.asc())
         )
         return [self._serialize_tool(tool) for tool in result.scalars().all()]
+
+    def _get_allowed_pricing_models(self, pricing_preference: PricingPreference) -> List[str]:
+        """Map frontend pricing preferences to supported pricing models."""
+        pricing_map = {
+            "free_only": ["free"],
+            "free_freemium": ["free", "freemium"],
+            "freemium_paid": ["freemium", "paid"],
+            "any": ["free", "freemium", "paid"],
+        }
+        return pricing_map.get(pricing_preference, pricing_map["any"])
+
+    def _filter_tools_by_pricing(
+        self, tools: List[Dict[str, Any]], pricing_preference: PricingPreference
+    ) -> List[Dict[str, Any]]:
+        """Keep only tools compatible with the selected pricing preference."""
+        allowed_models = set(self._get_allowed_pricing_models(pricing_preference))
+        return [tool for tool in tools if tool.get("pricing_model") in allowed_models]
 
     def _serialize_tool(self, tool: Tools) -> Dict[str, Any]:
         """Convert ORM tool rows into the dict shape used by recommendation helpers."""
@@ -296,7 +319,12 @@ class StackService:
 
         return base_score * relevance_multiplier
 
-    def _build_diverse_stack(self, tools: List[Dict[str, Any]], intent: str) -> List[Dict[str, Any]]:
+    def _build_diverse_stack(
+        self,
+        tools: List[Dict[str, Any]],
+        intent: str,
+        pricing_preference: PricingPreference,
+    ) -> List[Dict[str, Any]]:
         """Build a diverse stack with role-based tool selection."""
         if len(tools) < 3:
             # Add fallback tools if needed
@@ -306,6 +334,7 @@ class StackService:
                     "short_description": "All-in-one workspace for notes and docs.",
                     "internal_score": 90,
                     "category": "automation",
+                    "pricing_model": "freemium",
                     "use_cases": "project management, documentation, knowledge base",
                     "target_audience": "teams and individuals",
                     "recommended_for": "organizing work and information",
@@ -318,6 +347,7 @@ class StackService:
                     "short_description": "Automate workflows across apps.",
                     "internal_score": 85,
                     "category": "automation",
+                    "pricing_model": "freemium",
                     "use_cases": "workflow automation, app integration, process optimization",
                     "target_audience": "businesses and teams",
                     "recommended_for": "connecting tools and automating processes",
@@ -330,6 +360,7 @@ class StackService:
                     "short_description": "Design and prototype interfaces.",
                     "internal_score": 80,
                     "category": "design",
+                    "pricing_model": "freemium",
                     "use_cases": "ui design, prototyping, collaboration",
                     "target_audience": "designers and teams",
                     "recommended_for": "creating visual designs and prototypes",
@@ -338,7 +369,8 @@ class StackService:
                     "logo": "https://logo.clearbit.com/figma.com"
                 },
             ]
-            tools = (tools + fallback_tools)[:3]
+            filtered_fallbacks = self._filter_tools_by_pricing(fallback_tools, pricing_preference)
+            tools = tools + filtered_fallbacks
 
         # Select tools with role diversity based on intent
         selected_tools = []

@@ -30,6 +30,8 @@ import ToolCard from '@/components/ToolCard';
 import StackelyLogo from '@/components/StackelyLogo';
 import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
+import SelectedStackBar from '@/components/SelectedStackBar';
+import CompareDrawer from '@/components/CompareDrawer';
 
 interface StackResponse {
   goal: string;
@@ -38,6 +40,8 @@ interface StackResponse {
     role: string;
     why: string;
     logo_url?: string;
+    logo?: string;
+    website_url?: string;
   }>;
   comparison: Array<{
     toolA: string;
@@ -97,6 +101,11 @@ export default function Results() {
   const [stackData, setStackData] = useState<StackResponse | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
   const [queryMode, setQueryMode] = useState<'stack' | 'search'>('search');
+
+  // Compare & temporary stack state
+  const [selectedForCompare, setSelectedForCompare] = useState<Tool[]>([]);
+  const [stackSelection, setStackSelection] = useState<Tool[]>([]);
+  const [compareDrawerOpen, setCompareDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (categoryParam && !query) {
@@ -225,6 +234,29 @@ export default function Results() {
     );
     setStackSaved(true);
     setTimeout(() => setStackSaved(false), 2500);
+  };
+
+  const toggleCompare = (tool: Tool) => {
+    setSelectedForCompare((prev) => {
+      const exists = prev.some((t) => t.id === tool.id);
+      if (exists) return prev.filter((t) => t.id !== tool.id);
+      if (prev.length >= 4) return prev; // max 4
+      return [...prev, tool];
+    });
+  };
+
+  const toggleStack = (tool: Tool) => {
+    setStackSelection((prev) => {
+      const exists = prev.some((t) => t.id === tool.id);
+      if (exists) return prev.filter((t) => t.id !== tool.id);
+      if (prev.length >= 5) return prev; // max 5
+      return [...prev, tool];
+    });
+  };
+
+  const clearSelections = () => {
+    setSelectedForCompare([]);
+    setStackSelection([]);
   };
 
   const handleRetry = () => {
@@ -389,7 +421,14 @@ export default function Results() {
                 {searchResults.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {searchResults.map((tool) => (
-                      <ToolCard key={tool.id} tool={tool} />
+                      <ToolCard
+                        key={tool.id}
+                        tool={tool}
+                        isSelectedForCompare={selectedForCompare.some((t) => t.id === tool.id)}
+                        isInStack={stackSelection.some((t) => t.id === tool.id)}
+                        onToggleCompare={toggleCompare}
+                        onToggleStack={toggleStack}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -466,7 +505,14 @@ export default function Results() {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {catTools.map((tool) => (
-                              <ToolCard key={tool.id} tool={tool} />
+                              <ToolCard
+                                key={tool.id}
+                                tool={tool}
+                                isSelectedForCompare={selectedForCompare.some((t) => t.id === tool.id)}
+                                isInStack={stackSelection.some((t) => t.id === tool.id)}
+                                onToggleCompare={toggleCompare}
+                                onToggleStack={toggleStack}
+                              />
                             ))}
                           </div>
                         </div>
@@ -603,6 +649,22 @@ export default function Results() {
 
       {/* Footer */}
       <SiteFooter />
+
+      {/* Compare & stack selection bar */}
+      <SelectedStackBar
+        compareCount={selectedForCompare.length}
+        stackCount={stackSelection.length}
+        onOpenCompare={() => setCompareDrawerOpen(true)}
+        onViewStack={() => setCompareDrawerOpen(false)}
+        onClearAll={clearSelections}
+      />
+
+      {/* Compare drawer */}
+      <CompareDrawer
+        open={compareDrawerOpen}
+        onOpenChange={setCompareDrawerOpen}
+        tools={selectedForCompare}
+      />
     </div>
   );
 }

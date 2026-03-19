@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, ArrowUpRight, Sparkles } from 'lucide-react';
+import { ExternalLink, ArrowUpRight, Sparkles, GitCompare, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES, type Tool } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
@@ -9,6 +9,10 @@ interface ToolCardProps {
   tool: Tool;
   compact?: boolean;
   relevanceScore?: number;
+  isSelectedForCompare?: boolean;
+  isInStack?: boolean;
+  onToggleCompare?: (tool: Tool) => void;
+  onToggleStack?: (tool: Tool) => void;
 }
 
 const pricingStyles: Record<string, string> = {
@@ -23,14 +27,28 @@ const skillStyles: Record<string, string> = {
   advanced: 'text-red-600',
 };
 
-export default function ToolCard({ tool, compact = false, relevanceScore }: ToolCardProps) {
+export default function ToolCard({
+  tool,
+  compact = false,
+  relevanceScore,
+  isSelectedForCompare = false,
+  isInStack = false,
+  onToggleCompare,
+  onToggleStack,
+}: ToolCardProps) {
   const navigate = useNavigate();
   const categoryInfo = CATEGORIES.find((c) => c.id === tool.category);
   const isAI = tool.tool_type === 'ai' || tool.tool_type === 'hybrid';
 
   return (
     <div
-      className="group flex flex-col p-5 rounded-xl border border-slate-200 bg-white hover:border-[#2F80ED]/40 hover:bg-blue-50/10 transition-all cursor-pointer"
+      className={`group flex flex-col p-5 rounded-xl border bg-white hover:bg-blue-50/10 transition-all cursor-pointer ${
+        isSelectedForCompare
+          ? 'border-[#2F80ED] ring-1 ring-[#2F80ED]/30'
+          : isInStack
+          ? 'border-violet-400 ring-1 ring-violet-300/30'
+          : 'border-slate-200 hover:border-[#2F80ED]/40'
+      }`}
       onClick={() => navigate(`/tools/${tool.slug}`)}
     >
       {/* Header */}
@@ -103,6 +121,44 @@ export default function ToolCard({ tool, compact = false, relevanceScore }: Tool
         </div>
 
         <div className="flex items-center gap-1">
+          {onToggleCompare && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-6 px-1.5 text-[10px] font-medium gap-0.5 ${
+                isSelectedForCompare
+                  ? 'text-[#2F80ED] bg-blue-50 hover:bg-blue-100'
+                  : 'text-slate-400 hover:text-[#2F80ED] hover:bg-blue-50'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCompare(tool);
+              }}
+              title={isSelectedForCompare ? 'Remove from compare' : 'Compare'}
+            >
+              <GitCompare className="w-3 h-3" />
+              <span>Compare</span>
+            </Button>
+          )}
+          {onToggleStack && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-6 px-1.5 text-[10px] font-medium gap-0.5 ${
+                isInStack
+                  ? 'text-violet-600 bg-violet-50 hover:bg-violet-100'
+                  : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleStack(tool);
+              }}
+              title={isInStack ? 'Remove from stack' : 'Add to stack'}
+            >
+              <Layers className="w-3 h-3" />
+              <span>Stack</span>
+            </Button>
+          )}
           {tool.website_url && (
             <Button
               variant="ghost"

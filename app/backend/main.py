@@ -16,7 +16,6 @@ from fastapi.routing import APIRouter
 from services.database import initialize_database, close_database
 from services.mock_data import initialize_mock_data
 from services.auth import initialize_admin_user
-from routers import stack as stack_router_module
 # MODULE_IMPORTS_END
 
 
@@ -151,10 +150,6 @@ def include_routers_from_package(app: FastAPI, package_name: str = "routers") ->
 # Setup logging before router discovery
 setup_logging()
 include_routers_from_package(app, "routers")
-
-# Ensure stack router is registered (avoid double-registration if auto-discovery already included it)
-if not any(getattr(route, "path", "").startswith(stack_router_module.router.prefix) for route in app.router.routes):
-    app.include_router(stack_router_module.router)
 
 
 # Add exception handler for all exceptions except HTTPException

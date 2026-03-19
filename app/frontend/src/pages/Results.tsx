@@ -25,11 +25,11 @@ import {
   type Tool,
   type PricingPreference,
 } from '@/lib/api';
+import { LOCAL_TOOLS } from '@/data/tools';
 import { useToolRecommendation } from '@/hooks/useToolRecommendation';
 import StackCard from '@/components/StackCard';
 import ToolCard from '@/components/ToolCard';
 import StackelyLogo from '@/components/StackelyLogo';
-import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 import SelectedStackBar from '@/components/SelectedStackBar';
 import CompareDrawer from '@/components/CompareDrawer';
@@ -53,6 +53,36 @@ interface StackResponse {
     reason: string;
   }>;
   notes: string[];
+}
+
+interface AdaptedStackItem {
+  tool: Tool;
+  role: string;
+  why: string;
+  rank: number;
+}
+
+function normalizeToolName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function slugifyToolName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function inferCategoryFromRole(role: string): string {
+  const lower = role.toLowerCase();
+  if (lower.includes('email')) return 'email_marketing';
+  if (lower.includes('landing') || lower.includes('page')) return 'landing_pages';
+  if (lower.includes('analytic') || lower.includes('insight') || lower.includes('report') || lower.includes('data')) return 'analytics';
+  if (lower.includes('video') || lower.includes('media')) return 'video';
+  if (lower.includes('copy') || lower.includes('content') || lower.includes('script')) return 'copywriting';
+  if (lower.includes('design')) return 'design';
+  return 'automation';
 }
 
 // Helper function to classify query mode
@@ -222,6 +252,44 @@ export default function Results() {
     return map;
   }, [searchResults, directTools, stack, alternatives, aiAccelerators]);
 
+  const aiStackItems = useMemo<AdaptedStackItem[]>(() => {
+    if (!stackData?.stack?.length) return [];
+
+    const localByName = new Map<string, Tool>();
+    for (const localTool of LOCAL_TOOLS) {
+      localByName.set(normalizeToolName(localTool.name), localTool);
+    }
+
+    return stackData.stack.map((item, index) => {
+      const matched = localByName.get(normalizeToolName(item.tool));
+
+      const adaptedTool: Tool = matched
+        ? {
+            ...matched,
+            logo_url: item.logo_url || item.logo || matched.logo_url,
+            website_url: item.website_url || matched.website_url,
+          }
+        : {
+            id: 900000 + index,
+            name: item.tool,
+            slug: slugifyToolName(item.tool),
+            short_description: item.why,
+            category: inferCategoryFromRole(item.role),
+            pricing_model: 'paid',
+            skill_level: 'intermediate',
+            website_url: item.website_url,
+            logo_url: item.logo_url || item.logo,
+          };
+
+      return {
+        tool: adaptedTool,
+        role: item.role,
+        why: item.why,
+        rank: index + 1,
+      };
+    });
+  }, [stackData]);
+
   const handleShareStack = async () => {
     if (!query || stack.length === 0) return;
     const stackId = saveStack(
@@ -282,15 +350,15 @@ export default function Results() {
   };
 
   const handleSmartStackSelect = (tools: Tool[]) => {
-    const seen = new Set(stackSelection.map((t) => t.id));
-    const merged: Tool[] = [...stackSelection];
+    const seen = new Set<number>();
+    const next: Tool[] = [];
     for (const tool of tools) {
-      if (!seen.has(tool.id) && merged.length < 5) {
-        merged.push(tool);
+      if (!seen.has(tool.id) && next.length < 5) {
+        next.push(tool);
         seen.add(tool.id);
       }
     }
-    setStackSelection(merged);
+    setStackSelection(next);
   };
 
   const handleRetry = () => {
@@ -602,42 +670,34 @@ export default function Results() {
                 </div>
 
                 <div className="space-y-3.5">
-                  {stackData.stack.map((item, index) => (
-                    <div
-                      key={item.tool}
-                      className="group relative flex gap-5 p-6 rounded-xl border border-slate-200 bg-white"
-                    >
-                      <div
-                        className="flex-shrink-0 w-9 h-9 rounded-lg text-white flex items-center justify-center text-[13px] font-semibold"
-                        style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
-                      >
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2.5">
-                          <ToolLogo
-                            logoUrl={item.logo_url || item.logo}
-                            websiteUrl={item.website_url}
-                            toolName={item.tool}
-                            size={36}
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 mb-2.5">
-                              <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
-                                {item.role}
-                              </span>
-                            </div>
-                            <h3 className="text-[16px] font-semibold text-slate-900 mb-2 truncate">
-                              {item.tool}
-                            </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {aiStackItems.map((item) => (
+                      <div key={`${item.tool.id}-${item.rank}`} className="space-y-2">
+                        <ToolCard
+                          tool={item.tool}
+                          isSelectedForCompare={selectedForCompare.some((t) => t.id === item.tool.id)}
+                          isInStack={stackSelection.some((t) => t.id === item.tool.id)}
+                          onToggleCompare={toggleCompare}
+                          onToggleStack={toggleStack}
+                        />
+
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span
+                              className="inline-flex items-center justify-center w-5 h-5 rounded-md text-white text-[10px] font-semibold"
+                              style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                            >
+                              {item.rank}
+                            </span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-[#2F80ED]">
+                              {item.role}
+                            </span>
                           </div>
+                          <p className="text-[12px] text-slate-600 leading-relaxed">{item.why}</p>
                         </div>
-                        <p className="text-[14px] text-slate-600 leading-relaxed">
-                          {item.why}
-                        </p>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Comparison Section */}

@@ -18,6 +18,11 @@ import { supabase } from './supabase';
 import type { Tool, PricingPreference, StackResponse } from './api';
 import { getAllowedPricingModels } from './api';
 
+export type StackResponseWithAlternatives = StackResponse & {
+  alternatives: Record<string, Tool[]>;
+  internal_stack_score?: number;
+};
+
 // ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
@@ -308,6 +313,136 @@ function fillBlueprint(
   return result;
 }
 
+function buildAlternativesBySelectedTool(
+  selected: ScoredTool[],
+  blueprint: WorkflowSlot[],
+  tools: Tool[],
+  goal: string
+): Record<string, Tool[]> {
+  const goalTokens = tokenize(goal);
+  const selectedIds = new Set(selected.map((s) => s.tool.id));
+  const alternatives: Record<string, Tool[]> = {};
+
+  selected.forEach((selectedItem, index) => {
+    const slot = blueprint[index] ?? blueprint[0];
+
+    const selectedCategoriesCount = new Map<string, number>();
+    const coveredStages = new Set<WorkflowStage>();
+    const selectedPricingTiers: number[] = [];
+
+    selected.forEach((other, otherIndex) => {
+      if (other.tool.id === selectedItem.tool.id) return;
+      selectedCategoriesCount.set(other.tool.category, (selectedCategoriesCount.get(other.tool.category) || 0) + 1);
+      coveredStages.add((blueprint[otherIndex] ?? blueprint[0]).stage);
+      selectedPricingTiers.push(getPricingTier(other.tool.pricing_model));
+    });
+
+    const rankedAlternatives = tools
+      .filter((tool) => {
+        if (selectedIds.has(tool.id)) return false;
+        return tool.category === selectedItem.tool.category;
+      })
+      .map((tool) => ({
+        tool,
+        score: scoreToolForSlot(
+          tool,
+          slot,
+          goalTokens,
+          selectedCategoriesCount,
+          coveredStages,
+          selectedPricingTiers
+        ),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map((entry) => entry.tool);
+
+    alternatives[selectedItem.tool.name] = rankedAlternatives;
+  });
+
+  return alternatives;
+}
+
+function findRoleSlotIndex(
+  role: string,
+  blueprint: WorkflowSlot[]
+): number {
+  const normalizedRole = role.toLowerCase().trim();
+  const idx = blueprint.findIndex((slot) => slot.role.toLowerCase().trim() === normalizedRole);
+  return idx >= 0 ? idx : 0;
+}
+
+function computeInternalStackScore(
+  selectedTools: Tool[]
+): number {
+  if (selectedTools.length === 0) return 0;
+  const total = selectedTools.reduce((acc, tool) => acc + (tool.internal_score || 0), 0);
+  return Math.round((total / selectedTools.length) * 10) / 10;
+}
+
+export function recomputeAlternativesForStack(
+  goal: string,
+  pricingPreference: PricingPreference,
+  stack: Array<{ tool: string; role: string }>,
+  selectedTools: Tool[],
+  sourceTools: Tool[]
+): Record<string, Tool[]> {
+  const intent = detectIntentFromGoal(goal);
+  const blueprint = WORKFLOW_BLUEPRINTS[intent] ?? WORKFLOW_BLUEPRINTS['creation'];
+  const allowedPricingModels = new Set(getAllowedPricingModels(pricingPreference));
+  const goalTokens = tokenize(goal);
+
+  const filteredSource = sourceTools.filter(
+    (tool) => tool.active !== false && allowedPricingModels.has(tool.pricing_model)
+  );
+
+  const selectedIds = new Set(selectedTools.map((t) => t.id));
+  const alternatives: Record<string, Tool[]> = {};
+
+  stack.forEach((stackItem, stackIndex) => {
+    const selectedTool = selectedTools[stackIndex];
+    if (!selectedTool) return;
+
+    const slotIndex = findRoleSlotIndex(stackItem.role, blueprint);
+    const slot = blueprint[slotIndex] ?? blueprint[0];
+
+    const selectedCategoriesCount = new Map<string, number>();
+    const coveredStages = new Set<WorkflowStage>();
+    const selectedPricingTiers: number[] = [];
+
+    selectedTools.forEach((tool, index) => {
+      if (index === stackIndex) return;
+      selectedCategoriesCount.set(tool.category, (selectedCategoriesCount.get(tool.category) || 0) + 1);
+      const stageIndex = findRoleSlotIndex(stack[index]?.role || '', blueprint);
+      coveredStages.add((blueprint[stageIndex] ?? blueprint[0]).stage);
+      selectedPricingTiers.push(getPricingTier(tool.pricing_model));
+    });
+
+    alternatives[stackItem.tool] = filteredSource
+      .filter((tool) => {
+        if (selectedIds.has(tool.id)) return false;
+        if (tool.category !== selectedTool.category) return false;
+        return true;
+      })
+      .map((tool) => ({
+        tool,
+        score: scoreToolForSlot(
+          tool,
+          slot,
+          goalTokens,
+          selectedCategoriesCount,
+          coveredStages,
+          selectedPricingTiers
+        ),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map((entry) => entry.tool);
+  });
+
+  return alternatives;
+}
+
 // ---------------------------------------------------------------------------
 // Why-text builder
 // ---------------------------------------------------------------------------
@@ -358,6 +493,42 @@ function buildComparison(
   const bTool = b.tool;
 
   // Required comparison factors
+  const scoreDelta = Math.abs(aScore - bScore).toFixed(1);
+
+  const aTier = getPricingTier(aTool.pricing_model);
+  const bTier = getPricingTier(bTool.pricing_model);
+  const pricingDiff = aTier === bTier
+    ? 'Both tools are in the same pricing tier'
+    : `${aTier < bTier ? aTool.name : bTool.name} is in a lower pricing tier`;
+
+  const beginnerDiff = aTool.beginner_friendly === bTool.beginner_friendly
+    ? 'both are similar in beginner suitability'
+    : `${aTool.beginner_friendly ? aTool.name : bTool.name} is better suited for beginners`;
+
+  const winner = aScore >= bScore ? aTool.name : bTool.name;
+  const reason = `${winner} leads with a score delta of ${scoreDelta}; ${pricingDiff.toLowerCase()}; ${beginnerDiff}.`;
+
+  return [{ toolA: aTool.name, toolB: bTool.name, winner, reason }];
+}
+
+function buildComparisonFromTools(selectedTools: Tool[]): StackResponse['comparison'] {
+  if (selectedTools.length < 2) {
+    if (selectedTools.length === 1) {
+      return [
+        {
+          toolA: selectedTools[0].name,
+          toolB: selectedTools[0].name,
+          winner: selectedTools[0].name,
+          reason: 'Only one tool is currently selected in this stack step sequence.',
+        },
+      ];
+    }
+    return [];
+  }
+
+  const [aTool, bTool] = selectedTools;
+  const aScore = aTool.internal_score || 0;
+  const bScore = bTool.internal_score || 0;
   const scoreDelta = Math.abs(aScore - bScore).toFixed(1);
 
   const aTier = getPricingTier(aTool.pricing_model);
@@ -432,6 +603,19 @@ function buildNotes(intent: string, goal: string, pricingPreference: PricingPref
   return [intentNotes[0], intentNotes[1], pricingNote];
 }
 
+export function recomputeStackNarrativeFromTools(
+  goal: string,
+  pricingPreference: PricingPreference,
+  selectedTools: Tool[]
+): Pick<StackResponseWithAlternatives, 'comparison' | 'notes' | 'internal_stack_score'> {
+  const intent = detectIntentFromGoal(goal);
+  return {
+    comparison: buildComparisonFromTools(selectedTools.slice(0, 3)),
+    notes: buildNotes(intent, goal, pricingPreference),
+    internal_stack_score: computeInternalStackScore(selectedTools.slice(0, 3)),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -439,7 +623,7 @@ function buildNotes(intent: string, goal: string, pricingPreference: PricingPref
 export async function recommendStackFromGoal(
   goal: string,
   pricingPreference: PricingPreference
-): Promise<StackResponse> {
+): Promise<StackResponseWithAlternatives> {
   const intent = detectIntentFromGoal(goal);
   const blueprint = WORKFLOW_BLUEPRINTS[intent] ?? WORKFLOW_BLUEPRINTS['creation'];
   const allowedPricingModels = getAllowedPricingModels(pricingPreference);
@@ -466,6 +650,8 @@ export async function recommendStackFromGoal(
   // Fill blueprint slots strictly and cap at 3 results.
   const filledSlots = fillBlueprint(blueprint, uniqueTools, goal).slice(0, 3);
 
+  const alternatives = buildAlternativesBySelectedTool(filledSlots, blueprint, uniqueTools, goal);
+
   // Build stack response items
   const stack: StackResponse['stack'] = filledSlots.map((entry, index) => {
     const slotDef = blueprint[index] ?? blueprint[0];
@@ -481,8 +667,9 @@ export async function recommendStackFromGoal(
 
   const comparison = buildComparison(filledSlots);
   const notes = buildNotes(intent, goal, pricingPreference);
+  const internal_stack_score = computeInternalStackScore(filledSlots.map((slot) => slot.tool));
 
-  return { goal, stack, comparison, notes };
+  return { goal, stack, comparison, notes, alternatives, internal_stack_score };
 }
 
 // Re-export helpers consumed by Results.tsx (kept for backward compat)

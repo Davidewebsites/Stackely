@@ -23,10 +23,14 @@ import {
   recommendStackFromGoal,
   saveStack,
   searchTools,
-  type StackResponse,
   type Tool,
   type PricingPreference,
 } from '@/lib/api';
+import {
+  recomputeAlternativesForStack,
+  recomputeStackNarrativeFromTools,
+  type StackResponseWithAlternatives,
+} from '@/lib/stackRecommendation';
 import { supabase } from '@/lib/supabase';
 import { useToolRecommendation } from '@/hooks/useToolRecommendation';
 import StackCard from '@/components/StackCard';
@@ -133,9 +137,10 @@ export default function Results() {
   const [skillFilter, setSkillFilter] = useState('all');
   const [linkCopied, setLinkCopied] = useState(false);
   const [stackSaved, setStackSaved] = useState(false);
-  const [stackData, setStackData] = useState<StackResponse | null>(null);
+  const [stackData, setStackData] = useState<StackResponseWithAlternatives | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
   const [catalogTools, setCatalogTools] = useState<Tool[]>([]);
+  const [recentlyReplacedToolId, setRecentlyReplacedToolId] = useState<number | null>(null);
 
   const queryMode = useMemo<'stack' | 'search'>(() => {
     if (!query) return 'search';
@@ -322,6 +327,23 @@ export default function Results() {
     });
   }, [stackData, catalogTools]);
 
+  const stackToolLookup = useMemo(() => {
+    const map = new Map<string, Tool>();
+    for (const tool of catalogTools) {
+      map.set(normalizeToolName(tool.name), tool);
+      if (tool.slug) {
+        map.set(tool.slug.toLowerCase(), tool);
+      }
+    }
+    for (const item of aiStackItems) {
+      map.set(normalizeToolName(item.tool.name), item.tool);
+      if (item.tool.slug) {
+        map.set(item.tool.slug.toLowerCase(), item.tool);
+      }
+    }
+    return map;
+  }, [catalogTools, aiStackItems]);
+
   const stackPricingLabel = useMemo(() => {
     const option = PRICING_OPTIONS.find((o) => o.id === pricingParam);
     return option?.label || 'Best options regardless of price';
@@ -417,6 +439,85 @@ export default function Results() {
       }
     }
     setStackSelection(next);
+  };
+
+  const handleReplaceStackTool = (slotIndex: number, replacement: Tool) => {
+    setStackData((prev) => {
+      if (!prev) return prev;
+      if (slotIndex < 0 || slotIndex >= prev.stack.length) return prev;
+
+      const currentItem = prev.stack[slotIndex];
+      const oldToolName = currentItem.tool;
+
+      const currentStackTools = prev.stack
+        .map((item) =>
+          stackToolLookup.get(normalizeToolName(item.tool)) ||
+          stackToolLookup.get(slugifyToolName(item.tool)) ||
+          null
+        )
+        .filter((tool): tool is Tool => !!tool);
+
+      const alreadyInStack = currentStackTools.some((tool, idx) => idx !== slotIndex && tool.id === replacement.id);
+      if (alreadyInStack) return prev;
+
+      const nextToolsIfReplace = currentStackTools.map((tool, idx) => (idx === slotIndex ? replacement : tool));
+      const replacementCategoryCount = nextToolsIfReplace.filter((tool) => tool.category === replacement.category).length;
+
+      if (replacementCategoryCount > 1) {
+        const alternativesForCurrent = prev.alternatives?.[oldToolName] || [];
+        const hasDiversitySafeAlternative = alternativesForCurrent.some((alt) => {
+          if (alt.id === replacement.id) return false;
+          if (currentStackTools.some((tool, idx) => idx !== slotIndex && tool.id === alt.id)) return false;
+          const hypothetical = currentStackTools.map((tool, idx) => (idx === slotIndex ? alt : tool));
+          return hypothetical.filter((tool) => tool.category === alt.category).length <= 1;
+        });
+
+        // Avoid allowing a duplicate-category swap when a diversity-safe option exists.
+        if (hasDiversitySafeAlternative) return prev;
+      }
+
+      const nextStack = [...prev.stack];
+      nextStack[slotIndex] = {
+        ...currentItem,
+        tool: replacement.name,
+        logo_url: replacement.logo_url,
+        logo: replacement.logo_url,
+        website_url: replacement.website_url,
+      };
+
+      const selectedTools = nextStack
+        .map((item, index) => {
+          if (index === slotIndex) return replacement;
+          return (
+            stackToolLookup.get(normalizeToolName(item.tool)) ||
+            stackToolLookup.get(slugifyToolName(item.tool)) ||
+            null
+          );
+        })
+        .filter((tool): tool is Tool => !!tool);
+
+      const nextAlternatives = recomputeAlternativesForStack(
+        query,
+        pricingParam,
+        nextStack.map((item) => ({ tool: item.tool, role: item.role })),
+        selectedTools,
+        catalogTools
+      );
+
+      const narrative = recomputeStackNarrativeFromTools(query, pricingParam, selectedTools);
+
+      setRecentlyReplacedToolId(replacement.id);
+      setTimeout(() => setRecentlyReplacedToolId((current) => (current === replacement.id ? null : current)), 1400);
+
+      return {
+        ...prev,
+        stack: nextStack,
+        alternatives: nextAlternatives,
+        comparison: narrative.comparison,
+        notes: narrative.notes,
+        internal_stack_score: narrative.internal_stack_score,
+      };
+    });
   };
 
   const handleRetry = () => {
@@ -766,7 +867,13 @@ export default function Results() {
                         {index < aiStackItems.length - 1 && <span className="w-px h-[140px] bg-slate-200 mt-2" />}
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                      <div
+                        className={`rounded-2xl border bg-white p-4 sm:p-5 transition-all duration-300 ${
+                          recentlyReplacedToolId === item.tool.id
+                            ? 'border-emerald-300 ring-2 ring-emerald-100'
+                            : 'border-slate-200'
+                        }`}
+                      >
                         <div className="flex items-center justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2">
                             <span
@@ -795,6 +902,60 @@ export default function Results() {
 
                         <div className="pt-3 px-1">
                           <p className="text-[13px] text-slate-600 leading-relaxed">{item.why}</p>
+
+                          {(stackData.alternatives?.[item.tool.name] || []).slice(0, 2).length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-slate-100">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                  Alternatives
+                                </span>
+                              </div>
+
+                              <div className="space-y-2">
+                                {(stackData.alternatives?.[item.tool.name] || [])
+                                  .slice(0, 2)
+                                  .map((alt) => (
+                                    <div
+                                      key={`${item.tool.id}-${alt.id}`}
+                                      className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"
+                                    >
+                                      <div className="min-w-0 flex items-center gap-2">
+                                        <span className="text-[12px] text-slate-700 font-medium truncate">{alt.name}</span>
+                                        <Badge variant="outline" className="text-[9px] uppercase border-slate-300 text-slate-600">
+                                          {alt.pricing_model}
+                                        </Badge>
+                                      </div>
+                                      {(() => {
+                                        const existingTools = aiStackItems.map((stackItem) => stackItem.tool);
+                                        const duplicateTool = existingTools.some((stackTool, idx) => idx !== index && stackTool.id === alt.id);
+                                        const hypothetical = existingTools.map((stackTool, idx) => (idx === index ? alt : stackTool));
+                                        const duplicateCategoryCount = hypothetical.filter((t) => t.category === alt.category).length;
+                                        const disableReplace = duplicateTool || duplicateCategoryCount > 1;
+
+                                        return (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2.5 text-[11px] border-slate-300"
+                                            onClick={() => handleReplaceStackTool(index, alt)}
+                                            disabled={disableReplace}
+                                            title={
+                                              duplicateTool
+                                                ? 'This tool is already in your stack.'
+                                                : duplicateCategoryCount > 1
+                                                ? 'This replacement would reduce category diversity.'
+                                                : 'Replace this step'
+                                            }
+                                          >
+                                            Replace
+                                          </Button>
+                                        );
+                                      })()}
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

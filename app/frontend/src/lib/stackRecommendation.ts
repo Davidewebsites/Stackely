@@ -17,6 +17,7 @@
 import { supabase } from './supabase';
 import type { Tool, PricingPreference, StackResponse } from './api';
 import { getAllowedPricingModels } from './api';
+import { normalizeQueryTypos } from './queryNormalization';
 
 export type StackResponseWithAlternatives = StackResponse & {
   summary: string;
@@ -93,7 +94,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
 };
 
 export function detectIntentFromGoal(goal: string): string {
-  const normalized = goal.toLowerCase().trim();
+  const normalized = normalizeQueryTypos(goal);
 
   // Pass 1: full-phrase match (highest confidence)
   for (const [intent, phrases] of Object.entries(INTENT_PHRASES)) {

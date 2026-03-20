@@ -58,7 +58,7 @@ export default function SelectedStackBar({
               Compare now
             </Button>
           )}
-          {stackCount > 0 && (
+          {stackCount >= 1 && (
             <Button
               size="sm"
               className="h-8 px-4 text-[12px] font-medium text-white shadow-none rounded-lg"
@@ -66,7 +66,7 @@ export default function SelectedStackBar({
               onClick={onViewStack}
             >
               <Layers className="w-3.5 h-3.5 mr-1.5" />
-              View stack
+              Go to stack
             </Button>
           )}
           <Button

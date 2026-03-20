@@ -146,15 +146,34 @@ const PREDEFINED_TOOLS: Record<string, Tool> = {
 interface StackOption {
   icon: typeof Sparkles;
   title: string;
+  intent: 'Most complete' | 'Lowest cost' | 'Fastest launch';
+  audience: string;
+  whyPick: string;
+  tradeoff: string;
   subtitle: string;
   description: string;
   tools: Tool[];
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  landing_pages: 'Builder',
+  email_marketing: 'Email',
+  analytics: 'Analytics',
+  automation: 'Automation',
+  design: 'Design',
+  copywriting: 'Copy',
+  ads: 'Ads',
+  video: 'Video',
+};
+
 const STACK_OPTIONS: StackOption[] = [
   {
     icon: Sparkles,
     title: 'Best Overall',
+    intent: 'Most complete',
+    audience: 'Teams that want depth and flexibility',
+    whyPick: 'Best when you need advanced workflows across all core roles.',
+    tradeoff: 'Higher monthly cost and more setup decisions.',
     subtitle: 'Complete & powerful',
     description: 'Premium stack with full features across all categories',
     tools: [
@@ -167,6 +186,10 @@ const STACK_OPTIONS: StackOption[] = [
   {
     icon: Zap,
     title: 'Cheapest Setup',
+    intent: 'Lowest cost',
+    audience: 'Solo founders and early-stage projects',
+    whyPick: 'Keeps spend low while still covering the essential stack roles.',
+    tradeoff: 'Some limits on scale, reporting depth, and automation complexity.',
     subtitle: 'Free & freemium tools',
     description: 'Save money while covering all essentials',
     tools: [
@@ -179,6 +202,10 @@ const STACK_OPTIONS: StackOption[] = [
   {
     icon: Rocket,
     title: 'Fastest to Launch',
+    intent: 'Fastest launch',
+    audience: 'Users who need to ship quickly with low friction',
+    whyPick: 'Quickest path to a live workflow with beginner-friendly defaults.',
+    tradeoff: 'Less customization depth than a full-featured stack.',
     subtitle: 'Quick & beginner-friendly',
     description: 'Get started in minutes with minimal learning curve',
     tools: [
@@ -200,7 +227,7 @@ export default function SmartEmptyState({ onSelectStack, compact = false }: Smar
             Get Started with a Starter Stack
           </h2>
           <p className="text-[15px] text-slate-500">
-            Choose a prebuilt stack tailored to your needs
+            Compare intent, trade-offs, and role coverage before choosing
           </p>
         </div>
 
@@ -221,24 +248,40 @@ export default function SmartEmptyState({ onSelectStack, compact = false }: Smar
                   <div className="min-w-0">
                     <h3 className="text-[15px] font-semibold text-slate-900">{option.title}</h3>
                     <p className="text-[12px] text-slate-400">{option.subtitle}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#2F80ED] mt-1">{option.intent}</p>
                   </div>
                 </div>
 
-                {/* Description */}
-                <p className="text-[13px] text-slate-600 leading-relaxed mb-4">
-                  {option.description}
-                </p>
+                {/* Decision cues */}
+                <div className="mb-3.5 space-y-2.5">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">Who it is for</p>
+                    <p className="text-[12px] text-slate-700 leading-snug">{option.audience}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">Why choose it</p>
+                    <p className="text-[12px] text-slate-700 leading-snug">{option.whyPick}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 mb-0.5">Main trade-off</p>
+                    <p className="text-[12px] text-amber-800 leading-snug">{option.tradeoff}</p>
+                  </div>
+                </div>
 
-                {/* Tool List */}
+                {/* Role-based tool list */}
                 <div className="mb-4 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                    Includes
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                    Included roles
                   </p>
                   <ul className="space-y-1.5">
                     {option.tools.map((tool) => (
-                      <li key={tool.id} className="text-[12px] text-slate-600 flex items-start gap-2">
-                        <span className="w-1 h-1 rounded-full bg-slate-300 flex-shrink-0 mt-1.5" />
-                        <span>{tool.name}</span>
+                      <li key={tool.id} className="text-[12px] text-slate-600 flex items-center gap-2 min-w-0">
+                        <span className="inline-flex items-center gap-1.5 min-w-[5.1rem]">
+                          <span className="w-1 h-1 rounded-full bg-slate-300 flex-shrink-0" />
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{ROLE_LABELS[tool.category] || tool.category}</span>
+                        </span>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-[12px] text-slate-700 font-medium truncate">{tool.name}</span>
                       </li>
                     ))}
                   </ul>

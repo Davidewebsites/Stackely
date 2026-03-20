@@ -1,6 +1,7 @@
 import { createClient } from '@metagptx/web-sdk';
 import { LOCAL_TOOLS } from '@/data/tools';
 import { supabase } from './supabase';
+import { normalizeQueryTypos } from './queryNormalization';
 
 const client = createClient();
 const defaultApiBaseUrl = import.meta.env.DEV ? 'http://127.0.0.1:8000' : window.location.origin;
@@ -525,7 +526,7 @@ export async function searchTools(
   category?: string,
   limit = 24
 ): Promise<Tool[]> {
-  const cleanQuery = searchQuery.trim();
+  const cleanQuery = normalizeQueryTypos(searchQuery.trim());
   if (!cleanQuery) return [];
 
   const allowedModels = getAllowedPricingModels(pricingPreference);
@@ -708,7 +709,7 @@ function getFuzzyFallbackResults(tools: Tool[], rawQuery: string, limit: number)
 function calculateRelevanceScore(tool: Tool, query: string): number {
   const baseScore = tool.internal_score || 0;
   let relevanceMultiplier = 1.0;
-  const lowerQuery = query.toLowerCase();
+  const lowerQuery = normalizeQueryTypos(query);
 
   // Detect query intent
   const queryIntent = detectQueryIntent(lowerQuery);
@@ -728,6 +729,10 @@ function calculateRelevanceScore(tool: Tool, query: string): number {
     relevanceMultiplier *= 1.3; // Boost copywriting tools for writing queries
   } else if (queryIntent === 'video' && tool.category === 'video') {
     relevanceMultiplier *= 1.4; // Strong boost for video tools
+  } else if (queryIntent === 'landing_pages' && tool.category === 'landing_pages') {
+    relevanceMultiplier *= 1.35; // Boost site and landing page tools
+  } else if (queryIntent === 'analytics' && tool.category === 'analytics') {
+    relevanceMultiplier *= 1.35; // Boost analytics tools for typo-corrected analytics queries
   }
 
   // Use cases and tags matching
@@ -762,15 +767,18 @@ function calculateRelevanceScore(tool: Tool, query: string): number {
 
 // Detect query intent for relevance scoring
 function detectQueryIntent(query: string): string {
+  const normalizedQuery = normalizeQueryTypos(query);
   const intentKeywords = {
     automation: ['automate', 'automation', 'workflow', 'process', 'integrate', 'sync'],
     email_marketing: ['email', 'newsletter', 'campaign', 'audience', 'marketing', 'subscribe'],
     writing: ['write', 'writing', 'copy', 'content', 'text', 'article', 'blog'],
-    video: ['video', 'film', 'media', 'production', 'broadcast', 'stream']
+    video: ['video', 'film', 'media', 'production', 'broadcast', 'stream'],
+    landing_pages: ['landing', 'landing page', 'website', 'site builder', 'ecommerce', 'store', 'shop', 'checkout'],
+    analytics: ['analytics', 'track', 'measure', 'report', 'metrics', 'insights', 'dashboard']
   };
 
   for (const [intent, keywords] of Object.entries(intentKeywords)) {
-    if (keywords.some(keyword => query.includes(keyword))) {
+    if (keywords.some(keyword => normalizedQuery.includes(keyword))) {
       return intent;
     }
   }

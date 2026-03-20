@@ -36,19 +36,10 @@ export default function CategoryPage() {
 
   return (
     <div className="min-h-screen bg-white relative overflow-hidden">
-      {/* Brand atmosphere */}
-      <div
-        className="pointer-events-none fixed top-[-120px] right-[-80px] w-[500px] h-[500px] rounded-full opacity-[0.04]"
-        style={{ background: 'radial-gradient(circle, #2F80ED 0%, #4FD1C5 40%, transparent 70%)' }}
-      />
-      <div
-        className="pointer-events-none fixed bottom-[-150px] left-[-100px] w-[450px] h-[450px] rounded-full opacity-[0.03]"
-        style={{ background: 'radial-gradient(circle, #8A2BE2 0%, transparent 70%)' }}
-      />
 
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8 h-[72px] flex items-center justify-between">
+        <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -67,18 +58,18 @@ export default function CategoryPage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-8 py-14 relative">
+      <div className="page-shell py-7 relative">
         {/* Category Header */}
-        <div className="mb-12">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#2F80ED]">
               Category
             </span>
           </div>
-          <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-3">
+          <h1 className="text-[31px] sm:text-[38px] font-bold text-slate-900 tracking-tight mb-1">
             {categoryInfo?.label || category}
           </h1>
-          <p className="text-[16px] text-slate-500 leading-relaxed max-w-3xl">
+          <p className="text-[14px] text-slate-500 leading-relaxed max-w-3xl">
             {categoryInfo
               ? `Explore the best ${categoryInfo.label.toLowerCase()} tools. ${categoryInfo.description} — curated and ranked by Stackely to help you find the right fit for your workflow.`
               : `Browse tools in the ${category} category.`}
@@ -97,10 +88,10 @@ export default function CategoryPage() {
         {!loading && (
           <>
             {tools.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 mb-8">
-                <span className="text-[12px] font-medium text-slate-500">Filter</span>
+              <div className="flex flex-wrap items-center gap-2.5 mb-4 rounded-xl border border-[#2F80ED]/15 bg-white p-2.5 sm:p-3 shadow-card">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#2F80ED]">Filters</span>
                 <Select value={pricingFilter} onValueChange={setPricingFilter}>
-                  <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none">
+                  <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none focus:border-[#2F80ED]/45 focus:ring-[#2F80ED]/20">
                     <SelectValue placeholder="Pricing" />
                   </SelectTrigger>
                   <SelectContent>
@@ -112,7 +103,7 @@ export default function CategoryPage() {
                 </Select>
 
                 <Select value={skillFilter} onValueChange={setSkillFilter}>
-                  <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none">
+                  <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none focus:border-[#2F80ED]/45 focus:ring-[#2F80ED]/20">
                     <SelectValue placeholder="Skill level" />
                   </SelectTrigger>
                   <SelectContent>
@@ -123,14 +114,14 @@ export default function CategoryPage() {
                   </SelectContent>
                 </Select>
 
-                <span className="text-[12px] text-slate-400">
+                <span className="text-[12px] text-slate-500 font-medium">
                   {filteredTools.length} tool{filteredTools.length !== 1 ? 's' : ''}
                 </span>
               </div>
             )}
 
             {filteredTools.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="content-grid">
                 {filteredTools
                   .sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0))
                   .map((tool) => (
@@ -142,8 +133,7 @@ export default function CategoryPage() {
                 <p className="text-[15px] text-slate-500 mb-5">No tools found in this category.</p>
                 <Button
                   onClick={() => navigate('/')}
-                  className="h-10 text-[13px] text-white shadow-none"
-                  style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                  className="h-10 text-[13px] text-white shadow-none bg-blue-600 hover:bg-blue-700"
                 >
                   Go home
                 </Button>
@@ -154,8 +144,8 @@ export default function CategoryPage() {
 
         {/* Browse other categories */}
         {!loading && (
-          <div className="mt-20 border-t border-slate-100 pt-14">
-            <h2 className="text-[20px] font-semibold text-slate-900 mb-6">Browse other categories</h2>
+          <div className="mt-12 border-t border-slate-100 pt-8">
+            <h2 className="text-[20px] font-semibold text-slate-900 mb-5">Browse other categories</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {CATEGORIES.filter((c) => c.id !== category).map((cat) => (
                 <button

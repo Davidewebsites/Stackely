@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Box } from 'lucide-react';
 
 interface ToolLogoProps {
   logoUrl?: string;
@@ -8,11 +7,6 @@ interface ToolLogoProps {
   size?: number;
 }
 
-/**
- * Extract the root domain from a URL for the logo provider.
- * e.g. "https://www.canva.com" → "canva.com"
- * e.g. "https://ads.google.com/home" → "ads.google.com"
- */
 function getDomain(url?: string): string | null {
   if (!url) return null;
   try {
@@ -23,59 +17,62 @@ function getDomain(url?: string): string | null {
   }
 }
 
-/**
- * Build a logo URL from a domain using Logo.dev (free tier).
- * Falls back to Google's favicon service as a secondary option.
- */
 function getLogoProviderUrl(domain: string): string {
-  return `https://img.logo.dev/${domain}?token=pk_a8CO5lPpQbCMPyOJMNbBzw&size=64&format=png`;
+  return `https://img.logo.dev/${domain}?token=pk_a8CO5lPpQbCMPyOJMNbBzw&size=128&format=png`;
 }
 
-function getGoogleFaviconUrl(domain: string): string {
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+const INITIAL_GRADIENTS = [
+  'linear-gradient(135deg, #6366f1, #8b5cf6)',
+  'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+  'linear-gradient(135deg, #10b981, #059669)',
+  'linear-gradient(135deg, #f59e0b, #d97706)',
+  'linear-gradient(135deg, #ec4899, #db2777)',
+  'linear-gradient(135deg, #64748b, #475569)',
+  'linear-gradient(135deg, #2F80ED, #4FD1C5)',
+];
+
+function getInitialGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return INITIAL_GRADIENTS[Math.abs(hash) % INITIAL_GRADIENTS.length];
 }
 
-/**
- * ToolLogo displays a tool's logo with a 3-tier fallback:
- * 1. logo_url (manual override from database)
- * 2. Logo.dev based on website_url domain
- * 3. Google Favicon as secondary fallback
- * 4. Neutral placeholder icon
- */
+function InitialsFallback({ toolName, size }: { toolName: string; size: number }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-md flex-shrink-0 select-none"
+      style={{
+        width: size,
+        height: size,
+        background: getInitialGradient(toolName),
+        fontSize: Math.round(size * 0.44),
+        fontWeight: 700,
+        color: 'white',
+        letterSpacing: '-0.01em',
+        lineHeight: 1,
+      }}
+    >
+      {toolName.trim().charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+// Tier 1: logoUrl or Logo.dev
+// Tier 2: Google Favicon
+// Tier 3: Initials
 export default function ToolLogo({ logoUrl, websiteUrl, toolName, size = 28 }: ToolLogoProps) {
-  const [fallbackLevel, setFallbackLevel] = useState(0);
-  // 0 = primary source, 1 = google favicon fallback, 2 = placeholder
+  const [tier, setTier] = useState(0);
 
   const domain = getDomain(websiteUrl);
 
-  // Determine the image source based on fallback level
-  const getImageSrc = (): string | null => {
-    if (fallbackLevel === 0) {
-      // Priority 1: manual logo_url
-      if (logoUrl) return logoUrl;
-      // Priority 2: Logo.dev from domain
-      if (domain) return getLogoProviderUrl(domain);
-      return null;
-    }
-    if (fallbackLevel === 1) {
-      // Priority 3: Google favicon fallback
-      if (domain) return getGoogleFaviconUrl(domain);
-      return null;
-    }
+  const imageSrc: string | null = (() => {
+    if (tier === 0) return logoUrl || (domain ? getLogoProviderUrl(domain) : null);
+    if (tier === 1) return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
     return null;
-  };
+  })();
 
-  const imageSrc = getImageSrc();
-
-  if (!imageSrc || fallbackLevel >= 2) {
-    return (
-      <div
-        className="flex items-center justify-center rounded-md bg-slate-100 text-slate-400 flex-shrink-0"
-        style={{ width: size, height: size }}
-      >
-        <Box style={{ width: size * 0.5, height: size * 0.5 }} />
-      </div>
-    );
+  if (!imageSrc) {
+    return <InitialsFallback toolName={toolName} size={size} />;
   }
 
   return (
@@ -86,7 +83,7 @@ export default function ToolLogo({ logoUrl, websiteUrl, toolName, size = 28 }: T
       height={size}
       className="rounded-md flex-shrink-0 object-contain"
       loading="lazy"
-      onError={() => setFallbackLevel((prev) => prev + 1)}
+      onError={() => setTier((prev) => prev + 1)}
     />
   );
 }

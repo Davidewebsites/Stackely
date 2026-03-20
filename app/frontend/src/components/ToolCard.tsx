@@ -4,11 +4,16 @@ import { ExternalLink, ArrowUpRight, Sparkles, GitCompare, Layers } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES, type Tool } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
-import { getBestFor, getWhyRecommended, getAvoidIf } from '@/lib/toolInsights';
+import { getBestFor, getWhyRecommended, getAvoidIf, getDisplayTags } from '@/lib/toolInsights';
 
 export function trackToolClick(toolId: number): void {
   // Placeholder hook for future analytics wiring.
   console.debug('trackToolClick', { toolId, ts: Date.now() });
+}
+
+function toScanText(value: string | null): string {
+  if (!value) return '';
+  return value.replace(/\s+/g, ' ').trim().replace(/[.;:]\s*$/, '');
 }
 
 interface ToolCardProps {
@@ -52,11 +57,19 @@ export default function ToolCard({
   const bestFor = getBestFor(tool);
   const whyRec = getWhyRecommended(tool);
   const avoidIf = getAvoidIf(tool);
-  const hasInsights = bestFor !== '—' || whyRec !== '—' || avoidIf !== null;
+  const bestForText = bestFor !== '—' ? toScanText(bestFor) : null;
+  const whyRecText = whyRec !== '—' ? toScanText(whyRec) : null;
+  const avoidIfText = avoidIf !== null ? toScanText(avoidIf) : null;
+  const insightRows = [
+    { label: 'Best', value: bestForText, labelClass: 'text-[#2F80ED]/85' },
+    { label: 'Why', value: whyRecText, labelClass: 'text-[#4F46E5]/80' },
+    { label: 'Avoid', value: avoidIfText, labelClass: 'text-amber-500/80', valueClass: 'text-amber-700/90' },
+  ].filter((row) => !!row.value);
+  const useCaseTokens = getDisplayTags(tool, 3);
 
   return (
     <div
-      className={`group flex flex-col p-6 rounded-2xl border bg-white transition-all duration-200 ${
+      className={`group flex flex-col ${compact ? 'p-3 min-h-[175px]' : 'p-4 min-h-[292px]'} rounded-2xl border bg-white transition-all duration-200 ${
         isSelectedForCompare
           ? 'border-slate-700 ring-1 ring-slate-200'
           : isInStack
@@ -73,13 +86,13 @@ export default function ToolCard({
       }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
+      <div className={`flex items-start justify-between gap-3 ${compact ? 'mb-2' : 'mb-2.5'}`}>
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={compact ? 30 : 38} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <h3
-                className={`text-[15px] font-semibold text-slate-900 truncate transition-colors ${
+                className={`text-[15.5px] font-semibold text-slate-900 truncate transition-colors ${
                   isNavigable ? 'group-hover:text-slate-700' : ''
                 }`}
               >
@@ -91,7 +104,7 @@ export default function ToolCard({
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               {categoryInfo && (
-                <span className="text-[11px] text-slate-500">{categoryInfo.label}</span>
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#2F80ED]">{categoryInfo.label}</span>
               )}
               {isAI && (
                 <>
@@ -116,47 +129,35 @@ export default function ToolCard({
       </div>
 
       {/* Description */}
-      <p className="text-[13px] text-slate-600 leading-relaxed mb-4 line-clamp-2">
+      <p className={`text-slate-600 ${compact ? 'text-[12px] leading-snug mb-1.5 line-clamp-2 min-h-[1.9rem]' : 'text-[12.25px] leading-relaxed mb-1.5 line-clamp-3 min-h-[3.2rem]'}`}>
         {tool.short_description}
       </p>
 
       {/* Insight rows (non-compact only) */}
-      {!compact && hasInsights && (
-        <div className="mb-4 space-y-2">
-          {bestFor !== '—' && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-20 flex-shrink-0">Best for</span>
-              <span className="text-[12px] text-slate-600 leading-snug line-clamp-1">{bestFor}</span>
+      {!compact && insightRows.length > 0 && (
+        <div className="mb-2 space-y-1.25">
+          {insightRows.map((row) => (
+            <div key={row.label} className="grid grid-cols-[2.7rem_minmax(0,1fr)] items-start gap-2">
+              <span className={`text-[9px] font-medium uppercase tracking-[0.12em] ${row.labelClass}`}>{row.label}</span>
+              <span className={`text-[12px] font-medium leading-snug line-clamp-2 ${row.valueClass || 'text-slate-700'}`}>{row.value}</span>
             </div>
-          )}
-          {whyRec !== '—' && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-20 flex-shrink-0">Why</span>
-              <span className="text-[12px] text-slate-600 leading-snug line-clamp-1">{whyRec}</span>
-            </div>
-          )}
-          {avoidIf !== null && (
-            <div className="flex gap-2 items-baseline">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500 w-20 flex-shrink-0">Avoid if</span>
-              <span className="text-[12px] text-amber-600 leading-snug line-clamp-1">{avoidIf}</span>
-            </div>
-          )}
+          ))}
         </div>
       )}
 
       {/* Use cases (non-compact only) */}
-      {!compact && tool.use_cases && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {tool.use_cases.split(',').slice(0, 3).map((uc) => (
-            <span key={uc} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-              {uc.trim().replace(/_/g, ' ')}
+      {!compact && useCaseTokens.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {useCaseTokens.length > 0 && useCaseTokens.map((uc) => (
+            <span key={uc} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 max-w-[13rem] truncate whitespace-nowrap">
+              {uc}
             </span>
           ))}
         </div>
       )}
 
       {/* Footer */}
-      <div className="mt-auto flex items-center justify-between gap-2 pt-4 border-t border-slate-100">
+      <div className={`mt-auto flex items-center justify-between gap-2 ${compact ? 'pt-2' : 'pt-2.5'} border-t border-slate-100`}>
         <div className="flex items-center gap-2">
           <span className={`text-[11px] font-medium capitalize ${skillStyles[tool.skill_level] || 'text-slate-500'}`}>
             {tool.skill_level}
@@ -193,7 +194,7 @@ export default function ToolCard({
             <Button
               variant="ghost"
               size="sm"
-              className={`h-6 px-1.5 text-[10px] font-medium gap-0.5 ${
+              className={`h-6 px-2.5 text-[10px] font-medium gap-0.5 ${
                 isInStack
                   ? 'text-slate-700 bg-slate-100 hover:bg-slate-200'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
@@ -202,10 +203,10 @@ export default function ToolCard({
                 e.stopPropagation();
                 onToggleStack(tool);
               }}
-              title={isInStack ? 'Remove from stack' : 'Add to stack'}
+              title={isInStack ? 'Remove from stack' : 'Build your stack'}
             >
               <Layers className="w-3 h-3" />
-              <span>Stack</span>
+              <span>{isInStack ? 'In stack' : 'Build your stack'}</span>
             </Button>
           )}
           {tool.website_url && (

@@ -1,17 +1,17 @@
 import { type Tool } from '@/lib/api';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  ads: 'ads & PPC',
-  design: 'design',
-  copywriting: 'copywriting',
-  video: 'video',
-  landing_pages: 'landing pages',
+  ads: 'landing',
+  design: 'landing',
+  copywriting: 'landing',
+  video: 'landing',
+  landing_pages: 'landing',
   analytics: 'analytics',
   automation: 'automation',
-  email_marketing: 'email marketing',
+  email_marketing: 'email',
 };
 
-const REQUIRED_CATEGORIES = ['landing_pages', 'email_marketing', 'analytics'] as const;
+const REQUIRED_CATEGORIES = ['landing_pages', 'email_marketing', 'analytics', 'automation'] as const;
 
 const SUGGESTIONS: Record<string, string[]> = {
   landing_pages: ['Webflow', 'Carrd', 'Framer'],

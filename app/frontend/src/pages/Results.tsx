@@ -41,7 +41,10 @@ import SiteFooter from '@/components/SiteFooter';
 import SelectedStackBar from '@/components/SelectedStackBar';
 import CompareDrawer from '@/components/CompareDrawer';
 import SmartEmptyState from '@/components/SmartEmptyState';
-import { getStackCoverage, getMissingCategories, getSuggestedTools, getSuggestionReason } from '@/lib/stackInsights';
+import { getStackCoverage, getMissingCategories } from '@/lib/stackInsights';
+import { getWhyRecommended, getAvoidIf } from '@/lib/toolInsights';
+import { loadWorkflowSelection, saveWorkflowSelection } from '@/lib/workflowSelection';
+import { getDisplayQueryLabel, normalizeQueryTypos } from '@/lib/queryNormalization';
 
 interface AdaptedStackItem {
   tool: Tool;
@@ -49,6 +52,21 @@ interface AdaptedStackItem {
   why: string;
   rank: number;
   isSynthesized: boolean;
+}
+
+const STACK_ACCENTS = [
+  { strong: '#2563eb', soft: '#dbeafe', border: '#93c5fd' },
+  { strong: '#0891b2', soft: '#cffafe', border: '#67e8f9' },
+  { strong: '#7c3aed', soft: '#ede9fe', border: '#c4b5fd' },
+  { strong: '#0f766e', soft: '#ccfbf1', border: '#5eead4' },
+  { strong: '#be185d', soft: '#fce7f3', border: '#f9a8d4' },
+];
+
+function getStackAccent(tool: Tool) {
+  const seed = `${tool.name}-${tool.logo_url || tool.website_url || tool.category}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  return STACK_ACCENTS[Math.abs(hash) % STACK_ACCENTS.length];
 }
 
 function normalizeToolName(name: string): string {
@@ -94,7 +112,7 @@ function hasBoundedPhrase(text: string, phrase: string): boolean {
 
 // Helper function to classify query mode
 function classifyQueryMode(query: string): 'stack' | 'search' {
-  const lowerQuery = query.toLowerCase();
+  const lowerQuery = normalizeQueryTypos(query);
 
   // Check for tool discovery keywords - force search mode
   const discoveryKeywords = ['best', 'top', 'tools', 'software', 'platforms'];
@@ -142,16 +160,23 @@ export default function Results() {
   const [stackLoading, setStackLoading] = useState(false);
   const [catalogTools, setCatalogTools] = useState<Tool[]>([]);
   const [recentlyReplacedToolId, setRecentlyReplacedToolId] = useState<number | null>(null);
+  const [draftStackFocused, setDraftStackFocused] = useState(false);
 
   const queryMode = useMemo<'stack' | 'search'>(() => {
     if (!query) return 'search';
     return classifyQueryMode(query);
   }, [query]);
 
+  const displayQueryLabel = useMemo(() => getDisplayQueryLabel(query), [query]);
+
   // Compare & temporary stack state
   const [selectedForCompare, setSelectedForCompare] = useState<Tool[]>([]);
-  const [stackSelection, setStackSelection] = useState<Tool[]>([]);
+  const [stackSelection, setStackSelection] = useState<Tool[]>(() => loadWorkflowSelection());
   const [compareDrawerOpen, setCompareDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    saveWorkflowSelection(stackSelection);
+  }, [stackSelection]);
 
   useEffect(() => {
     if (categoryParam && !query) {
@@ -268,22 +293,9 @@ export default function Results() {
 
   const stackCoverage = useMemo(() => getStackCoverage(stackSelection), [stackSelection]);
   const stackMissing = useMemo(() => getMissingCategories(stackSelection), [stackSelection]);
-  const stackSuggested = useMemo(() => getSuggestedTools(stackMissing), [stackMissing]);
-
-  const suggestedToolLookup = useMemo(() => {
-    const all = [
-      ...searchResults,
-      ...directTools,
-      ...(stack as Tool[]),
-      ...(alternatives as Tool[]),
-      ...(aiAccelerators as Tool[]),
-    ];
-    const map = new Map<string, Tool>();
-    for (const tool of all) {
-      map.set(tool.name.toLowerCase(), tool);
-    }
-    return map;
-  }, [searchResults, directTools, stack, alternatives, aiAccelerators]);
+  const stackRoles = ['landing', 'email', 'analytics', 'automation'];
+  const coveredRoleSet = useMemo(() => new Set(stackCoverage.map((label) => label.toLowerCase())), [stackCoverage]);
+  const nextMissingRole = stackMissing[0] || null;
 
   const aiStackItems = useMemo<AdaptedStackItem[]>(() => {
     if (!stackData?.stack?.length) return [];
@@ -481,6 +493,7 @@ export default function Results() {
       nextStack[slotIndex] = {
         ...currentItem,
         tool: replacement.name,
+        why: getWhyRecommended(replacement),
         logo_url: replacement.logo_url,
         logo: replacement.logo_url,
         website_url: replacement.website_url,
@@ -563,11 +576,10 @@ export default function Results() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 relative overflow-hidden">
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.72),rgba(248,250,252,0.8))]" />
 
       {/* Header */}
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 h-[72px] flex items-center justify-between">
+        <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -586,14 +598,14 @@ export default function Results() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14 lg:py-16 relative">
+      <div className="page-shell py-7 lg:py-8 relative">
         {/* Mode indicator */}
         {query && (
-          <div className="mb-8 flex items-center gap-2">
+          <div className="mb-4 flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               {queryMode === 'stack' ? 'AI Stack Mode' : 'Tool Search Mode'}
             </span>
-            <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-slate-700' : 'bg-emerald-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-[#4F46E5]' : 'bg-[#4FD1C5]'}`} />
           </div>
         )}
         {/* Loading */}
@@ -631,7 +643,8 @@ export default function Results() {
               </Button>
               <Button
                 onClick={handleRetry}
-                className="h-10 text-[13px] text-white shadow-none bg-slate-900 hover:bg-slate-800"
+                className="h-10 text-[13px] text-white shadow-none"
+                style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                 Try again
@@ -655,17 +668,18 @@ export default function Results() {
             {/* Keyword Search Mode */}
             {isKeywordSearch && (
               <>
-                <div className="mb-16">
-                  <h1 className="text-[34px] sm:text-[42px] font-semibold text-slate-950 tracking-tight mb-3">
-                    Search results for "{query}"
+                <div className="mb-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#2F80ED] mb-1.5">Search</div>
+                  <h1 className="text-[32px] sm:text-[40px] font-semibold text-slate-950 tracking-tight mb-1.5">
+                    Search results for "{displayQueryLabel}"
                   </h1>
-                  <p className="text-[15px] text-slate-500">
+                  <p className="text-[14px] text-slate-500">
                     {searchResults.length} tool{searchResults.length !== 1 ? 's' : ''} found
                   </p>
                 </div>
 
                 {searchResults.length >= 3 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  <div className="content-grid">
                     {searchResults.map((tool) => (
                       <ToolCard
                         key={tool.id}
@@ -679,7 +693,7 @@ export default function Results() {
                   </div>
                 ) : searchResults.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+                    <div className="content-grid mb-6">
                       {searchResults.map((tool) => (
                         <ToolCard
                           key={tool.id}
@@ -691,7 +705,7 @@ export default function Results() {
                         />
                       ))}
                     </div>
-                    <div className="border-t border-slate-200 pt-8">
+                    <div className="border-t border-slate-200 pt-6">
                       <SmartEmptyState onSelectStack={handleSmartStackSelect} compact />
                     </div>
                   </>
@@ -704,13 +718,14 @@ export default function Results() {
             {/* Direct Browse Mode */}
             {isDirectBrowse && (
               <>
-                <div className="mb-12">
+                <div className="mb-4">
                   {activeCategoryInfo ? (
                     <div>
-                      <h1 className="text-[32px] font-bold text-slate-900 tracking-tight mb-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2F80ED] mb-1.5">Category</div>
+                      <h1 className="text-[31px] font-bold text-slate-900 tracking-tight mb-1">
                         {activeCategoryInfo.label}
                       </h1>
-                      <p className="text-[16px] text-slate-500">{activeCategoryInfo.description}</p>
+                      <p className="text-[14px] text-slate-500 max-w-3xl leading-relaxed">{activeCategoryInfo.description}</p>
                     </div>
                   ) : (
                     <h1 className="text-[32px] font-bold text-slate-900 tracking-tight">Browse tools</h1>
@@ -718,10 +733,10 @@ export default function Results() {
                 </div>
 
                 {directTools.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-3 mb-8">
-                    <span className="text-[12px] font-medium text-slate-500">Filter</span>
+                  <div className="flex flex-wrap items-center gap-2.5 mb-4 rounded-xl border border-[#2F80ED]/15 bg-white p-2.5 sm:p-3 shadow-card">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#2F80ED]">Filters</span>
                     <Select value={pricingFilter} onValueChange={setPricingFilter}>
-                      <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none">
+                      <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none focus:border-[#2F80ED]/45 focus:ring-[#2F80ED]/20">
                         <SelectValue placeholder="Pricing" />
                       </SelectTrigger>
                       <SelectContent>
@@ -733,7 +748,7 @@ export default function Results() {
                     </Select>
 
                     <Select value={skillFilter} onValueChange={setSkillFilter}>
-                      <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none">
+                      <SelectTrigger className="w-32 h-9 text-[12px] border-slate-200 shadow-none focus:border-[#2F80ED]/45 focus:ring-[#2F80ED]/20">
                         <SelectValue placeholder="Skill level" />
                       </SelectTrigger>
                       <SelectContent>
@@ -744,14 +759,14 @@ export default function Results() {
                       </SelectContent>
                     </Select>
 
-                    <span className="text-[12px] text-slate-400">
+                    <span className="text-[12px] text-slate-500 font-medium">
                       {filteredDirectTools.length} tool{filteredDirectTools.length !== 1 ? 's' : ''}
                     </span>
                   </div>
                 )}
 
                 {orderedDirectCategoryIds.length > 0 ? (
-                  <div className="space-y-14">
+                  <div className="space-y-8">
                     {orderedDirectCategoryIds.map((catId) => {
                       const catTools = groupedDirectTools[catId];
                       const cat = CATEGORIES.find((c) => c.id === catId);
@@ -759,11 +774,11 @@ export default function Results() {
 
                       return (
                         <div key={catId}>
-                          <div className="flex items-center gap-2.5 mb-6">
+                          <div className="flex items-center gap-2.5 mb-3">
                             <h2 className="text-[18px] font-semibold text-slate-900">{cat?.label || catId}</h2>
                             <span className="text-[12px] text-slate-400 font-medium">{catTools.length}</span>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                          <div className="content-grid">
                             {catTools.map((tool) => (
                               <ToolCard
                                 key={tool.id}
@@ -797,15 +812,15 @@ export default function Results() {
 
             {/* Stack Recommendation Section */}
             {queryMode === 'stack' && stackData && (
-              <div className="mt-16">
+              <div className="mt-12">
                 <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                      <Layers className="w-5 h-5 text-slate-700" />
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      <StackelyLogo size="sm" />
                     </div>
                     <div>
                       <h2 className="text-[28px] font-semibold text-slate-950 tracking-tight">
-                        Stack for: {query}
+                        Stack for: {displayQueryLabel}
                       </h2>
                       <p className="text-[14px] text-slate-500 mt-1">
                         Workflow recommendation with {stackData.stack.length} structured step{stackData.stack.length !== 1 ? 's' : ''}
@@ -857,33 +872,38 @@ export default function Results() {
                   </div>
                 )}
 
-                <div className="space-y-6">
-                  {aiStackItems.map((item, index) => (
-                    <div key={`${item.tool.id}-${item.rank}`} className="relative pl-0 sm:pl-16">
-                      <div className="hidden sm:flex absolute left-0 top-2 flex-col items-center">
+                <div className="relative space-y-4 sm:space-y-5">
+                  <div className="hidden sm:block absolute left-[17px] top-3 bottom-3 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-slate-300" />
+                  {aiStackItems.map((item, index) => {
+                    const accent = getStackAccent(item.tool);
+                    const pickReason = item.why && item.why.trim().length > 0 ? item.why.trim() : getWhyRecommended(item.tool);
+                    const avoidTradeoff = getAvoidIf(item.tool);
+                    return (
+                    <div key={`${item.tool.id}-${item.rank}`} className="relative pl-0 sm:pl-14">
+                      <div className="hidden sm:flex absolute left-0 top-1.5 flex-col items-center">
                         <span
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-[12px] font-semibold"
-                          style={{ background: '#0f172a' }}
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-full text-white text-[12px] font-semibold ring-2 ring-white"
+                          style={{ background: accent.strong }}
                         >
                           {index + 1}
                         </span>
-                        {index < aiStackItems.length - 1 && <span className="w-px h-[140px] bg-slate-200 mt-2" />}
                       </div>
 
                       <div
-                        className={`rounded-2xl border bg-white p-5 sm:p-6 transition-all duration-300 ${
+                        className={`rounded-2xl border bg-white p-4 sm:p-5 transition-all duration-300 ${
                           recentlyReplacedToolId === item.tool.id
                             ? 'border-emerald-300 ring-2 ring-emerald-100'
                             : index === 0
                             ? 'border-slate-400 ring-1 ring-slate-200 shadow-sm'
                             : 'border-slate-200'
                         }`}
+                        style={{ borderColor: index === 0 || recentlyReplacedToolId === item.tool.id ? undefined : accent.border }}
                       >
-                        <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center justify-between gap-3 mb-2.5">
                           <div className="flex items-center gap-2">
                             <span
-                              className="sm:hidden inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-[11px] font-semibold"
-                              style={{ background: '#0f172a' }}
+                              className="sm:hidden inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[11px] font-semibold"
+                              style={{ background: accent.strong }}
                             >
                               {index + 1}
                             </span>
@@ -892,12 +912,15 @@ export default function Results() {
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-600 bg-white">
+                              Selected pick
+                            </Badge>
                             {index === 0 && (
-                              <Badge className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50">
+                              <Badge className="text-[10px] border hover:bg-amber-50" style={{ backgroundColor: accent.soft, color: accent.strong, borderColor: accent.border }}>
                                 Best starting point
                               </Badge>
                             )}
-                            <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-slate-50">
+                            <Badge variant="outline" className="text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: accent.border, color: accent.strong, backgroundColor: accent.soft }}>
                               {item.role}
                             </Badge>
                           </div>
@@ -912,10 +935,27 @@ export default function Results() {
                           disableNavigation={item.isSynthesized}
                         />
 
-                        <div className="pt-3 px-1">
-                          <p className="text-[13px] text-slate-600 leading-relaxed">{item.why}</p>
+                        <div className="pt-2 px-1">
+                          <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                            <div className="flex items-start gap-1.5">
+                              <Check className="w-3.5 h-3.5 mt-0.5" style={{ color: accent.strong }} />
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Why this pick</p>
+                                <p className="text-[12.5px] text-slate-700 leading-relaxed">{pickReason}</p>
+                              </div>
+                            </div>
+                            {avoidTradeoff && (
+                              <div className="mt-2.5 pt-2 border-t border-amber-200/70 flex items-start gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 mt-0.5 text-amber-600" />
+                                <div className="min-w-0">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-0.5">Trade-off</p>
+                                  <p className="text-[12px] text-amber-800 leading-relaxed">{avoidTradeoff}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
 
-                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                             <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
                               {item.tool.pricing_model}
                             </Badge>
@@ -932,7 +972,7 @@ export default function Results() {
                           </div>
 
                           {(item.tool.affiliate_url || item.tool.website_url) && (
-                            <div className="mt-3">
+                            <div className="mt-2.5">
                               <Button
                                 size="sm"
                                 className="h-8 px-3 text-[11px] text-white bg-slate-900 hover:bg-slate-800"
@@ -950,11 +990,12 @@ export default function Results() {
                           )}
 
                           {(stackData.alternatives?.[item.tool.name] || []).slice(0, 2).length > 0 && (
-                            <div className="mt-4 pt-3 border-t border-slate-100">
+                            <div className="mt-3 pt-2.5 border-t border-slate-100">
                               <div className="flex items-center justify-between gap-2 mb-2">
                                 <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                  Alternatives
+                                  Swap options
                                 </span>
+                                <span className="text-[10px] text-slate-400">Secondary picks</span>
                               </div>
 
                               <div className="space-y-2">
@@ -963,7 +1004,7 @@ export default function Results() {
                                   .map((alt) => (
                                     <div
                                       key={`${item.tool.id}-${alt.id}`}
-                                      className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"
+                                      className="flex items-center justify-between gap-3 rounded-md border border-slate-200/80 bg-slate-50/55 px-2.5 py-2"
                                     >
                                       <div className="min-w-0 flex items-center gap-2">
                                         <span className="text-[12px] text-slate-700 font-medium truncate">{alt.name}</span>
@@ -982,7 +1023,7 @@ export default function Results() {
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="h-7 px-2.5 text-[11px] border-slate-300"
+                                            className="h-7 px-2.5 text-[11px] border-slate-300 bg-white"
                                             onClick={() => handleReplaceStackTool(index, alt)}
                                             disabled={disableReplace}
                                             title={
@@ -1005,7 +1046,7 @@ export default function Results() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Comparison Section */}
@@ -1063,13 +1104,37 @@ export default function Results() {
       </div>
 
       {/* Draft stack summary */}
-      {stackSelection.length >= 2 && (
-        <div className="max-w-7xl mx-auto px-8 pb-10">
-          <div className="rounded-xl border border-violet-100 bg-violet-50/20 p-4">
+      {stackSelection.length > 0 && (
+        <div id="draft-stack-summary" className="page-shell pb-10 scroll-mt-24">
+          <div
+            className={`rounded-xl border border-violet-100 bg-violet-50/20 p-4 transition-all duration-300 ${
+              draftStackFocused ? 'ring-2 ring-violet-300/70 ring-offset-2 ring-offset-white' : ''
+            }`}
+          >
             <div className="flex items-center gap-2 mb-3.5">
               <Layers className="w-4 h-4 text-violet-500" />
-              <h3 className="text-[14px] font-semibold text-slate-900">Your draft stack</h3>
-              <span className="text-[11px] text-slate-400 ml-1">{stackSelection.length} tools</span>
+              <h3 className="text-[14px] font-semibold text-slate-900">Your stack preview</h3>
+              <span className="text-[11px] text-slate-400 ml-1">{stackSelection.length} selected</span>
+            </div>
+
+            <div
+              className={`mb-3 rounded-lg border px-3 py-2 ${
+                stackMissing.length === 0
+                  ? 'border-emerald-200 bg-emerald-50/40'
+                  : 'border-amber-200 bg-amber-50/40'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${stackMissing.length === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wide ${stackMissing.length === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  {stackMissing.length === 0 ? 'Draft status: complete' : 'Draft status: partial'}
+                </p>
+              </div>
+              <p className="text-[12px] text-slate-700 leading-snug">
+                {stackMissing.length === 0
+                  ? 'Coverage is complete. This stack now covers the core roles needed for a basic workflow.'
+                  : `Coverage is partial. You have ${stackSelection.length} tool${stackSelection.length !== 1 ? 's' : ''} selected and ${stackMissing.length} role${stackMissing.length !== 1 ? 's' : ''} still missing.`}
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-1.5 mb-3.5">
@@ -1083,87 +1148,43 @@ export default function Results() {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-[1.7fr_1fr] gap-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Covers</p>
-                {stackCoverage.length > 0 ? (
-                  <ul className="space-y-0.5">
-                    {stackCoverage.map((label) => (
-                      <li key={label} className="text-[12px] text-slate-600 flex items-center gap-1.5">
-                        <span className="w-1 h-1 rounded-full bg-emerald-400 flex-shrink-0" />
-                        {label}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-[12px] text-slate-400">—</p>
-                )}
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#2F80ED] mb-2">Coverage</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {stackRoles.map((role) => {
+                    const isCovered = coveredRoleSet.has(role);
+                    return (
+                      <div
+                        key={role}
+                        className={`rounded-lg border px-3 py-2 ${
+                          isCovered
+                            ? 'border-emerald-200 bg-emerald-50/50'
+                            : 'border-amber-200 bg-amber-50/50'
+                        }`}
+                      >
+                        <p className="text-[11px] font-medium text-slate-700 capitalize">{role}</p>
+                        <p className={`text-[10px] mt-1 font-medium ${isCovered ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {isCovered ? 'Covered' : 'Missing'}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Potential gap</p>
-                {stackMissing.length > 0 ? (
-                  <ul className="space-y-0.5">
-                    {stackMissing.map((label) => (
-                      <li key={label} className="text-[12px] text-amber-600 flex items-center gap-1.5">
-                        <span className="w-1 h-1 rounded-full bg-amber-400 flex-shrink-0" />
-                        {label}
-                      </li>
-                    ))}
-                  </ul>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 mb-2">Next step</p>
+                {nextMissingRole ? (
+                  <div className="rounded-lg border border-violet-200 bg-white px-3 py-2.5">
+                    <p className="text-[13px] font-medium text-slate-800">Add {nextMissingRole} tool</p>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">This is the clearest gap in your current stack.</p>
+                  </div>
                 ) : (
-                  <p className="text-[12px] text-emerald-600 font-medium">Full coverage</p>
-                )}
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Suggested next tool</p>
-                {stackSuggested.length > 0 ? (
-                  <ul className="space-y-2">
-                    {stackSuggested.map((name, i) => {
-                      const alreadyAdded = stackSelection.some((t) => t.name.toLowerCase() === name.toLowerCase());
-                      const matchedTool = suggestedToolLookup.get(name.toLowerCase());
-                      const reason = getSuggestionReason(name, stackMissing[i] ?? '');
-                      return (
-                        <li key={name}>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[12px] text-slate-600 flex items-center gap-1.5 min-w-0">
-                              <span className="w-1 h-1 rounded-full bg-blue-400 flex-shrink-0" />
-                              <span className="truncate font-medium">{name}</span>
-                            </span>
-                            {alreadyAdded ? (
-                              <span className="text-[10px] font-medium text-emerald-600 flex items-center gap-0.5 flex-shrink-0">
-                                <Check className="w-3 h-3" />
-                                Added
-                              </span>
-                            ) : matchedTool && stackSelection.length < 5 ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 px-1.5 text-[10px] font-medium gap-0.5 text-violet-600 hover:text-violet-700 hover:bg-violet-50 flex-shrink-0"
-                                onClick={() => toggleStack(matchedTool)}
-                              >
-                                <Plus className="w-2.5 h-2.5" />
-                                Add
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 px-1.5 text-[10px] font-medium gap-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex-shrink-0"
-                                onClick={() => navigate(`/results?q=${encodeURIComponent(name)}`)}
-                              >
-                                Search
-                              </Button>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-400 ml-4 mt-0.5 leading-snug">{reason}</p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <p className="text-[12px] text-slate-400">—</p>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2.5">
+                    <p className="text-[13px] font-medium text-emerald-700">Core roles covered</p>
+                    <p className="text-[11px] text-emerald-700/80 mt-1 leading-snug">You have landing, email, analytics, and automation covered.</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -1179,7 +1200,13 @@ export default function Results() {
         compareCount={selectedForCompare.length}
         stackCount={stackSelection.length}
         onOpenCompare={() => setCompareDrawerOpen(true)}
-        onViewStack={() => setCompareDrawerOpen(false)}
+        onViewStack={() => {
+          const section = document.getElementById('draft-stack-summary');
+          if (!section) return;
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setDraftStackFocused(true);
+          setTimeout(() => setDraftStackFocused(false), 1200);
+        }}
         onClearAll={clearSelections}
       />
 

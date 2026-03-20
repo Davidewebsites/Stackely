@@ -4,6 +4,7 @@ import { ExternalLink, ArrowUpRight, Target, Lightbulb, Sparkles } from 'lucide-
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES, type StackTool } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
+import { getBestFor, getWhyRecommended, getAvoidIf, getDisplayTags } from '@/lib/toolInsights';
 
 const pricingStyles: Record<string, string> = {
   free: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -16,20 +17,40 @@ interface StackCardProps {
   position: number;
 }
 
+const ACCENTS = [
+  { strong: '#2563eb', soft: '#dbeafe', border: '#93c5fd' },
+  { strong: '#0891b2', soft: '#cffafe', border: '#67e8f9' },
+  { strong: '#7c3aed', soft: '#ede9fe', border: '#c4b5fd' },
+  { strong: '#0f766e', soft: '#ccfbf1', border: '#5eead4' },
+  { strong: '#be185d', soft: '#fce7f3', border: '#f9a8d4' },
+];
+
+function getToolAccent(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  return ACCENTS[Math.abs(hash) % ACCENTS.length];
+}
+
 export default function StackCard({ tool, position }: StackCardProps) {
   const navigate = useNavigate();
   const catInfo = CATEGORIES.find((c) => c.id === tool.category);
   const isAI = tool.tool_type === 'ai' || tool.tool_type === 'hybrid';
+  const accent = getToolAccent(`${tool.name}-${tool.logo_url || tool.website_url || tool.category}`);
+  const useItForText = (typeof tool.use_it_for === 'string' ? tool.use_it_for.trim() : '') || getBestFor(tool);
+  const whySelectedText = (typeof tool.why_selected === 'string' ? tool.why_selected.trim() : '') || getWhyRecommended(tool);
+  const avoidIfText = getAvoidIf(tool);
+  const contextTags = getDisplayTags(tool, 3);
 
   return (
     <div
-      className="group relative flex gap-5 p-6 rounded-xl border border-slate-200 bg-white hover:border-[#2F80ED]/40 hover:bg-blue-50/10 transition-all cursor-pointer"
+      className="group relative flex gap-4 p-5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50/10 transition-all cursor-pointer"
+      style={{ borderColor: accent.border }}
       onClick={() => navigate(`/tools/${tool.slug}`)}
     >
       {/* Position */}
       <div
         className="flex-shrink-0 w-9 h-9 rounded-lg text-white flex items-center justify-center text-[13px] font-semibold"
-        style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+        style={{ background: accent.strong }}
       >
         {position}
       </div>
@@ -37,8 +58,8 @@ export default function StackCard({ tool, position }: StackCardProps) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Top row: role */}
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#2F80ED' }}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-sm" style={{ color: accent.strong, backgroundColor: accent.soft }}>
             {tool.role || catInfo?.label || tool.category}
           </span>
           <span className="text-slate-200">·</span>
@@ -63,31 +84,49 @@ export default function StackCard({ tool, position }: StackCardProps) {
         </div>
 
         {/* Tool name with logo */}
-        <div className="flex items-center gap-3 mb-1.5">
+        <div className="flex items-center gap-3 mb-1">
           <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={32} />
-          <h3 className="text-[17px] font-semibold text-slate-900 group-hover:text-[#2F80ED] transition-colors">
+          <h3 className="text-[17px] font-semibold text-slate-900 transition-colors">
             {tool.name}
           </h3>
         </div>
-        <p className="text-[14px] text-slate-500 leading-relaxed mb-4">{tool.short_description}</p>
+        <p className="text-[13px] text-slate-500 leading-relaxed mb-3">{tool.short_description}</p>
 
         {/* Context cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
-          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Target className="w-3.5 h-3.5" style={{ color: '#2F80ED' }} />
-              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Use it for</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Target className="w-3.5 h-3.5" style={{ color: accent.strong }} />
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Best for</span>
             </div>
-            <p className="text-[13px] text-slate-700 leading-relaxed">{tool.use_it_for}</p>
+            <p className="text-[13px] text-slate-700 leading-relaxed">{useItForText}</p>
           </div>
-          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Lightbulb className="w-3.5 h-3.5" style={{ color: '#8A2BE2' }} />
-              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Why we selected this</span>
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Lightbulb className="w-3.5 h-3.5" style={{ color: accent.strong }} />
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Why selected</span>
             </div>
-            <p className="text-[13px] text-slate-700 leading-relaxed">{tool.why_selected}</p>
+            <p className="text-[13px] text-slate-700 leading-relaxed">{whySelectedText}</p>
           </div>
+          {avoidIfText && (
+            <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-100 sm:col-span-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[11px] font-medium text-amber-600 uppercase tracking-wider">Avoid if</span>
+              </div>
+              <p className="text-[13px] text-amber-800 leading-relaxed">{avoidIfText}</p>
+            </div>
+          )}
         </div>
+
+        {contextTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {contextTags.map((tag) => (
+              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md text-slate-600 max-w-[14rem] truncate whitespace-nowrap" style={{ backgroundColor: accent.soft }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Footer actions */}
         <div className="flex items-center gap-2">

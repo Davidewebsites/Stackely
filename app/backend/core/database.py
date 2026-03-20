@@ -93,13 +93,18 @@ class DatabaseManager:
                 logger.info("Database already initialized")
                 return
 
-        if not settings.database_url:
-            logger.error("No database URL provided. DATABASE_URL environment variable must be set.")
-            raise ValueError("DATABASE_URL environment variable is required")
+        raw_database_url = os.environ.get("DATABASE_URL")
+        if not raw_database_url:
+            logger.error("Live database not configured")
+            raise ValueError("Live database not configured")
+
+        if raw_database_url.lower().startswith("sqlite") or "stackely.db" in raw_database_url.lower():
+            logger.error("Live database not configured")
+            raise ValueError("Live database not configured")
 
         try:
             logger.info("Normalizing database URL for async compatibility...")
-            database_url = self._normalize_async_database_url(settings.database_url)
+            database_url = self._normalize_async_database_url(raw_database_url)
 
             logger.info("Creating async database engine...")
             # Configure engine based on environment (Lambda vs non-Lambda)

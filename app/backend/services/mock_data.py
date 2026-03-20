@@ -6,9 +6,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from core.config import settings
 from core.database import db_manager
+from models.tools import Tools
 from sqlalchemy import Date, DateTime, MetaData, Table, func, select
 from sqlalchemy.exc import NoSuchTableError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -155,3 +158,173 @@ async def _load_table_from_file(data_file: Path):
             logger.info("Inserted %d mock records into %s", len(records), table_name)
         except SQLAlchemyError as exc:
             logger.error("Failed to insert mock data into %s: %s", table_name, exc)
+
+
+REQUIRED_TOOL_FIELDS = {
+    "name",
+    "slug",
+    "category",
+    "pricing_model",
+    "short_description",
+    "website_url",
+    "internal_score",
+    "beginner_friendly",
+    "popularity_score",
+}
+
+
+def _sanitize_tool_record(raw: dict[str, Any], allowed_columns: set[str]) -> dict[str, Any] | None:
+    """Sanitize and validate one tools.json row for DB upsert."""
+    if not isinstance(raw, dict):
+        return None
+
+    missing = [k for k in REQUIRED_TOOL_FIELDS if not raw.get(k)]
+    if missing:
+        return None
+
+    record = {k: v for k, v in raw.items() if k in allowed_columns and k != "id"}
+    if not record.get("active"):
+        record["active"] = True
+    return record
+
+
+def _resolve_database_target_for_sync(db: AsyncSession) -> str:
+    """Resolve active DB target and hard-fail if admin sync is pointed to sqlite."""
+    raw_database_url = os.environ.get("DATABASE_URL")
+    if not raw_database_url:
+        raise RuntimeError("Live database not configured")
+
+    if raw_database_url.lower().startswith("sqlite") or "stackely.db" in raw_database_url.lower():
+        raise RuntimeError("Live database not configured")
+
+    bind = db.get_bind()
+    target = str(getattr(bind, "url", raw_database_url))
+    lower_target = target.lower()
+
+    if lower_target.startswith("sqlite") or "stackely.db" in lower_target:
+        raise RuntimeError("Live database not configured")
+
+    return target
+
+
+async def sync_tools_catalog_from_mock_data(
+    db: AsyncSession,
+    data_file: Path | None = None,
+) -> dict[str, Any]:
+    """Upsert tools catalog from mock_data/tools.json into the live DB tools table.
+
+    This is designed for authenticated admin-triggered synchronization.
+    """
+    path = data_file or (MOCK_DATA_DIR / "tools.json")
+    if not path.exists():
+        raise FileNotFoundError(f"Tools dataset not found: {path}")
+
+    raw_data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw_data, list):
+        raise ValueError("tools.json must be a JSON array")
+
+    current_database_target = _resolve_database_target_for_sync(db)
+
+    allowed_columns = {col.name for col in Tools.__table__.columns}
+
+    # Dedupe and validate incoming rows.
+    seen_slugs: set[str] = set()
+    seen_names: set[str] = set()
+    cleaned: list[dict[str, Any]] = []
+    skipped_invalid = 0
+    skipped_duplicates = 0
+
+    for row in raw_data:
+        record = _sanitize_tool_record(row, allowed_columns)
+        if record is None:
+            skipped_invalid += 1
+            continue
+
+        slug_key = str(record.get("slug", "")).strip().lower()
+        name_key = str(record.get("name", "")).strip().lower()
+        if not slug_key or not name_key:
+            skipped_invalid += 1
+            continue
+
+        if slug_key in seen_slugs or name_key in seen_names:
+            skipped_duplicates += 1
+            continue
+
+        seen_slugs.add(slug_key)
+        seen_names.add(name_key)
+        cleaned.append(record)
+
+    if not cleaned:
+        skipped_total = skipped_invalid + skipped_duplicates
+        return {
+            "current_database_target": current_database_target,
+            "source_total": len(raw_data),
+            "prepared_total": 0,
+            "inserted": 0,
+            "updated": 0,
+            "skipped": skipped_total,
+            "skipped_invalid": skipped_invalid,
+            "skipped_duplicates": skipped_duplicates,
+            "active_total": 0,
+            "active_total_after": 0,
+            "category_distribution": {},
+        }
+
+    slugs = [str(item["slug"]).strip() for item in cleaned]
+    existing_rows = await db.execute(select(Tools).where(Tools.slug.in_(slugs)))
+    existing_by_slug = {str(t.slug).strip().lower(): t for t in existing_rows.scalars().all()}
+
+    inserted = 0
+    updated = 0
+
+    for record in cleaned:
+        slug_key = str(record["slug"]).strip().lower()
+        existing = existing_by_slug.get(slug_key)
+        if existing:
+            for key, value in record.items():
+                setattr(existing, key, value)
+            updated += 1
+        else:
+            db.add(Tools(**record))
+            inserted += 1
+
+    await db.commit()
+
+    # Debug/verification counters required by task.
+    total_active = await db.scalar(select(func.count()).select_from(Tools).where(Tools.active.is_(True)))
+    category_rows = await db.execute(
+        select(Tools.category, func.count().label("count"))
+        .where(Tools.active.is_(True))
+        .group_by(Tools.category)
+    )
+    category_distribution = {str(row.category): int(row.count) for row in category_rows}
+
+    duplicate_slug_rows = await db.execute(
+        select(Tools.slug)
+        .group_by(Tools.slug)
+        .having(func.count() > 1)
+    )
+    duplicate_name_rows = await db.execute(
+        select(func.lower(Tools.name).label("name_key"))
+        .group_by(func.lower(Tools.name))
+        .having(func.count() > 1)
+    )
+    duplicate_slug_groups = len(duplicate_slug_rows.scalars().all())
+    duplicate_name_groups = len(duplicate_name_rows.scalars().all())
+    skipped_total = skipped_invalid + skipped_duplicates
+
+    return {
+        "current_database_target": current_database_target,
+        "source_total": len(raw_data),
+        "prepared_total": len(cleaned),
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": skipped_total,
+        "skipped_invalid": skipped_invalid,
+        "skipped_duplicates": skipped_duplicates,
+        "active_total": int(total_active or 0),
+        "active_total_after": int(total_active or 0),
+        "duplicate_slug_groups": duplicate_slug_groups,
+        "duplicate_name_groups": duplicate_name_groups,
+        "category_distribution": dict(sorted(category_distribution.items())),
+    }

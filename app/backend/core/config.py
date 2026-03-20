@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./stackely.db"
+    database_url: str | None = None
 
     # AWS Lambda Configuration
     is_lambda: bool = False

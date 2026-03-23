@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight,
@@ -19,6 +19,7 @@ import ToolLogo from '@/components/ToolLogo';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
 import { Badge } from '@/components/ui/badge';
+import { usePageSeo } from '@/lib/seo';
 
 const pricingBadgeStyles: Record<string, string> = {
   free: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -33,11 +34,10 @@ const skillColors: Record<string, string> = {
 };
 
 function FeaturedToolCard({ tool }: { tool: Tool }) {
-  const navigate = useNavigate();
   const catLabel = CATEGORIES.find((c) => c.id === tool.category)?.label;
   return (
-    <div
-      onClick={() => navigate(`/tools/${tool.slug}`)}
+    <Link
+      to={`/tools/${tool.slug}`}
       className="group flex flex-col items-center gap-3 p-5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer text-center"
     >
       <ToolLogo
@@ -69,7 +69,7 @@ function FeaturedToolCard({ tool }: { tool: Tool }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -136,6 +136,14 @@ export default function Index() {
   const [pricingPreference, setPricingPreference] = useState<PricingPreference | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
   const [featuredTools, setFeaturedTools] = useState<Tool[]>([]);
+
+  usePageSeo({
+    title: 'Stackely - Build the right tool stack for any goal',
+    description:
+      'Find and compare the best tools for your goal. Stackely helps you build practical tool stacks for marketing, growth, and automation workflows.',
+    canonicalPath: '/',
+    robots: 'index',
+  });
 
   useEffect(() => {
     fetchFeaturedTools().then(setFeaturedTools);
@@ -396,16 +404,16 @@ export default function Index() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
                 {CATEGORIES.map((cat) => (
-                  <button
+                  <Link
                     key={cat.id}
-                    onClick={() => navigate(`/categories/${cat.id}`)}
+                    to={`/categories/${cat.id}`}
                     className="group flex flex-col items-start gap-3 p-7 rounded-xl border border-slate-200 bg-white hover:border-[#2F80ED]/40 hover:bg-blue-50/20 hover:shadow-sm transition-all text-left"
                   >
                     <span className="text-[15px] font-semibold text-slate-900 group-hover:text-[#2F80ED] transition-colors">
                       {cat.label}
                     </span>
                     <span className="text-[13px] text-slate-400 leading-relaxed">{cat.description}</span>
-                  </button>
+                  </Link>
                 ))}
               </div>
             </div>

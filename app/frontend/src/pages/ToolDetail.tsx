@@ -27,6 +27,7 @@ import SiteFooter from '@/components/SiteFooter';
 import CompareDrawer from '@/components/CompareDrawer';
 import SelectedStackBar from '@/components/SelectedStackBar';
 import { loadWorkflowSelection, saveWorkflowSelection } from '@/lib/workflowSelection';
+import { usePageSeo } from '@/lib/seo';
 
 const pricingStyles: Record<string, string> = {
   free: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -80,6 +81,15 @@ export default function ToolDetail() {
   const [selectedForCompare, setSelectedForCompare] = useState<Tool[]>([]);
   const [stackSelection, setStackSelection] = useState<Tool[]>(() => loadWorkflowSelection());
   const [compareDrawerOpen, setCompareDrawerOpen] = useState(false);
+
+  usePageSeo({
+    title: tool ? `${tool.name} review and alternatives - Stackely` : 'Tool details - Stackely',
+    description: tool
+      ? `${tool.name}: pricing, skill level, fit, and alternatives. Compare before you choose your stack.`
+      : 'Detailed tool analysis, pricing, and alternatives on Stackely.',
+    canonicalPath: slug ? `/tools/${slug}` : '/tools',
+    robots: tool ? 'index' : 'noindex',
+  });
 
   useEffect(() => {
     saveWorkflowSelection(stackSelection);
@@ -227,7 +237,7 @@ export default function ToolDetail() {
 
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-8 h-[72px] flex items-center justify-between">
+        <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -246,7 +256,7 @@ export default function ToolDetail() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-8 py-10 relative">
+      <div className="page-shell py-10 relative">
         {/* Hero */}
         <Card className="border-slate-200/80 shadow-none overflow-hidden mb-8 bg-white/95">
           <CardContent className="p-7">

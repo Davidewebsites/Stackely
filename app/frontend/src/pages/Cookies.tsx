@@ -17,7 +17,7 @@ export default function Cookies() {
 
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8 h-[72px] flex items-center justify-between">
+        <div className="page-shell h-[72px] flex items-center justify-between">
           <Link to="/">
             <StackelyLogo size="sm" />
           </Link>

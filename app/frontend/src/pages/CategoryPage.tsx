@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -7,6 +7,7 @@ import { CATEGORIES, fetchToolsByCategories, type Tool } from '@/lib/api';
 import ToolCard from '@/components/ToolCard';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
+import { usePageSeo } from '@/lib/seo';
 
 export default function CategoryPage() {
   const { category } = useParams<{ category: string }>();
@@ -17,6 +18,17 @@ export default function CategoryPage() {
   const [skillFilter, setSkillFilter] = useState('all');
 
   const categoryInfo = CATEGORIES.find((c) => c.id === category);
+
+  usePageSeo({
+    title: categoryInfo
+      ? `${categoryInfo.label} tools - Stackely`
+      : 'Tool category - Stackely',
+    description: categoryInfo
+      ? `Explore ${categoryInfo.label.toLowerCase()} tools on Stackely. Compare options by pricing, skill level, and fit.`
+      : 'Browse tool categories on Stackely and compare options by pricing and skill level.',
+    canonicalPath: category ? `/categories/${category}` : '/categories',
+    robots: categoryInfo ? 'index' : 'noindex',
+  });
 
   useEffect(() => {
     if (!category) return;
@@ -148,16 +160,16 @@ export default function CategoryPage() {
             <h2 className="text-[20px] font-semibold text-slate-900 mb-5">Browse other categories</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {CATEGORIES.filter((c) => c.id !== category).map((cat) => (
-                <button
+                <Link
                   key={cat.id}
-                  onClick={() => navigate(`/categories/${cat.id}`)}
+                  to={`/categories/${cat.id}`}
                   className="group flex flex-col items-start gap-2 p-5 rounded-xl border border-slate-200 bg-white hover:border-[#2F80ED]/40 hover:bg-blue-50/20 transition-all text-left"
                 >
                   <span className="text-[14px] font-semibold text-slate-900 group-hover:text-[#2F80ED] transition-colors">
                     {cat.label}
                   </span>
                   <span className="text-[12px] text-slate-400 leading-relaxed">{cat.description}</span>
-                </button>
+                </Link>
               ))}
             </div>
           </div>

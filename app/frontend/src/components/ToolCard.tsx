@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, ArrowUpRight, Sparkles, GitCompare, Layers } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CATEGORIES, type Tool } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
 import { getBestFor, getWhyRecommended, getAvoidIf, getDisplayTags } from '@/lib/toolInsights';
@@ -69,7 +69,7 @@ export default function ToolCard({
 
   return (
     <div
-      className={`group flex flex-col ${compact ? 'p-3 min-h-[175px]' : 'p-4 min-h-[292px]'} rounded-2xl border bg-white transition-all duration-200 ${
+      className={`group flex flex-col ${compact ? 'p-3 min-h-[175px]' : 'p-4 min-h-[292px]'} rounded-xl border bg-white transition-all duration-200 ${
         isSelectedForCompare
           ? 'border-slate-700 ring-1 ring-slate-200'
           : isInStack
@@ -224,7 +224,14 @@ export default function ToolCard({
             </Button>
           )}
           {isNavigable ? (
-            <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 transition-colors" />
+            <Link
+              to={`/tools/${tool.slug}`}
+              className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600 font-medium"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Details
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 transition-colors" />
+            </Link>
           ) : (
             <span className="text-[10px] text-slate-400 font-medium">Preview only</span>
           )}

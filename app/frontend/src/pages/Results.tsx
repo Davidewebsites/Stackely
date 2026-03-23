@@ -45,6 +45,7 @@ import { getStackCoverage, getMissingCategories } from '@/lib/stackInsights';
 import { getWhyRecommended, getAvoidIf } from '@/lib/toolInsights';
 import { loadWorkflowSelection, saveWorkflowSelection } from '@/lib/workflowSelection';
 import { getDisplayQueryLabel, normalizeQueryTypos } from '@/lib/queryNormalization';
+import { usePageSeo } from '@/lib/seo';
 
 interface AdaptedStackItem {
   tool: Tool;
@@ -168,6 +169,17 @@ export default function Results() {
   }, [query]);
 
   const displayQueryLabel = useMemo(() => getDisplayQueryLabel(query), [query]);
+
+  usePageSeo({
+    title: query
+      ? `${queryMode === 'stack' ? 'Stack results' : 'Search results'} for ${displayQueryLabel} - Stackely`
+      : 'Results - Stackely',
+    description: query
+      ? `Dynamic ${queryMode === 'stack' ? 'stack recommendations' : 'search results'} for ${displayQueryLabel} on Stackely.`
+      : 'Dynamic tool results on Stackely.',
+    canonicalPath: '/results',
+    robots: 'noindex',
+  });
 
   // Compare & temporary stack state
   const [selectedForCompare, setSelectedForCompare] = useState<Tool[]>([]);

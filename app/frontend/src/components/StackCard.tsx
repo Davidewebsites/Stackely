@@ -43,7 +43,7 @@ export default function StackCard({ tool, position }: StackCardProps) {
 
   return (
     <div
-      className="group relative flex gap-4 p-5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50/10 transition-all cursor-pointer"
+      className="group relative flex gap-4 p-5 rounded-lg border border-slate-200 bg-white hover:bg-blue-50/10 transition-all cursor-pointer"
       style={{ borderColor: accent.border }}
       onClick={() => navigate(`/tools/${tool.slug}`)}
     >

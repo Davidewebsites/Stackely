@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, Link2, Check } from 'lucide-react';
 import { getSavedStackById, type SavedStack } from '@/lib/api';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
+import { usePageSeo } from '@/lib/seo';
 
 export default function SharedStack() {
   const { stackId } = useParams<{ stackId: string }>();
@@ -13,6 +14,15 @@ export default function SharedStack() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  usePageSeo({
+    title: savedStack ? `Shared stack: ${savedStack.goal} - Stackely` : 'Shared stack - Stackely',
+    description: savedStack
+      ? `Shared Stackely stack for ${savedStack.goal}.`
+      : 'Shared stack link on Stackely.',
+    canonicalPath: stackId ? `/stack/${stackId}` : '/stack',
+    robots: 'noindex',
+  });
 
   useEffect(() => {
     if (!stackId) {
@@ -65,7 +75,7 @@ export default function SharedStack() {
     return (
       <div className="min-h-screen bg-white">
         <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-8 h-[72px] flex items-center">
+          <div className="page-shell h-[72px] flex items-center">
             <div className="cursor-pointer" onClick={() => navigate('/')}>
               <StackelyLogo size="sm" />
             </div>
@@ -100,7 +110,7 @@ export default function SharedStack() {
 
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8 h-[72px] flex items-center justify-between">
+        <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -119,7 +129,7 @@ export default function SharedStack() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-8 py-14">
+      <div className="page-shell py-14">
         {/* Stack info */}
         <div className="mb-10">
           <span className="text-[11px] font-medium uppercase tracking-wider mb-3 block" style={{ color: '#2F80ED' }}>
@@ -140,7 +150,7 @@ export default function SharedStack() {
             {savedStack.toolNames.map((name, index) => (
               <div
                 key={index}
-                className="flex items-center gap-4 p-5 rounded-xl border border-slate-200 bg-white"
+                className="flex items-center gap-4 p-5 rounded-lg border border-slate-200 bg-white"
               >
                 <div
                   className="w-9 h-9 rounded-lg text-white flex items-center justify-center text-[13px] font-semibold flex-shrink-0"
@@ -158,7 +168,7 @@ export default function SharedStack() {
         <div className="flex flex-wrap gap-3">
           <Button
             onClick={handleRegenerate}
-            className="h-11 px-7 text-white text-[14px] font-semibold shadow-none rounded-xl"
+            className="h-11 px-7 text-white text-[14px] font-semibold shadow-none rounded-md"
             style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
           >
             Regenerate this stack
@@ -166,7 +176,7 @@ export default function SharedStack() {
           <Button
             variant="outline"
             onClick={handleCopyLink}
-            className="h-11 px-6 border-slate-200 text-slate-600 text-[14px] font-medium shadow-none rounded-xl"
+            className="h-11 px-6 border-slate-200 text-slate-600 text-[14px] font-medium shadow-none rounded-md"
           >
             {linkCopied ? (
               <>

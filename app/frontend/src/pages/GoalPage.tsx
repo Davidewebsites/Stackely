@@ -10,6 +10,7 @@ import ToolCard from '@/components/ToolCard';
 import StackelyLogo from '@/components/StackelyLogo';
 import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
+import { usePageSeo } from '@/lib/seo';
 
 /** Convert a slug like "create-instagram-ads" to a readable goal "create instagram ads" */
 function slugToGoal(slug: string): string {
@@ -24,6 +25,15 @@ export default function GoalPage() {
 
   const { classify, reset, isLoading, classification, stack, alternatives, aiAccelerators, error } =
     useToolRecommendation();
+
+  usePageSeo({
+    title: goalQuery ? `${goalQuery} tool stack - Stackely` : 'Goal stack - Stackely',
+    description: goalQuery
+      ? `Tool stack recommendations for ${goalQuery}. Compare options and build a practical workflow with Stackely.`
+      : 'Goal-based tool stack recommendations on Stackely.',
+    canonicalPath: goalSlug ? `/goals/${goalSlug}` : '/goals',
+    robots: goalSlug ? 'index' : 'noindex',
+  });
 
   const [hasStarted, setHasStarted] = useState(false);
 

@@ -1,9 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';
+import { usePageSeo } from '@/lib/seo';
 
 export default function NotFound() {
   const navigate = useNavigate();
+
+  usePageSeo({
+    title: 'Page not found - Stackely',
+    description: 'This page is not available.',
+    canonicalPath: '/404',
+    robots: 'noindex',
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">

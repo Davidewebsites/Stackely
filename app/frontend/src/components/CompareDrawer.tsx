@@ -44,6 +44,8 @@ const skillRank: Record<string, number> = {
 type RowDef = { label: string; key: keyof Tool };
 type GroupDef = { title: string; rows: RowDef[] };
 
+const PLACEHOLDER_VALUES = new Set(['-', '--', '—', 'n/a', 'na', 'none', 'null', 'undefined']);
+
 const GROUPS: GroupDef[] = [
   {
     title: 'Overview',
@@ -78,7 +80,9 @@ const GROUPS: GroupDef[] = [
 ];
 
 function hasValue(v: unknown): boolean {
-  return v !== null && v !== undefined && String(v).trim() !== '';
+  if (v === null || v === undefined) return false;
+  const normalized = String(v).trim().toLowerCase();
+  return normalized !== '' && !PLACEHOLDER_VALUES.has(normalized);
 }
 
 function rowDiffers(key: keyof Tool, tools: Tool[]): boolean {
@@ -169,6 +173,14 @@ function CellValue({ rowKey, value, isBest }: { rowKey: keyof Tool; value: unkno
     return <span className="text-[13px] font-medium text-slate-800">{cat?.label ?? str}</span>;
   }
 
+  if (rowKey === 'best_use_cases' || rowKey === 'recommended_for' || rowKey === 'target_audience' || rowKey === 'pros' || rowKey === 'cons') {
+    return (
+      <span className={`inline-flex rounded-md px-2 py-1 text-[12px] leading-relaxed text-slate-800 max-w-[28ch] text-left ${bestTone}`}>
+        {str}
+      </span>
+    );
+  }
+
   return <span className={`inline-flex rounded-md px-2 py-1 text-[13px] leading-relaxed text-slate-800 ${bestTone}`}>{str}</span>;
 }
 
@@ -179,7 +191,7 @@ export default function CompareDrawer({ open, onOpenChange, tools }: CompareDraw
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[85vh] px-0 rounded-t-2xl flex flex-col bg-[linear-gradient(180deg,rgba(47,128,237,0.05)_0%,rgba(138,43,226,0.03)_28%,rgba(255,255,255,0)_55%)]"
+        className="h-[85vh] px-0 rounded-t-[0.56rem] flex flex-col bg-[linear-gradient(180deg,rgba(47,128,237,0.05)_0%,rgba(138,43,226,0.03)_28%,rgba(255,255,255,0)_55%)]"
       >
         <SheetHeader className="px-6 pt-3 pb-5 border-b border-slate-100/90 flex-shrink-0 text-center relative">
           <div className="w-20 h-1 rounded-full mx-auto mb-3 bg-gradient-to-r from-[#2F80ED] via-[#4F46E5] to-[#8A2BE2]" />
@@ -196,17 +208,17 @@ export default function CompareDrawer({ open, onOpenChange, tools }: CompareDraw
             <p className="text-[14px] text-slate-400 text-center py-16">No tools selected for comparison.</p>
           ) : (
             <div
-              className="grid gap-x-4 mt-6 max-w-6xl mx-auto"
-              style={{ gridTemplateColumns: `150px repeat(${colCount}, minmax(0, 1fr))` }}
+              className="grid gap-x-3 mt-6 mx-auto w-full max-w-[80rem] rounded-[0.48rem] border border-slate-100/90 bg-white/70"
+              style={{ gridTemplateColumns: `160px repeat(${colCount}, minmax(0, 1fr))` }}
             >
               {/* Tool header row */}
               <div />
               {tools.map((tool) => (
                 <div
                   key={tool.slug}
-                  className="flex flex-col items-center gap-2 pb-5 border-b border-slate-100 text-center px-3"
+                  className="flex flex-col items-center gap-2 pb-4 pt-3 border-b border-slate-100 text-center px-2"
                 >
-                  <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/40 p-2.5">
+                  <div className="rounded-[0.56rem] border border-slate-200/80 bg-white shadow-sm shadow-slate-200/40 p-2.5">
                     <ToolLogo
                       logoUrl={tool.logo_url}
                       websiteUrl={tool.website_url}
@@ -252,18 +264,18 @@ export default function CompareDrawer({ open, onOpenChange, tools }: CompareDraw
                     {visibleRows.map(({ label, key }, rowIdx) => {
                       const differs = rowDiffers(key, tools);
                       const rowBg = differs
-                        ? 'bg-violet-50/30'
+                        ? 'bg-violet-50/25'
                         : rowIdx % 2 === 1
-                        ? 'bg-slate-50/45'
-                        : 'bg-white/70';
+                        ? 'bg-slate-50/40'
+                        : 'bg-white/80';
                       return (
                         <React.Fragment key={key}>
-                          <div className={`flex min-h-[56px] items-center gap-1.5 py-3 pr-4 border-b border-slate-100 ${rowBg}`}>
+                          <div className={`flex min-h-[52px] items-center justify-center gap-1.5 py-2.5 px-3 border-b border-slate-100 ${rowBg}`}>
                             <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">
                               {label}
                             </span>
                             {differs && (
-                              <span className="mt-[1px] w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+                              <span className="mt-[1px] w-1.5 h-1.5 rounded-full bg-[#4F46E5] flex-shrink-0" />
                             )}
                           </div>
                           {tools.map((tool) => {
@@ -271,7 +283,7 @@ export default function CompareDrawer({ open, onOpenChange, tools }: CompareDraw
                             return (
                               <div
                                 key={`${tool.slug}-${key}`}
-                                className={`flex min-h-[56px] items-center justify-center py-3 px-2 border-b border-slate-100 ${rowBg}`}
+                                className={`flex min-h-[52px] items-center justify-center py-2.5 px-2 border-b border-slate-100 ${rowBg}`}
                               >
                                 <CellValue rowKey={key} value={tool[key]} isBest={best} />
                               </div>

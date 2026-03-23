@@ -16,6 +16,32 @@ function toScanText(value: string | null): string {
   return value.replace(/\s+/g, ' ').trim().replace(/[.;:]\s*$/, '');
 }
 
+function formatListingPrice(value?: string | null): { primary: string; secondary?: string } | null {
+  const normalized = value?.replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+
+  const separators = [' + ', ' - ', ' / ', ' | ', ', '];
+  for (const separator of separators) {
+    const parts = normalized.split(separator).map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return {
+        primary: parts[0],
+        secondary: parts.slice(1).join(separator.trim() === '|' ? ' | ' : ' · '),
+      };
+    }
+  }
+
+  const parenIndex = normalized.indexOf('(');
+  if (parenIndex > 0 && normalized.endsWith(')')) {
+    return {
+      primary: normalized.slice(0, parenIndex).trim(),
+      secondary: normalized.slice(parenIndex + 1, -1).trim(),
+    };
+  }
+
+  return { primary: normalized };
+}
+
 interface ToolCardProps {
   tool: Tool;
   compact?: boolean;
@@ -60,6 +86,7 @@ export default function ToolCard({
   const bestForText = bestFor !== '—' ? toScanText(bestFor) : null;
   const whyRecText = whyRec !== '—' ? toScanText(whyRec) : null;
   const avoidIfText = avoidIf !== null ? toScanText(avoidIf) : null;
+  const priceDisplay = formatListingPrice(tool.starting_price);
   const insightRows = [
     { label: 'Best', value: bestForText, labelClass: 'text-[#2F80ED]/85' },
     { label: 'Why', value: whyRecText, labelClass: 'text-[#4F46E5]/80' },
@@ -129,7 +156,7 @@ export default function ToolCard({
       </div>
 
       {/* Description */}
-      <p className={`text-slate-600 ${compact ? 'text-[12px] leading-snug mb-1.5 line-clamp-2 min-h-[1.9rem]' : 'text-[12.25px] leading-relaxed mb-1.5 line-clamp-3 min-h-[3.2rem]'}`}>
+      <p className={`text-slate-600 ${compact ? 'text-[12px] leading-[1.45] mb-1.5 line-clamp-2 min-h-[2.05rem]' : 'text-[12.25px] leading-[1.52] mb-1.5 line-clamp-2 min-h-[2.3rem]'}`}>
         {tool.short_description}
       </p>
 
@@ -157,20 +184,25 @@ export default function ToolCard({
       )}
 
       {/* Footer */}
-      <div className={`mt-auto flex items-center justify-between gap-2 ${compact ? 'pt-2' : 'pt-2.5'} border-t border-slate-100`}>
-        <div className="flex items-center gap-2">
+      <div className={`mt-auto flex flex-col sm:flex-row sm:items-center gap-2 ${compact ? 'pt-2' : 'pt-2.5'} border-t border-slate-100`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-0">
           <span className={`text-[11px] font-medium capitalize ${skillStyles[tool.skill_level] || 'text-slate-500'}`}>
             {tool.skill_level}
           </span>
-          {tool.starting_price && !compact && (
+          {priceDisplay && !compact && (
             <>
-              <span className="text-slate-200">·</span>
-              <span className="text-[11px] text-slate-400">{tool.starting_price}</span>
+              <span className="text-slate-200 hidden sm:inline">·</span>
+              <div className="min-w-0 flex flex-col leading-tight">
+                <span className="text-[11px] font-medium text-slate-600 break-words">{priceDisplay.primary}</span>
+                {priceDisplay.secondary && (
+                  <span className="text-[10px] text-slate-400 break-words line-clamp-1">{priceDisplay.secondary}</span>
+                )}
+              </div>
             </>
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {onToggleCompare && (
             <Button
               variant="ghost"

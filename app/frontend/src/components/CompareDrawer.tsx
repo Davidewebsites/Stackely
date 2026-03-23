@@ -208,7 +208,7 @@ export default function CompareDrawer({ open, onOpenChange, tools }: CompareDraw
             <p className="text-[14px] text-slate-400 text-center py-16">No tools selected for comparison.</p>
           ) : (
             <div
-              className="grid gap-x-3 mt-6 mx-auto w-full max-w-[80rem] rounded-[0.48rem] border border-slate-100/90 bg-white/70"
+              className="grid gap-x-3 mt-6 mx-auto w-full max-w-[92rem] rounded-[0.48rem] border border-slate-100/90 bg-white/70"
               style={{ gridTemplateColumns: `160px repeat(${colCount}, minmax(0, 1fr))` }}
             >
               {/* Tool header row */}

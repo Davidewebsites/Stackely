@@ -32,6 +32,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Integrated with SEMrush, data-driven topics, content briefs",
     cons: "Requires SEMrush subscription, complex",
     best_use_cases: "Content strategy, Topic research, SEO content planning",
+    content: {
+      decision_summary: {
+        best_for: "Teams already running SEO content planning inside SEMrush.",
+        avoid_if: "You only need draft optimization or publish too infrequently to justify the stack.",
+      },
+      when_to_use: [
+        "Use it when topic selection, keyword research, and briefs need to stay in one SEO workflow.",
+        "Choose it when multiple writers need consistent outlines before writing starts.",
+        "Use it when editorial planning is driven by search demand, not gut feel.",
+      ],
+      when_to_avoid: [
+        "Avoid it if you publish a few articles a quarter and do not run a real content pipeline.",
+        "Skip it when your team is not already paying for SEMrush.",
+        "Avoid it if the main bottleneck is optimization in the draft, not planning before the draft.",
+      ],
+      faq: [
+        { question: "Is this a writing tool?", answer: "Not really. It is stronger before writing than during writing." },
+        { question: "Who benefits most?", answer: "Teams producing content on a weekly schedule with clear SEO targets." },
+        { question: "What is the usual failure mode?", answer: "Teams create briefs but still publish weak or generic content." },
+      ],
+    },
   },
   {
     id: 2,
@@ -59,6 +80,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Domain Authority metric, good keyword tool, educational resources",
     cons: "Smaller link index than Ahrefs, dated interface",
     best_use_cases: "Domain authority analysis, Keyword research, Site audits",
+    content: {
+      decision_summary: {
+        best_for: "SEO teams that want stable reporting and familiar domain-level benchmarks.",
+        avoid_if: "Backlink depth and enterprise-scale technical SEO are your main requirements.",
+      },
+      when_to_use: [
+        "Use it when clients or stakeholders already understand Domain Authority as a reference point.",
+        "Choose it when you need keyword tracking, site audits, and reporting in one product.",
+        "Use it when your SEO team values structure over raw data volume.",
+      ],
+      when_to_avoid: [
+        "Avoid it if link prospecting and backlink gap analysis drive most of your strategy.",
+        "Skip it when you need advanced technical automation or very large crawl depth.",
+        "Avoid it if your team already works efficiently in another full SEO suite.",
+      ],
+      faq: [
+        { question: "Is Moz Pro enough for most SEO teams?", answer: "Yes for core tracking, audits, and keyword work." },
+        { question: "Can it replace Ahrefs?", answer: "Only if deep backlink analysis is not central to the job." },
+        { question: "Who gets the best fit?", answer: "Agencies and in-house SEO teams that need dependable recurring reporting." },
+      ],
+    },
   },
   {
     id: 3,
@@ -86,6 +128,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Easy heatmaps, simple A/B testing, affordable",
     cons: "Less features than Hotjar, limited recordings",
     best_use_cases: "Quick heatmap analysis, Simple A/B tests",
+    content: {
+      decision_summary: {
+        best_for: "Marketing and UX teams that need fast page-level behavior insight.",
+        avoid_if: "You need deep product analytics or a mature experimentation stack.",
+      },
+      when_to_use: [
+        "Use it when you need quick evidence of where people click and where they stop scrolling.",
+        "Choose it for landing-page tuning where a full experimentation platform would be overkill.",
+        "Use it when marketers need answers fast without waiting on a data team.",
+      ],
+      when_to_avoid: [
+        "Avoid it if your main questions require event-level product analysis.",
+        "Skip it when session replay and user interviews are more important than heatmaps.",
+        "Avoid it for experimentation programs that need strict statistical controls.",
+      ],
+      faq: [
+        { question: "Can it replace analytics tools?", answer: "No. It answers page-behavior questions, not full analytics questions." },
+        { question: "How much traffic do I need?", answer: "Enough to see stable patterns. Low-traffic pages stay noisy." },
+        { question: "What is the biggest misuse?", answer: "Making layout decisions from one short snapshot." },
+      ],
+    },
   },
   {
     id: 4,
@@ -113,6 +176,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Powerful behavioral analytics, generous free tier, great visualizations",
     cons: "Complex setup, steep learning curve",
     best_use_cases: "Product usage analysis, Behavioral cohorts, Growth experiments",
+    content: {
+      decision_summary: {
+        best_for: "Product teams that make decisions from retention, funnels, and behavioral cohorts.",
+        avoid_if: "Your team cannot maintain clean event tracking and metric definitions.",
+      },
+      when_to_use: [
+        "Use it when retention cohorts matter more than top-line traffic numbers.",
+        "Choose it when product and growth teams need one source of truth for activation and engagement.",
+        "Use it when feature decisions need to be tied to downstream behavior, not vanity metrics.",
+      ],
+      when_to_avoid: [
+        "Avoid it if event naming and instrumentation ownership are already messy.",
+        "Skip it when simple web analytics already answers the business question.",
+        "Avoid it if no one can turn analytical output into product decisions.",
+      ],
+      faq: [
+        { question: "Is the free tier enough to start?", answer: "Usually yes for early funnel and retention work." },
+        { question: "What breaks Amplitude most often?", answer: "Poor event governance, not missing dashboards." },
+        { question: "Should teams track everything?", answer: "No. Start with critical product moments only." },
+      ],
+    },
   },
   {
     id: 5,
@@ -140,6 +224,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Powerful automation, LinkedIn focused, cloud-based",
     cons: "Can violate platform TOS, learning curve",
     best_use_cases: "LinkedIn lead generation, Data extraction, Outreach automation",
+    content: {
+      decision_summary: {
+        best_for: "Outbound teams that need repeatable sourcing and extraction workflows.",
+        avoid_if: "Compliance risk and account safety are stricter than sourcing speed.",
+      },
+      when_to_use: [
+        "Use it when sourcing is repetitive and manual list building is slowing the team down.",
+        "Choose it when automations need to run on schedule without internal scripts.",
+        "Use it when prospect criteria are clear and enrichment starts from public profile data.",
+      ],
+      when_to_avoid: [
+        "Avoid it if account restrictions would create real business risk.",
+        "Skip it when quality research per account matters more than list volume.",
+        "Avoid it if no one owns limits, QA, and guardrails.",
+      ],
+      faq: [
+        { question: "Can it trigger account restrictions?", answer: "Yes, if limits are aggressive or behavior looks automated." },
+        { question: "Is it a full outbound stack?", answer: "No. It handles extraction, not the full sales workflow." },
+        { question: "What goes wrong most often?", answer: "Teams chase volume and stop checking lead quality." },
+      ],
+    },
   },
   {
     id: 6,
@@ -167,6 +272,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Extremely flexible, beautiful views, automations, free tier",
     cons: "Can get expensive, record limits",
     best_use_cases: "Content calendars, CRM, Project tracking, Inventory",
+    content: {
+      decision_summary: {
+        best_for: "Teams that need structured shared data without building internal software.",
+        avoid_if: "You need true database scale, strict governance, or complex transactional logic.",
+      },
+      when_to_use: [
+        "Use it when spreadsheets still hold the process, but the process is now too messy for spreadsheets.",
+        "Choose it when different teams need different views over the same operational data.",
+        "Use it when you need a working internal system before engineering can justify building one.",
+      ],
+      when_to_avoid: [
+        "Avoid it if scale, permissions, or auditability are non-negotiable.",
+        "Skip it when core workflows will outgrow record limits quickly.",
+        "Avoid it if the process really needs a proper product, not a flexible data layer.",
+      ],
+      faq: [
+        { question: "Can it replace a real database?", answer: "Only for many internal workflows, not for high-scale products." },
+        { question: "What usually breaks first?", answer: "Base design and governance, not the interface." },
+        { question: "Who gets the best fit?", answer: "Operations, marketing, and small cross-functional teams." },
+      ],
+    },
   },
   {
     id: 7,
@@ -194,6 +320,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Intuitive, massive integrations, channels, free tier",
     cons: "Can be distracting, message history limits on free",
     best_use_cases: "Team communication, Project channels, Workflow notifications",
+    content: {
+      decision_summary: {
+        best_for: "Teams that need fast operational communication and app-driven alerts in one place.",
+        avoid_if: "Noise, retention policy, or context loss are already damaging execution.",
+      },
+      when_to_use: [
+        "Use it when quick decisions happen across functions and time zones.",
+        "Choose it when tool notifications need to land where teams already work.",
+        "Use it when channels can replace long internal email loops.",
+      ],
+      when_to_avoid: [
+        "Avoid it if notification overload is already slowing the team down.",
+        "Skip it when message retention and compliance controls are mandatory but unsupported by plan level.",
+        "Avoid it if the team needs slower, more deliberate written communication by default.",
+      ],
+      faq: [
+        { question: "Can Slack replace email?", answer: "Not fully. It replaces a lot of internal email, not all of it." },
+        { question: "What causes Slack chaos?", answer: "Too many channels and no notification discipline." },
+        { question: "Who should own setup?", answer: "Ops or IT with clear channel and integration rules." },
+      ],
+    },
   },
   {
     id: 8,
@@ -221,6 +368,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Simple kanban, free tier, visual, easy to learn",
     cons: "Limited for complex projects, basic reporting",
     best_use_cases: "Task management, Content calendars, Simple project tracking",
+    content: {
+      decision_summary: {
+        best_for: "Small teams that want visible work status without process overhead.",
+        avoid_if: "You need dependencies, capacity planning, or portfolio-level reporting.",
+      },
+      when_to_use: [
+        "Use it when teams need a board everyone understands in minutes.",
+        "Choose it for lightweight work tracking where simplicity matters more than reporting depth.",
+        "Use it when a clear left-to-right workflow is enough to manage delivery.",
+      ],
+      when_to_avoid: [
+        "Avoid it for large programs with dependencies across teams.",
+        "Skip it when workload balancing and capacity planning are core needs.",
+        "Avoid it if your process needs strict governance and auditability.",
+      ],
+      faq: [
+        { question: "Can Trello scale far?", answer: "Only for simple workflows. Complex operations usually outgrow it." },
+        { question: "What is Trello best at?", answer: "Visible status tracking with almost no onboarding cost." },
+        { question: "What is its main limit?", answer: "Dependency management and reporting depth." },
+      ],
+    },
   },
   {
     id: 9,
@@ -248,6 +416,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Multiple views, goals, automations, free tier",
     cons: "Can be complex, expensive for advanced features",
     best_use_cases: "Team project management, Goal tracking, Cross-team collaboration",
+    content: {
+      decision_summary: {
+        best_for: "Growing teams that need structure, visibility, and cross-team coordination.",
+        avoid_if: "The team is too small or too undisciplined to maintain a structured work system.",
+      },
+      when_to_use: [
+        "Use it when many people contribute to one initiative and ownership needs to stay clear.",
+        "Choose it when timelines, tasks, and goals need to connect in one system.",
+        "Use it when leadership needs a better view of execution without status-chasing.",
+      ],
+      when_to_avoid: [
+        "Avoid it for very small teams that can manage work with a simple board.",
+        "Skip it when advanced planning features are outside budget.",
+        "Avoid it if no one will maintain clean projects, tasks, and ownership.",
+      ],
+      faq: [
+        { question: "Is Asana hard to adopt?", answer: "Setup takes work, but teams usually adapt fast with good templates." },
+        { question: "Can it replace spreadsheets?", answer: "Yes for most project and task coordination workflows." },
+        { question: "What causes clutter?", answer: "Weak structure and too many unmanaged fields or projects." },
+      ],
+    },
   },
   {
     id: 10,
@@ -275,6 +464,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Very easy, AI site builder, templates, free tier",
     cons: "Less flexible than Webflow, Wix branding on free",
     best_use_cases: "Small business websites, Portfolios, Simple e-commerce",
+    content: {
+      decision_summary: {
+        best_for: "Non-technical users who need a site live quickly with minimal setup friction.",
+        avoid_if: "Brand control, extensibility, or SEO architecture will become strategic priorities.",
+      },
+      when_to_use: [
+        "Use it when a business site needs to go live quickly without developer help.",
+        "Choose it for brochure sites, simple portfolios, and lightweight service pages.",
+        "Use it when editing simplicity matters more than technical control.",
+      ],
+      when_to_avoid: [
+        "Avoid it if the site must follow a unique or tightly controlled design system.",
+        "Skip it when long-term extensibility is a real requirement, not a nice-to-have.",
+        "Avoid it for content-heavy SEO programs and complex information architecture.",
+      ],
+      faq: [
+        { question: "Is Wix good for beginners?", answer: "Yes. Few website builders are faster to pick up." },
+        { question: "Can it scale with a growing company?", answer: "Only to a point. Complex needs tend to outgrow it." },
+        { question: "What is Wix weakest at?", answer: "Deep customization and advanced content structure." },
+      ],
+    },
   },
   {
     id: 11,
@@ -302,6 +512,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Gorgeous templates, all-in-one, reliable hosting",
     cons: "Less flexible, limited third-party integrations",
     best_use_cases: "Creative portfolios, Restaurant sites, Small business websites",
+    content: {
+      decision_summary: {
+        best_for: "Brands that care more about polished presentation than technical flexibility.",
+        avoid_if: "The site will need custom workflows, deep integrations, or fast growth experimentation.",
+      },
+      when_to_use: [
+        "Use it when presentation quality is non-negotiable from launch.",
+        "Choose it for portfolios, hospitality, and service sites that benefit from refined templates.",
+        "Use it when you want hosting, templates, and core site management bundled together.",
+      ],
+      when_to_avoid: [
+        "Avoid it if the site needs custom workflows or unusual integrations.",
+        "Skip it when flexible CMS structure matters more than aesthetic consistency.",
+        "Avoid it if growth teams need to experiment heavily with site architecture.",
+      ],
+      faq: [
+        { question: "Is Squarespace easy to maintain?", answer: "Yes for standard business sites with moderate updates." },
+        { question: "Can it support advanced custom apps?", answer: "Not well. It is better for conventional website needs." },
+        { question: "Does it handle e-commerce?", answer: "Yes for basic to moderate stores, not for complex commerce operations." },
+      ],
+    },
   },
   {
     id: 12,
@@ -329,6 +560,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Thoughtful responses, long context, excellent writing, safe",
     cons: "Can be verbose, no image generation",
     best_use_cases: "Long-form writing, Document analysis, Strategy brainstorming",
+    content: {
+      decision_summary: {
+        best_for: "Knowledge work that needs long-context reasoning and careful written output.",
+        avoid_if: "You need built-in multimodal breadth or very terse output by default.",
+      },
+      when_to_use: [
+        "Use it when you need to reason across long documents without losing context.",
+        "Choose it for drafting structured writing where tone and logic both matter.",
+        "Use it when strategy work needs multi-step thinking rather than short answers.",
+      ],
+      when_to_avoid: [
+        "Avoid it if the workflow depends on image generation in the same tool.",
+        "Skip it when ultra-brief output is the default requirement.",
+        "Avoid it when the task requires deterministic, rules-based output every time.",
+      ],
+      faq: [
+        { question: "Is Claude good for coding?", answer: "Yes for reasoning-heavy coding help, reviews, and planning." },
+        { question: "Can it cite web sources automatically?", answer: "Not like search-first tools. Source-grounded research may need a companion tool." },
+        { question: "What is its strongest use case?", answer: "Long-context analysis and structured writing." },
+      ],
+    },
   },
   {
     id: 13,
@@ -356,6 +608,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Cited sources, real-time data, easy to use, free tier",
     cons: "Can miss nuance, limited deep analysis",
     best_use_cases: "Quick research, Competitive analysis, Fact-checking",
+    content: {
+      decision_summary: {
+        best_for: "Fast cited research when the job starts with finding current information.",
+        avoid_if: "The work requires deep synthesis, nuanced judgment, or private internal context.",
+      },
+      when_to_use: [
+        "Use it when you need quick answers with visible sources attached.",
+        "Choose it for first-pass market, competitor, or fact-checking work.",
+        "Use it when the goal is gathering current references before deeper analysis starts.",
+      ],
+      when_to_avoid: [
+        "Avoid it when the task needs deep multi-step reasoning and synthesis.",
+        "Skip it for high-stakes conclusions without reading the cited sources yourself.",
+        "Avoid it when internal context matters more than public information.",
+      ],
+      faq: [
+        { question: "Can I trust every cited answer?", answer: "No. Citations help, but source quality still needs review." },
+        { question: "Is it good for strategy work?", answer: "It is better for research intake than final strategic thinking." },
+        { question: "What is the common mistake?", answer: "Treating snippets as complete context without opening the source." },
+      ],
+    },
   },
   {
     id: 14,
@@ -383,6 +656,27 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Easy to use, templates, integrated with Canva, free tier",
     cons: "Limited editing features, basic transitions",
     best_use_cases: "Social media videos, Promotional clips, Video presentations",
+    content: {
+      decision_summary: {
+        best_for: "Teams that need fast template-based video output without specialist editors.",
+        avoid_if: "The project needs advanced editing control or serious post-production work.",
+      },
+      when_to_use: [
+        "Use it when non-editors need to ship social clips quickly.",
+        "Choose it for template-driven promo videos and short explainers.",
+        "Use it when speed and brand consistency matter more than editing flexibility.",
+      ],
+      when_to_avoid: [
+        "Avoid it for complex narrative editing with heavy timeline work.",
+        "Skip it when motion design precision is central to the deliverable.",
+        "Avoid it for advanced post-production, grading, or sound work.",
+      ],
+      faq: [
+        { question: "Can it replace pro editing tools?", answer: "No. It is built for fast production, not advanced editing." },
+        { question: "What videos fit best?", answer: "Short social, promo, and template-based explainer content." },
+        { question: "What is the main limit?", answer: "Limited control over complex edits and effects." },
+      ],
+    },
   },
   {
     id: 15,
@@ -410,5 +704,26 @@ export const LOCAL_TOOLS: Tool[] = [
     pros: "Free to start, built-in monetization, simple, growing network",
     cons: "10% cut on paid, limited design, basic analytics",
     best_use_cases: "Paid newsletters, Thought leadership, Audience building",
+    content: {
+      decision_summary: {
+        best_for: "Writers who want to monetize a newsletter quickly without managing infrastructure.",
+        avoid_if: "Brand control, owned audience infrastructure, or advanced lifecycle marketing matter most.",
+      },
+      when_to_use: [
+        "Use it when a writer wants paid subscriptions live without technical setup.",
+        "Choose it when publishing consistency matters more than deep customization.",
+        "Use it when audience growth and monetization happen in the same workflow.",
+      ],
+      when_to_avoid: [
+        "Avoid it if full design control is part of the brand strategy.",
+        "Skip it when platform revenue share is unacceptable.",
+        "Avoid it for advanced segmentation and lifecycle email operations.",
+      ],
+      faq: [
+        { question: "Is Substack free to start?", answer: "Yes, but paid subscriptions include platform revenue share." },
+        { question: "Can I brand it deeply?", answer: "Only to a point. Customization remains limited." },
+        { question: "What is the main tradeoff?", answer: "Speed and monetization in exchange for less control and a revenue cut." },
+      ],
+    },
   },
 ];

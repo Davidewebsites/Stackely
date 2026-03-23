@@ -41,6 +41,23 @@ export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
 export type ToolType = 'traditional' | 'ai' | 'hybrid';
 
+export interface ToolContentFaq {
+  question: string;
+  answer: string;
+}
+
+export interface ToolContentDecisionSummary {
+  best_for: string;
+  avoid_if: string;
+}
+
+export interface ToolContent {
+  decision_summary: ToolContentDecisionSummary;
+  when_to_use: string[];
+  when_to_avoid: string[];
+  faq: ToolContentFaq[];
+}
+
 export interface Tool {
   id: number;
   name: string;
@@ -69,6 +86,7 @@ export interface Tool {
   popularity_score?: number;
   beginner_friendly?: boolean;
   tool_type?: ToolType;
+  content?: ToolContent;
 }
 
 export interface ClassificationResult {

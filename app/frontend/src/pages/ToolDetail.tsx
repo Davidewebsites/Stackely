@@ -128,6 +128,11 @@ export default function ToolDetail() {
   const toolUseCases = splitCsv(tool?.use_cases);
   const targetAudience = splitCsv(tool?.target_audience);
   const recommendedFor = splitCsv(tool?.recommended_for);
+  const contentDecisionSummary = tool?.content?.decision_summary;
+  const contentWhenToUse = tool?.content?.when_to_use ?? [];
+  const contentWhenToAvoid = tool?.content?.when_to_avoid ?? [];
+  const contentFaq = tool?.content?.faq ?? [];
+  const hasStructuredContent = contentWhenToUse.length > 0 || contentWhenToAvoid.length > 0 || contentFaq.length > 0;
 
   const qualityLabel = metricLabel(tool?.internal_score, 55, 80, ['Needs validation', 'Solid option', 'Strong performer']);
   const popularityLabel = metricLabel(tool?.popularity_score, 4, 7, ['Niche adoption', 'Steady adoption', 'Widely adopted']);
@@ -144,7 +149,7 @@ export default function ToolDetail() {
       };
     }
 
-    const bestFor = firstOrFallback(
+    const bestFor = contentDecisionSummary?.best_for || firstOrFallback(
       [...recommendedFor, ...targetAudience, ...toolUseCases],
       'Teams that want a reliable, practical tool in this category.'
     );
@@ -154,7 +159,7 @@ export default function ToolDetail() {
       tool.short_description || 'It offers a practical balance between setup effort and expected results.'
     );
 
-    const avoidIf = firstOrFallback(
+    const avoidIf = contentDecisionSummary?.avoid_if || firstOrFallback(
       cons,
       tool.difficulty_score && tool.difficulty_score >= 4
         ? 'You need fast onboarding with minimal setup complexity.'
@@ -175,7 +180,7 @@ export default function ToolDetail() {
       strongestUseCase,
       oneLiner,
     };
-  }, [tool, recommendedFor, targetAudience, toolUseCases, pros, cons, useCases, qualityLabel]);
+  }, [tool, recommendedFor, targetAudience, toolUseCases, pros, cons, useCases, qualityLabel, contentDecisionSummary]);
 
   const toggleCompare = (candidate: Tool) => {
     setSelectedForCompare((prev) => {
@@ -383,6 +388,70 @@ export default function ToolDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {hasStructuredContent && (
+          <div className="mb-8 space-y-4">
+            <Card className="border-slate-100 shadow-none bg-white/95">
+              <CardContent className="p-6">
+                {contentWhenToUse.length > 0 && (
+                  <div className={contentWhenToAvoid.length > 0 ? 'pb-5 border-b border-slate-100' : ''}>
+                    <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-500" />
+                      When to use
+                    </h3>
+                    <ul className="space-y-2.5">
+                      {contentWhenToUse.map((item, index) => (
+                        <li key={`when-to-use-${index}`} className="flex items-start gap-2 text-[13px] text-slate-600 leading-relaxed">
+                          <Check className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {contentWhenToAvoid.length > 0 && (
+                  <div className={contentWhenToUse.length > 0 ? 'pt-5' : ''}>
+                    <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                      <X className="w-4 h-4 text-red-500" />
+                      When to avoid
+                    </h3>
+                    <ul className="space-y-2.5">
+                      {contentWhenToAvoid.map((item, index) => (
+                        <li key={`when-to-avoid-${index}`} className="flex items-start gap-2 text-[13px] text-slate-600 leading-relaxed">
+                          <X className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {contentFaq.length > 0 && (
+              <Card className="border-[#8A2BE2]/12 shadow-none bg-[linear-gradient(180deg,rgba(138,43,226,0.035)_0%,rgba(255,255,255,0.98)_100%)]">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A2BE2]/80 mb-1.5">FAQ</p>
+                    <h3 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4" style={{ color: '#8A2BE2' }} />
+                      Common questions before choosing this tool
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {contentFaq.map((item, index) => (
+                      <div key={`faq-${index}`} className="rounded-[0.48rem] border border-slate-100 bg-white/85 px-4 py-3">
+                        <p className="text-[13px] font-semibold text-slate-900 leading-snug">{item.question}</p>
+                        <p className="text-[12.5px] text-slate-600 leading-relaxed mt-1.5">{item.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-8">

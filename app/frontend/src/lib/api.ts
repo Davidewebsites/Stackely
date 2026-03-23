@@ -108,6 +108,306 @@ function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function splitCsvValues(value?: string): string[] {
+  return value?.split(',').map((item) => item.trim()).filter(Boolean) || [];
+}
+
+function humanizeLabel(value?: string): string {
+  return (value || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function uniqueValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const normalized = value.toLowerCase();
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+}
+
+function lowerFirst(value: string): string {
+  return value ? value.charAt(0).toLowerCase() + value.slice(1) : value;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getCategoryLabel(category?: string): string {
+  return CATEGORIES.find((item) => item.id === category)?.label || humanizeLabel(category) || 'tool';
+}
+
+function getPrimaryAudience(tool: Tool): string {
+  const audience = uniqueValues([
+    ...splitCsvValues(tool.recommended_for).map(humanizeLabel),
+    ...splitCsvValues(tool.target_audience).map(humanizeLabel),
+  ]);
+
+  if (audience.length > 0) {
+    return audience[0];
+  }
+
+  if (tool.beginner_friendly) {
+    return 'non-specialist teams';
+  }
+
+  return `teams evaluating ${getCategoryLabel(tool.category).toLowerCase()} tools`;
+}
+
+function getPrimaryAction(tool: Tool): string {
+  const shortDescription = (tool.short_description || '').trim();
+  if (shortDescription) {
+    const withoutLead = shortDescription
+      .replace(new RegExp(`^Use\\s+${escapeRegExp(tool.name)}\\s+to\\s+`, 'i'), '')
+      .replace(new RegExp(`^${escapeRegExp(tool.name)}\\s+(?:is|for|to)\\s+`, 'i'), '')
+      .replace(/\.$/, '')
+      .trim();
+
+    if (withoutLead) {
+      return lowerFirst(withoutLead);
+    }
+  }
+
+  const useCases = uniqueValues([
+    ...splitCsvValues(tool.best_use_cases).map(humanizeLabel),
+    ...splitCsvValues(tool.use_cases).map(humanizeLabel),
+  ]);
+
+  if (useCases.length > 0) {
+    return lowerFirst(useCases[0]);
+  }
+
+  return `${getCategoryLabel(tool.category).toLowerCase()} work`;
+}
+
+function getBeginnerAnswer(tool: Tool): string {
+  if (tool.beginner_friendly || tool.skill_level === 'beginner') {
+    return 'Yes. The learning curve is manageable for non-specialists.';
+  }
+  if (tool.skill_level === 'advanced') {
+    return 'Usually not. It needs someone who already knows the workflow.';
+  }
+  return 'Usually yes if one owner sets standards and keeps the workflow tidy.';
+}
+
+function buildFallbackToolContent(tool: Tool): ToolContent {
+  const audience = getPrimaryAudience(tool);
+  const audienceLower = lowerFirst(audience);
+  const action = getPrimaryAction(tool);
+  const categoryLabel = getCategoryLabel(tool.category).toLowerCase();
+
+  switch (tool.category) {
+    case 'design':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need to ${action}.`,
+          avoid_if: 'You need original art direction, advanced production control, or specialist design tooling.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} on a repeatable schedule.`,
+          `Choose it when ${audienceLower} need templates and speed more than custom design production.`,
+          'Use it when marketing or ops need self-serve visual output without a designer in every request.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the work needs advanced illustration, motion, or complex production files.',
+          'Skip it when a dedicated design team already works in specialist creative software.',
+          'Avoid it if strict brand systems need deeper layout and collaboration control.',
+        ],
+        faq: [
+          { question: 'Is it suitable for non-designers?', answer: getBeginnerAnswer(tool) },
+          { question: 'What kind of work fits best?', answer: 'Repeatable marketing visuals, presentations, and lightweight brand assets.' },
+          { question: 'What is the main tradeoff?', answer: 'Template speed comes with less control over advanced creative work.' },
+        ],
+      };
+    case 'analytics':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need clearer measurement before changing the workflow.`,
+          avoid_if: 'Nobody owns tracking quality, reporting discipline, or follow-up decisions.',
+        },
+        when_to_use: [
+          `Use it when ${action} affects weekly optimization decisions.`,
+          `Choose it when ${audienceLower} will review the data regularly, not just collect it.`,
+          'Use it when a shared metric baseline matters more than one-off reporting.',
+        ],
+        when_to_avoid: [
+          'Avoid it if nobody will maintain instrumentation or naming discipline.',
+          'Skip it when the team expects instant insight without enough clean data volume.',
+          'Avoid it if the current analytics stack already goes unused.',
+        ],
+        faq: [
+          { question: 'Do I need clean tracking first?', answer: 'Yes. Weak instrumentation makes the output hard to trust.' },
+          { question: 'Who gets the most value?', answer: `${audience} using the data in recurring planning or optimization cycles.` },
+          { question: 'What usually goes wrong?', answer: 'Teams build dashboards but do not change decisions.' },
+        ],
+      };
+    case 'automation':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need to remove repetitive manual work from ${categoryLabel} workflows.`,
+          avoid_if: 'The process is unstable, undocumented, or too risky to automate cleanly.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} across the same steps again and again.`,
+          `Choose it when ${audienceLower} lose time to copying, routing, or updating systems by hand.`,
+          'Use it when the workflow already has clear rules, triggers, and owners.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the process changes every week or depends on too many exceptions.',
+          'Skip it when nobody can own monitoring, error handling, and maintenance.',
+          'Avoid it if the compliance or operational risk of failure is high.',
+        ],
+        faq: [
+          { question: 'Do I need technical help to set it up?', answer: getBeginnerAnswer(tool) },
+          { question: 'What should be automated first?', answer: 'Start with a high-volume task that has stable rules and clear payoff.' },
+          { question: 'What is the common failure mode?', answer: 'Automating a messy process before simplifying it.' },
+        ],
+      };
+    case 'copywriting':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need to move drafting and messaging work faster.`,
+          avoid_if: 'The work requires proprietary expertise, legal precision, or zero editorial review.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} as part of a repeatable content workflow.`,
+          `Choose it when ${audienceLower} still review and refine the output before publishing.`,
+          'Use it when the bottleneck is first draft speed, ideation, or rewriting volume.',
+        ],
+        when_to_avoid: [
+          'Avoid it if no human editor owns quality control.',
+          'Skip it when source accuracy matters more than drafting speed.',
+          'Avoid it if the topic depends on deep subject-matter expertise not present in the prompt.',
+        ],
+        faq: [
+          { question: 'Can it replace a writer?', answer: 'No. It speeds drafting, but judgment and editing still matter.' },
+          { question: 'Where does it help most?', answer: 'High-volume drafting, rewriting, and message iteration.' },
+          { question: 'What is the main risk?', answer: 'Publishing generic or inaccurate copy without review.' },
+        ],
+      };
+    case 'video':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need faster video output without a full post-production workflow.`,
+          avoid_if: 'The project needs advanced editing control, custom motion, or serious finishing work.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} on tight timelines.`,
+          `Choose it when ${audienceLower} need repeatable template-based video production.`,
+          'Use it when speed and volume matter more than edit-by-edit precision.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the work needs advanced color, sound, or timeline control.',
+          'Skip it when the final output depends on a specialist editor.',
+          'Avoid it if the project requires heavy customization or complex revisions.',
+        ],
+        faq: [
+          { question: 'Can it replace professional editing software?', answer: 'No. It is better for fast production than deep post-production.' },
+          { question: 'What videos fit best?', answer: 'Short promos, explainers, social clips, and repeatable template-driven content.' },
+          { question: 'What usually limits the result?', answer: 'Creative control drops once the workflow gets more complex.' },
+        ],
+      };
+    case 'landing_pages':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need pages live quickly without a custom build cycle.`,
+          avoid_if: 'You need deep custom logic, complex integrations, or long-term architectural flexibility.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} without waiting on developers.`,
+          `Choose it when ${audienceLower} value launch speed over full implementation control.`,
+          'Use it when campaign pages, lead capture, or simple site flows are the main job.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the site will become a product surface with custom workflows.',
+          'Skip it when SEO architecture or deep experimentation will become a strategic differentiator.',
+          'Avoid it if the team already knows the page stack will need complex integrations.',
+        ],
+        faq: [
+          { question: 'Is it enough for a simple site or landing page stack?', answer: 'Usually yes when the goal is speed and standard conversion flows.' },
+          { question: 'Who benefits most?', answer: `${audience} that need launch velocity without custom development overhead.` },
+          { question: 'What is the common limit?', answer: 'Flexibility becomes the issue once the site grows more complex.' },
+        ],
+      };
+    case 'email_marketing':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need campaign execution and lifecycle email in one operating tool.`,
+          avoid_if: 'Deliverability, segmentation, or lifecycle strategy are weak enough to waste the platform.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} as part of a recurring email program.`,
+          `Choose it when ${audienceLower} need one place to manage campaigns, lists, and automation.`,
+          'Use it when email is a real growth channel rather than an occasional send.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the list is small and email is not a meaningful operating channel.',
+          'Skip it when nobody owns segmentation, deliverability, or calendar discipline.',
+          'Avoid it if the workflow depends on custom data models the tool cannot support cleanly.',
+        ],
+        faq: [
+          { question: 'Is this only for newsletters?', answer: 'Usually no. The value is higher when campaigns and automation live together.' },
+          { question: 'Who gets the most value?', answer: `${audience} running email as a repeatable acquisition or retention channel.` },
+          { question: 'What usually breaks first?', answer: 'Strategy and list quality, not the sending interface.' },
+        ],
+      };
+    case 'ads':
+      return {
+        decision_summary: {
+          best_for: `${audience} that need tighter control over paid acquisition workflows.`,
+          avoid_if: 'Budget is low, attribution is weak, or the team lacks the discipline to test and optimize consistently.',
+        },
+        when_to_use: [
+          `Use it when you need to ${action} with regular testing and budget decisions.`,
+          `Choose it when ${audienceLower} need faster campaign execution and clearer optimization loops.`,
+          'Use it when paid acquisition is material enough to justify dedicated tooling and review cycles.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the budget is too small to support meaningful testing.',
+          'Skip it when attribution and tracking are too weak to judge performance honestly.',
+          'Avoid it if the team will launch campaigns but not manage them actively.',
+        ],
+        faq: [
+          { question: 'Does the tool itself create performance?', answer: 'No. It improves execution, but strategy and creative still decide results.' },
+          { question: 'Who gets the most value?', answer: `${audience} running paid acquisition as an active operating channel.` },
+          { question: 'What is the common mistake?', answer: 'Buying tooling before the team has a stable testing rhythm.' },
+        ],
+      };
+    default:
+      return {
+        decision_summary: {
+          best_for: `${audience} that need to ${action}.`,
+          avoid_if: `You need specialist depth beyond what a general ${categoryLabel} tool usually handles.`,
+        },
+        when_to_use: [
+          `Use it when you need to ${action} on a repeatable basis.`,
+          `Choose it when ${audienceLower} need a practical ${categoryLabel} workflow with less manual overhead.`,
+          'Use it when the workflow benefits from clearer structure and a shared operating tool.',
+        ],
+        when_to_avoid: [
+          'Avoid it if the work is rare enough that setup and process discipline will not pay back.',
+          'Skip it when the team needs deeper specialization than the category normally covers.',
+          'Avoid it if nobody will own quality, structure, and follow-through.',
+        ],
+        faq: [
+          { question: 'Is it suitable for beginners?', answer: getBeginnerAnswer(tool) },
+          { question: 'Who gets the most value?', answer: `${audience} with a recurring need for this workflow.` },
+          { question: 'What usually goes wrong?', answer: 'Teams adopt the tool without defining the process around it.' },
+        ],
+      };
+  }
+}
+
+function findLocalToolBySlugOrName(slug: string, name?: string): Tool | undefined {
+  const normalizedName = name ? normalizeName(name) : '';
+  return LOCAL_TOOLS.find((tool) => tool.slug === slug || (normalizedName && normalizeName(tool.name) === normalizedName));
+}
+
+function resolveToolContent(tool: Tool, localTool?: Tool): ToolContent {
+  return tool.content || localTool?.content || buildFallbackToolContent(tool);
+}
+
 /**
  * Deduplicate a list of tools.
  * Uses slug as primary key, falls back to normalized name.
@@ -483,23 +783,35 @@ export async function fetchFeaturedTools() {
 
 // Fetch single tool by slug — merges local content enrichment if DB lacks it
 export async function fetchToolBySlug(slug: string) {
-  const { data, error } = await supabase
-    .from('tools')
-    .select('*')
-    .eq('slug', slug)
-    .eq('active', true)
-    .single();
+  const localTool = findLocalToolBySlugOrName(slug);
 
-  if (error) throw error;
+  try {
+    const { data, error } = await supabase
+      .from('tools')
+      .select('*')
+      .eq('slug', slug)
+      .eq('active', true)
+      .single();
 
-  if (data && !data.content) {
-    const localTool = LOCAL_TOOLS.find((t) => t.slug === slug);
-    if (localTool?.content) {
-      return { ...data, content: localTool.content };
+    if (error) throw error;
+    if (!data) {
+      if (localTool) {
+        return { ...localTool, content: resolveToolContent(localTool, localTool) };
+      }
+      throw new Error(`Tool not found for slug: ${slug}`);
     }
-  }
 
-  return data;
+    const matchedLocalTool = findLocalToolBySlugOrName(slug, data.name);
+    return {
+      ...data,
+      content: resolveToolContent(data as Tool, matchedLocalTool),
+    };
+  } catch (error) {
+    if (localTool) {
+      return { ...localTool, content: resolveToolContent(localTool, localTool) };
+    }
+    throw error;
+  }
 }
 
 // Fetch all tools (for admin) — no dedup here so admin can see duplicates

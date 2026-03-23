@@ -481,7 +481,7 @@ export async function fetchFeaturedTools() {
   return data ?? [];
 }
 
-// Fetch single tool by slug from local data
+// Fetch single tool by slug — merges local content enrichment if DB lacks it
 export async function fetchToolBySlug(slug: string) {
   const { data, error } = await supabase
     .from('tools')
@@ -491,6 +491,14 @@ export async function fetchToolBySlug(slug: string) {
     .single();
 
   if (error) throw error;
+
+  if (data && !data.content) {
+    const localTool = LOCAL_TOOLS.find((t) => t.slug === slug);
+    if (localTool?.content) {
+      return { ...data, content: localTool.content };
+    }
+  }
+
   return data;
 }
 

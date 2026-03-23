@@ -132,7 +132,6 @@ export default function ToolDetail() {
   const contentWhenToUse = tool?.content?.when_to_use ?? [];
   const contentWhenToAvoid = tool?.content?.when_to_avoid ?? [];
   const contentFaq = tool?.content?.faq ?? [];
-  const hasStructuredContent = contentWhenToUse.length > 0 || contentWhenToAvoid.length > 0 || contentFaq.length > 0;
 
   const qualityLabel = metricLabel(tool?.internal_score, 55, 80, ['Needs validation', 'Solid option', 'Strong performer']);
   const popularityLabel = metricLabel(tool?.popularity_score, 4, 7, ['Niche adoption', 'Steady adoption', 'Widely adopted']);
@@ -323,6 +322,60 @@ export default function ToolDetail() {
                   </div>
                 </div>
 
+                {(contentWhenToUse.length > 0 || contentWhenToAvoid.length > 0) && (
+                  <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {contentWhenToUse.length > 0 && (
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50/45 p-3.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700 mb-2 flex items-center gap-1.5">
+                          <Check className="w-3 h-3" />
+                          When to use
+                        </p>
+                        <ul className="space-y-1.5">
+                          {contentWhenToUse.map((item, i) => (
+                            <li key={`wu-${i}`} className="text-[12px] text-slate-700 leading-relaxed flex items-start gap-1.5">
+                              <Check className="w-2.5 h-2.5 text-emerald-500 mt-1 flex-shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {contentWhenToAvoid.length > 0 && (
+                      <div className="rounded-lg border border-red-100 bg-red-50/45 p-3.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-red-600 mb-2 flex items-center gap-1.5">
+                          <X className="w-3 h-3" />
+                          When to avoid
+                        </p>
+                        <ul className="space-y-1.5">
+                          {contentWhenToAvoid.map((item, i) => (
+                            <li key={`wa-${i}`} className="text-[12px] text-slate-700 leading-relaxed flex items-start gap-1.5">
+                              <X className="w-2.5 h-2.5 text-red-400 mt-1 flex-shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {contentFaq.length > 0 && (
+                  <div className="mb-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8A2BE2]/80 mb-2.5 flex items-center gap-1.5">
+                      <Lightbulb className="w-3 h-3" style={{ color: '#8A2BE2' }} />
+                      Common questions before choosing this tool
+                    </p>
+                    <div className="space-y-2">
+                      {contentFaq.map((item, i) => (
+                        <div key={`faq-${i}`} className="rounded-lg border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
+                          <p className="text-[12px] font-semibold text-slate-900 leading-snug">{item.question}</p>
+                          <p className="text-[12px] text-slate-600 leading-relaxed mt-1">{item.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2.5">
                   {tool.website_url && (
                     <Button
@@ -388,70 +441,6 @@ export default function ToolDetail() {
             </div>
           </CardContent>
         </Card>
-
-        {hasStructuredContent && (
-          <div className="mb-8 space-y-4">
-            <Card className="border-slate-100 shadow-none bg-white/95">
-              <CardContent className="p-6">
-                {contentWhenToUse.length > 0 && (
-                  <div className={contentWhenToAvoid.length > 0 ? 'pb-5 border-b border-slate-100' : ''}>
-                    <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      When to use
-                    </h3>
-                    <ul className="space-y-2.5">
-                      {contentWhenToUse.map((item, index) => (
-                        <li key={`when-to-use-${index}`} className="flex items-start gap-2 text-[13px] text-slate-600 leading-relaxed">
-                          <Check className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {contentWhenToAvoid.length > 0 && (
-                  <div className={contentWhenToUse.length > 0 ? 'pt-5' : ''}>
-                    <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                      <X className="w-4 h-4 text-red-500" />
-                      When to avoid
-                    </h3>
-                    <ul className="space-y-2.5">
-                      {contentWhenToAvoid.map((item, index) => (
-                        <li key={`when-to-avoid-${index}`} className="flex items-start gap-2 text-[13px] text-slate-600 leading-relaxed">
-                          <X className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {contentFaq.length > 0 && (
-              <Card className="border-[#8A2BE2]/12 shadow-none bg-[linear-gradient(180deg,rgba(138,43,226,0.035)_0%,rgba(255,255,255,0.98)_100%)]">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A2BE2]/80 mb-1.5">FAQ</p>
-                    <h3 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4" style={{ color: '#8A2BE2' }} />
-                      Common questions before choosing this tool
-                    </h3>
-                  </div>
-                  <div className="space-y-3">
-                    {contentFaq.map((item, index) => (
-                      <div key={`faq-${index}`} className="rounded-[0.48rem] border border-slate-100 bg-white/85 px-4 py-3">
-                        <p className="text-[13px] font-semibold text-slate-900 leading-snug">{item.question}</p>
-                        <p className="text-[12.5px] text-slate-600 leading-relaxed mt-1.5">{item.answer}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
 
         {/* Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-8">

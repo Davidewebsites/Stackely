@@ -31,6 +31,10 @@ function getToolAccent(seed: string) {
   return ACCENTS[Math.abs(hash) % ACCENTS.length];
 }
 
+function stabilizeCompactLabel(value: string): string {
+  return value.replace(/(\d)\s(?=\d{3}(?:\D|$))/g, '$1\u00A0');
+}
+
 export default function StackCard({ tool, position }: StackCardProps) {
   const navigate = useNavigate();
   const catInfo = CATEGORIES.find((c) => c.id === tool.category);
@@ -58,14 +62,12 @@ export default function StackCard({ tool, position }: StackCardProps) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Top row: role */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-sm" style={{ color: accent.strong, backgroundColor: accent.soft }}>
+        <div className="meta-row mb-2.5">
+          <span className="eyebrow-label" style={{ color: accent.strong }}>
             {tool.role || catInfo?.label || tool.category}
           </span>
           <span className="text-slate-200">·</span>
-          <Badge variant="outline" className={`text-[11px] font-medium border ${pricingStyles[tool.pricing_model] || 'border-slate-200 text-slate-500'}`}>
-            {tool.pricing_model}
-          </Badge>
+          <span className="text-[11px] font-medium capitalize text-slate-600">{tool.pricing_model}</span>
           {isAI && (
             <>
               <span className="text-slate-200">·</span>
@@ -78,7 +80,9 @@ export default function StackCard({ tool, position }: StackCardProps) {
           {tool.starting_price && (
             <>
               <span className="text-slate-200">·</span>
-              <span className="text-[11px] text-slate-400">{tool.starting_price}</span>
+              <span className="text-[11px] text-slate-500 whitespace-normal break-normal [overflow-wrap:normal] [word-break:keep-all] [text-wrap:pretty]">
+                {stabilizeCompactLabel(tool.starting_price)}
+              </span>
             </>
           )}
         </div>
@@ -90,7 +94,7 @@ export default function StackCard({ tool, position }: StackCardProps) {
             {tool.name}
           </h3>
         </div>
-        <p className="text-[13px] text-slate-500 leading-relaxed mb-3">{tool.short_description}</p>
+        <p className="card-description mb-3.5">{tool.short_description}</p>
 
         {/* Context cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -119,17 +123,21 @@ export default function StackCard({ tool, position }: StackCardProps) {
         </div>
 
         {contextTags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {contextTags.map((tag) => (
-              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md text-slate-600 max-w-[14rem] truncate whitespace-nowrap" style={{ backgroundColor: accent.soft }}>
-                {tag}
-              </span>
-            ))}
+          <div className="mb-3">
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              <span className="font-medium text-slate-700">Context:</span> {contextTags.join(' · ')}
+            </p>
           </div>
         )}
 
         {/* Footer actions */}
-        <div className="flex items-center gap-2">
+        <div className="card-footer-row pt-3">
+          <div className="card-footer-meta">
+            {tool.beginner_friendly && <span>Beginner friendly</span>}
+            {tool.beginner_friendly && <span className="text-slate-200">·</span>}
+            <span className="capitalize">{tool.skill_level}</span>
+          </div>
+          <div className="card-footer-actions">
           {tool.website_url && (
             <Button
               variant="outline"
@@ -157,9 +165,7 @@ export default function StackCard({ tool, position }: StackCardProps) {
             Details
             <ArrowUpRight className="w-3 h-3 ml-1" />
           </Button>
-          {tool.beginner_friendly && (
-            <span className="text-[11px] text-slate-400 ml-auto">Beginner friendly</span>
-          )}
+          </div>
         </div>
       </div>
     </div>

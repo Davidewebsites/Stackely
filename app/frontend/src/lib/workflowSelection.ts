@@ -2,6 +2,13 @@ import { type Tool } from '@/lib/api';
 
 const WORKFLOW_SELECTION_KEY = 'stackely.workflow-selection';
 
+export type StackItemStatus = 'not_started' | 'in_progress' | 'completed';
+
+export interface WorkflowSelectionState {
+  tools: Tool[];
+  statuses: Record<number, StackItemStatus>;
+}
+
 function sanitizeTool(tool: unknown): Tool | null {
   if (!tool || typeof tool !== 'object') return null;
 
@@ -16,26 +23,49 @@ function sanitizeTool(tool: unknown): Tool | null {
   return candidate as Tool;
 }
 
-export function loadWorkflowSelection(): Tool[] {
-  if (typeof window === 'undefined') return [];
+function sanitizeStatus(value: unknown): StackItemStatus {
+  if (value === 'in_progress' || value === 'completed') return value;
+  return 'not_started';
+}
+
+export function loadWorkflowSelection(): WorkflowSelectionState {
+  if (typeof window === 'undefined') return { tools: [], statuses: {} };
 
   try {
     const raw = window.localStorage.getItem(WORKFLOW_SELECTION_KEY);
-    if (!raw) return [];
+    if (!raw) return { tools: [], statuses: {} };
 
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
 
-    return parsed
-      .map((item) => sanitizeTool(item))
-      .filter((item): item is Tool => item !== null)
+    // Backward compatibility: older versions stored a raw Tool[]
+    if (Array.isArray(parsed)) {
+      const tools = parsed
+        .map((item) => sanitizeTool(item))
+        .filter((item): item is Tool => item !== null)
+        .slice(0, 5);
+      const statuses = Object.fromEntries(tools.map((tool) => [tool.id, 'not_started'])) as Record<number, StackItemStatus>;
+      return { tools, statuses };
+    }
+
+    const rawTools = Array.isArray(parsed?.tools) ? parsed.tools : [];
+    const tools = rawTools
+      .map((item: unknown) => sanitizeTool(item))
+      .filter((item: Tool | null): item is Tool => item !== null)
       .slice(0, 5);
+
+    const rawStatuses = typeof parsed?.statuses === 'object' && parsed.statuses ? parsed.statuses : {};
+    const statuses: Record<number, StackItemStatus> = {};
+    for (const tool of tools) {
+      statuses[tool.id] = sanitizeStatus((rawStatuses as Record<string, unknown>)[String(tool.id)]);
+    }
+
+    return { tools, statuses };
   } catch {
-    return [];
+    return { tools: [], statuses: {} };
   }
 }
 
-export function saveWorkflowSelection(tools: Tool[]): void {
+export function saveWorkflowSelection(tools: Tool[], statuses: Record<number, StackItemStatus>): void {
   if (typeof window === 'undefined') return;
 
   try {
@@ -44,7 +74,16 @@ export function saveWorkflowSelection(tools: Tool[]): void {
       return;
     }
 
-    window.localStorage.setItem(WORKFLOW_SELECTION_KEY, JSON.stringify(tools.slice(0, 5)));
+    const selected = tools.slice(0, 5);
+    const selectedStatuses: Record<number, StackItemStatus> = {};
+    for (const tool of selected) {
+      selectedStatuses[tool.id] = sanitizeStatus(statuses[tool.id]);
+    }
+
+    window.localStorage.setItem(
+      WORKFLOW_SELECTION_KEY,
+      JSON.stringify({ tools: selected, statuses: selectedStatuses }),
+    );
   } catch {
     // Ignore storage failures to keep workflow selection non-blocking.
   }

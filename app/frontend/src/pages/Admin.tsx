@@ -229,7 +229,7 @@ export default function Admin() {
             </Button>
             <div className="h-5 w-px bg-slate-200" />
             <div className="cursor-pointer" onClick={() => navigate('/')}>
-              <StackelyLogo size="sm" />
+              <StackelyLogo size="sm" showText={false} />
             </div>
             <span className="text-[13px] text-slate-400 font-medium">/ Admin</span>
           </div>
@@ -276,10 +276,10 @@ export default function Admin() {
             />
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-44 h-9 text-[13px] border-slate-200 shadow-none">
+            <SelectTrigger className="stackely-select-trigger w-44">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="stackely-select-content">
               <SelectItem value="all">All Categories</SelectItem>
               {CATEGORIES.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>

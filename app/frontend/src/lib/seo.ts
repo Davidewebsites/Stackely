@@ -9,6 +9,7 @@ interface SeoOptions {
   description: string;
   canonicalPath?: string;
   robots?: RobotsMode;
+  ogImage?: string;
 }
 
 function ensureMetaTag(name: string): HTMLMetaElement {
@@ -47,7 +48,7 @@ function toCanonicalUrl(path?: string): string {
   return `${SITE_ORIGIN}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-export function applySeo({ title, description, canonicalPath, robots = 'index' }: SeoOptions): void {
+export function applySeo({ title, description, canonicalPath, robots = 'index', ogImage }: SeoOptions): void {
   document.title = title;
 
   ensureMetaTag('description').setAttribute('content', description);
@@ -56,10 +57,16 @@ export function applySeo({ title, description, canonicalPath, robots = 'index' }
   ensurePropertyMetaTag('og:title').setAttribute('content', title);
   ensurePropertyMetaTag('og:description').setAttribute('content', description);
   ensurePropertyMetaTag('og:type').setAttribute('content', 'website');
+  if (ogImage) {
+    ensurePropertyMetaTag('og:image').setAttribute('content', ogImage);
+  }
 
   ensureMetaTag('twitter:card').setAttribute('content', 'summary_large_image');
   ensureMetaTag('twitter:title').setAttribute('content', title);
   ensureMetaTag('twitter:description').setAttribute('content', description);
+  if (ogImage) {
+    ensureMetaTag('twitter:image').setAttribute('content', ogImage);
+  }
 
   ensureCanonicalTag().setAttribute('href', toCanonicalUrl(canonicalPath));
 }
@@ -67,5 +74,5 @@ export function applySeo({ title, description, canonicalPath, robots = 'index' }
 export function usePageSeo(options: SeoOptions): void {
   useEffect(() => {
     applySeo(options);
-  }, [options.title, options.description, options.canonicalPath, options.robots]);
+  }, [options.title, options.description, options.canonicalPath, options.robots, options.ogImage]);
 }

@@ -36,6 +36,39 @@ interface ScoredTool {
   stage: WorkflowStage;
 }
 
+interface WorkflowGenerationOptions {
+  budgetBand: 'low' | 'medium' | 'high';
+  strictPrimaryCategory?: boolean;
+  diversitySalt?: number;
+  recentToolSlugs?: Set<string>;
+  recentToolTokens?: Set<string>;
+  enforceArchetypeTargets?: boolean;
+  rotationIntent?: string;
+}
+
+const CATEGORY_COMPLEMENTS: Record<string, string[]> = {
+  landing_pages: ['copywriting', 'analytics', 'email_marketing', 'ads'],
+  copywriting: ['landing_pages', 'email_marketing', 'video'],
+  email_marketing: ['analytics', 'automation', 'copywriting'],
+  analytics: ['ads', 'email_marketing', 'automation', 'landing_pages'],
+  automation: ['email_marketing', 'analytics', 'ads'],
+  video: ['design', 'copywriting', 'analytics'],
+  design: ['video', 'landing_pages', 'copywriting'],
+  ads: ['landing_pages', 'analytics', 'copywriting'],
+};
+
+export interface StackRecommendationOptions {
+  recentlyUsedTools?: string[];
+}
+
+type ToolArchetype = 'safe' | 'alternative' | 'innovative' | 'any';
+
+interface ToolArchetypeProfile {
+  safe: boolean;
+  alternative: boolean;
+  innovative: boolean;
+}
+
 type WorkflowStage = 'acquire' | 'convert' | 'nurture' | 'analyze';
 
 interface WorkflowSlot {
@@ -93,10 +126,27 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   video: ['video', 'media', 'record', 'edit', 'film', 'animation'],
 };
 
+/**
+ * Pre-detection: match well-known real-world goal phrases BEFORE generic scoring.
+ * Returns a specific intent key (with new-style blueprints) or null (falls through).
+ */
+function detectGoalDomain(normalized: string): string | null {
+  if (/\b(youtube|start[a-z\s]*channel|content[_\s-]?creator|vlogger|streamer|twitch)\b/.test(normalized)) return 'youtube_creator';
+  if (/\b(ecommerce|e-commerce|e commerce|online store|shopify|sell online|dropshipping|product store)\b/.test(normalized)) return 'ecommerce';
+  if (/\b(saas landing|saas page|software landing|app landing|startup landing)\b/.test(normalized)) return 'saas_landing';
+  if (/\b(grow newsletter|launch newsletter|start newsletter|newsletter audience|email list|build newsletter)\b/.test(normalized)) return 'newsletter';
+  if (/\b(automate marketing|marketing automation|marketing workflow|marketing pipeline)\b/.test(normalized)) return 'marketing_automation';
+  return null;
+}
+
 export function detectIntentFromGoal(goal: string): string {
   const normalized = normalizeQueryTypos(goal);
 
-  // Pass 1: full-phrase match (highest confidence)
+  // Pass 0: deterministic goal-domain predetect (highest confidence)
+  const goalDomain = detectGoalDomain(normalized);
+  if (goalDomain) return goalDomain;
+
+  // Pass 1: full-phrase match
   for (const [intent, phrases] of Object.entries(INTENT_PHRASES)) {
     if (phrases.some((p) => normalized.includes(p))) return intent;
   }
@@ -156,6 +206,35 @@ export const WORKFLOW_BLUEPRINTS: Record<string, WorkflowSlot[]> = {
     { role: 'Script & Copy', categories: ['copywriting'], purpose: 'write scripts and on-screen text', stage: 'nurture' },
     { role: 'Distribution', categories: ['email_marketing', 'landing_pages', 'automation'], purpose: 'publish and promote finished content', stage: 'acquire' },
   ],
+  // ---------------------------------------------------------------------------
+  // Goal-specific blueprints (deterministic predetect via detectGoalDomain)
+  // ---------------------------------------------------------------------------
+  youtube_creator: [
+    { role: 'Script & Copy', categories: ['copywriting'], purpose: 'write scripts, video descriptions, and on-screen hooks', stage: 'nurture' },
+    { role: 'Video & Design', categories: ['video', 'design'], purpose: 'produce, edit, and brand your content visually', stage: 'convert' },
+    { role: 'Channel Analytics', categories: ['analytics'], purpose: 'track views, watch time, audience growth, and engagement', stage: 'analyze' },
+  ],
+  ecommerce: [
+    { role: 'Store Builder', categories: ['landing_pages'], purpose: 'build and publish your storefront or product pages', stage: 'convert' },
+    { role: 'Email Lifecycle', categories: ['email_marketing'], purpose: 'send cart abandonment, welcome flows, and post-purchase sequences', stage: 'nurture' },
+    { role: 'Revenue Analytics', categories: ['analytics'], purpose: 'track conversions, revenue, and customer lifetime value', stage: 'analyze' },
+    { role: 'Order Automation', categories: ['automation'], purpose: 'automate order sync, CRM updates, and fulfillment triggers', stage: 'acquire' },
+  ],
+  saas_landing: [
+    { role: 'Page Builder', categories: ['landing_pages'], purpose: 'build a high-converting SaaS landing page', stage: 'convert' },
+    { role: 'Copy Engine', categories: ['copywriting'], purpose: 'write benefit-driven headlines and persuasive feature copy', stage: 'nurture' },
+    { role: 'Conversion Analytics', categories: ['analytics'], purpose: 'measure signup rates, scroll depth, and CTA performance', stage: 'analyze' },
+  ],
+  newsletter: [
+    { role: 'Email Platform', categories: ['email_marketing'], purpose: 'compose, schedule, and deliver newsletters to your list', stage: 'acquire' },
+    { role: 'Content Writer', categories: ['copywriting'], purpose: 'draft compelling newsletter content and subject lines', stage: 'nurture' },
+    { role: 'Audience Analytics', categories: ['analytics'], purpose: 'track open rates, click-throughs, and subscriber growth', stage: 'analyze' },
+  ],
+  marketing_automation: [
+    { role: 'Automation Hub', categories: ['automation'], purpose: 'trigger and orchestrate multi-step marketing workflows', stage: 'acquire' },
+    { role: 'Email & CRM Layer', categories: ['email_marketing'], purpose: 'reach and nurture contacts through automated sequences', stage: 'nurture' },
+    { role: 'Performance Analytics', categories: ['analytics'], purpose: 'measure funnel conversion and workflow effectiveness', stage: 'analyze' },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -172,6 +251,222 @@ function tokenize(value: string): string[] {
 
 function getPricingTier(model: string): number {
   return model === 'free' ? 0 : model === 'freemium' ? 1 : 2;
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function normalizeBudgetBand(pricingPreference: PricingPreference | string): 'low' | 'medium' | 'high' {
+  const value = String(pricingPreference || '').toLowerCase();
+  if (value === 'low' || value === 'free_only' || value === 'free_freemium') return 'low';
+  if (value === 'high' || value === 'freemium_paid') return 'high';
+  return 'medium';
+}
+
+function getAllowedPricingModelsForBudget(pricingPreference: PricingPreference | string, budgetBand: 'low' | 'medium' | 'high'): string[] {
+  if (budgetBand === 'low') return ['free', 'freemium'];
+  if (budgetBand === 'high') return ['free', 'freemium', 'paid'];
+  // Medium budget still allows all models, but additional monthly-price filtering
+  // is enforced later via isToolWithinBudget.
+  return ['free', 'freemium', 'paid'];
+}
+
+function parseMonthlyPrice(tool: Tool): number | null {
+  if (tool.pricing_model === 'free') return 0;
+  const raw = (tool.starting_price || '').toLowerCase().trim();
+  if (!raw) return null;
+  if (/^free\b/.test(raw) && !/\$\s*\d/.test(raw)) return 0;
+
+  const dollarMatches = [...raw.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)].map((m) =>
+    parseFloat(m[1].replace(/,/g, ''))
+  ).filter((n) => Number.isFinite(n));
+
+  let monthly: number | null = null;
+  if (dollarMatches.length > 0) {
+    monthly = Math.min(...dollarMatches);
+  } else {
+    const timedNumber = raw.match(/([\d,]+(?:\.\d+)?)\s*(?:\/\s*(?:mo|month|yr|year)|per\s*(?:month|year)|monthly|annual|annually)/i);
+    if (timedNumber) {
+      monthly = parseFloat(timedNumber[1].replace(/,/g, ''));
+    }
+  }
+
+  if (monthly === null || Number.isNaN(monthly) || monthly < 0) return null;
+
+  const hasAnnualOnlySignal = /\b(year|yr|annual|annually)\b/.test(raw) && !/\b(month|mo|monthly)\b/.test(raw);
+  if (hasAnnualOnlySignal) {
+    return Math.round((monthly / 12) * 100) / 100;
+  }
+  return Math.round(monthly * 100) / 100;
+}
+
+function isToolWithinBudget(tool: Tool, budgetBand: 'low' | 'medium' | 'high'): boolean {
+  if (budgetBand === 'high') return true;
+  if (budgetBand === 'low') {
+    return tool.pricing_model === 'free' || tool.pricing_model === 'freemium';
+  }
+
+  // Medium: free/freemium always allowed. Paid must be affordable (< $30/mo).
+  if (tool.pricing_model === 'free' || tool.pricing_model === 'freemium') return true;
+  const monthly = parseMonthlyPrice(tool);
+  if (monthly === null) return false;
+  return monthly < 30;
+}
+
+const RECENT_WORKFLOW_TOOLS_KEY = 'stackely.recent-workflow-tools';
+const WORKFLOW_ROTATION_CURSOR_KEY = 'stackely.workflow-rotation-cursor';
+
+function sanitizeRecentWorkflowStore(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const safe: Record<string, string[]> = {};
+  for (const [key, rawSlugs] of Object.entries(value as Record<string, unknown>)) {
+    if (!Array.isArray(rawSlugs)) continue;
+    safe[key] = rawSlugs
+      .map((slug) => String(slug || '').toLowerCase().trim())
+      .filter(Boolean)
+      .slice(0, 20);
+  }
+  return safe;
+}
+
+function sanitizeRotationCursorStore(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const safe: Record<string, number> = {};
+  for (const [key, rawCursor] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof rawCursor !== 'number' || !Number.isFinite(rawCursor)) continue;
+    safe[key] = Math.max(0, Math.floor(rawCursor));
+  }
+  return safe;
+}
+
+function loadRecentWorkflowToolSlugs(intent: string): Set<string> {
+  if (typeof window === 'undefined') return new Set<string>();
+  try {
+    const raw = window.localStorage.getItem(RECENT_WORKFLOW_TOOLS_KEY);
+    if (!raw) return new Set<string>();
+    const parsed = sanitizeRecentWorkflowStore(JSON.parse(raw));
+    const slugs = parsed[intent] || [];
+    return new Set(slugs.map((s) => String(s).toLowerCase()));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function buildRecentToolTokens(recentlyUsedTools?: string[]): Set<string> {
+  const tokens = new Set<string>();
+  for (const item of recentlyUsedTools || []) {
+    const normalized = String(item || '').toLowerCase().trim();
+    if (!normalized) continue;
+    tokens.add(normalized);
+    for (const part of normalized.replace(/[^a-z0-9\s-]+/g, ' ').split(/\s+/)) {
+      if (part.length >= 3) tokens.add(part);
+    }
+  }
+  return tokens;
+}
+
+function saveRecentWorkflowToolSlugs(intent: string, selectedTools: Tool[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(RECENT_WORKFLOW_TOOLS_KEY);
+    const parsed = raw ? sanitizeRecentWorkflowStore(JSON.parse(raw)) : {};
+    const previous = parsed[intent] || [];
+    const next = [
+      ...selectedTools.map((tool) => (tool.slug || '').toLowerCase()).filter(Boolean),
+      ...previous,
+    ];
+    parsed[intent] = Array.from(new Set(next)).slice(0, 20);
+    window.localStorage.setItem(RECENT_WORKFLOW_TOOLS_KEY, JSON.stringify(parsed));
+  } catch {
+    // no-op: diversity memory is best-effort only
+  }
+}
+
+function loadRotationCursor(intent: string, role: string): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = window.localStorage.getItem(WORKFLOW_ROTATION_CURSOR_KEY);
+    if (!raw) return 0;
+    const parsed = sanitizeRotationCursorStore(JSON.parse(raw));
+    const key = `${intent}:${role}`.toLowerCase();
+    const value = parsed[key];
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function bumpRotationCursor(intent: string, role: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(WORKFLOW_ROTATION_CURSOR_KEY);
+    const parsed = raw ? sanitizeRotationCursorStore(JSON.parse(raw)) : {};
+    const key = `${intent}:${role}`.toLowerCase();
+    const current = typeof parsed[key] === 'number' && Number.isFinite(parsed[key]) ? Math.max(0, Math.floor(parsed[key] as number)) : 0;
+    parsed[key] = current + 1;
+    window.localStorage.setItem(WORKFLOW_ROTATION_CURSOR_KEY, JSON.stringify(parsed));
+  } catch {
+    // no-op: rotation memory is best-effort only
+  }
+}
+
+function getToolArchetypeProfile(tool: Tool): ToolArchetypeProfile {
+  const popularity = tool.popularity_score || 0;
+  const quality = tool.internal_score || 0;
+  const tagBlob = [tool.tags, tool.use_cases, tool.short_description].filter(Boolean).join(' ').toLowerCase();
+  const hasInnovationSignal =
+    tool.tool_type === 'ai' ||
+    tool.tool_type === 'hybrid' ||
+    /\b(ai|agent|automate|automation|workflow|copilot|generative|no-?code)\b/.test(tagBlob);
+
+  const safe = !!tool.is_featured || popularity >= 8 || quality >= 88;
+  const innovative = hasInnovationSignal || (popularity <= 6 && quality >= 70);
+  const alternative = !safe || (innovative && popularity <= 7);
+
+  return { safe, alternative, innovative };
+}
+
+function desiredArchetypeForSlot(slotIndex: number, slotCount: number): ToolArchetype {
+  if (slotCount < 3) return 'safe';
+  if (slotIndex === 0) return 'safe';
+  if (slotIndex === 1) return 'alternative';
+  if (slotIndex === 2) return 'innovative';
+  return 'alternative';
+}
+
+function hasControlledVariation(slots: ScoredTool[]): boolean {
+  if (slots.length < 3) return false;
+  const profiles = slots.map((slot) => getToolArchetypeProfile(slot.tool));
+  const hasSafe = profiles.some((profile) => profile.safe);
+  const hasAlternative = profiles.some((profile) => profile.alternative);
+  const hasInnovative = profiles.some((profile) => profile.innovative);
+  const allSafeLeaders = profiles.every((profile) => profile.safe && !profile.alternative);
+  return hasSafe && hasAlternative && hasInnovative && !allSafeLeaders;
+}
+
+function computeComplementarityScore(category: string, selectedCategories: string[]): number {
+  if (selectedCategories.length === 0) return 0;
+  const complements = new Set(CATEGORY_COMPLEMENTS[category] || []);
+  let score = 0;
+  for (const selected of selectedCategories) {
+    if (selected === category) {
+      score -= 8;
+      continue;
+    }
+    if (complements.has(selected)) {
+      score += 5;
+    } else {
+      score += 1;
+    }
+  }
+  return score;
 }
 
 /**
@@ -191,11 +486,15 @@ function scoreToolForSlot(
   tool: Tool,
   slot: WorkflowSlot,
   goalTokens: string[],
+  selectedTools: Tool[],
   selectedCategoriesCount: Map<string, number>,
   coveredStages: Set<WorkflowStage>,
-  selectedPricingTiers: number[]
+  selectedPricingTiers: number[],
+  options: WorkflowGenerationOptions,
+  desiredArchetype: ToolArchetype
 ): number {
   let score = tool.internal_score || 0;
+  const archetype = getToolArchetypeProfile(tool);
 
   const cat = tool.category;
 
@@ -220,15 +519,24 @@ function scoreToolForSlot(
     .join(' ')
     .toLowerCase();
 
+  let matchedTokens = 0;
   for (const token of goalTokens) {
-    if (searchable.includes(token)) score += 8;
+    if (searchable.includes(token)) {
+      score += 8;
+      matchedTokens += 1;
+    }
+  }
+
+  // Long-tail visibility: if relevance is strong, boost less obvious options.
+  if ((tool.popularity_score || 0) <= 5 && matchedTokens >= 2) {
+    score += 7;
   }
 
   // Beginner-friendly
   if (tool.beginner_friendly) score += 6;
 
-  // Popularity signal (scaled to max +5)
-  score += Math.min((tool.popularity_score || 0) / 2, 5);
+  // Keep popularity as a weak signal only; avoid always selecting the same top-popularity tools.
+  score += Math.min((tool.popularity_score || 0) / 4, 2.5);
 
   // Coverage bonus: reward stages not yet represented in the stack
   if (!coveredStages.has(slot.stage)) score += 15;
@@ -239,11 +547,52 @@ function scoreToolForSlot(
     score -= 25 * duplicateCount;
   }
 
+  // Reward category combinations that naturally work together in a stack.
+  const selectedCategories = selectedTools.map((t) => t.category);
+  score += computeComplementarityScore(cat, selectedCategories);
+
   // Pricing inconsistency penalty: deviation from current stack average pricing tier
   if (selectedPricingTiers.length > 0) {
     const avgTier = selectedPricingTiers.reduce((acc, t) => acc + t, 0) / selectedPricingTiers.length;
     const deviation = Math.abs(getPricingTier(tool.pricing_model) - avgTier);
     score -= deviation * 10;
+  }
+
+  // Budget shaping: medium prefers cost-efficient mixes; high allows premium bias.
+  if (options.budgetBand === 'medium') {
+    if (tool.pricing_model === 'free') score += 2;
+    if (tool.pricing_model === 'freemium') score += 1.5;
+    if (tool.pricing_model === 'paid') score -= 4;
+  } else if (options.budgetBand === 'high') {
+    if (tool.pricing_model === 'paid') score += 2;
+  }
+
+  // Repetition penalty across similar queries in the same browsing history.
+  const slug = (tool.slug || '').toLowerCase();
+  if (slug && options.recentToolSlugs?.has(slug)) {
+    score -= 12;
+  }
+  if (options.recentToolTokens && options.recentToolTokens.size > 0) {
+    const normalizedName = (tool.name || '').toLowerCase();
+    const normalizedSlug = (tool.slug || '').toLowerCase();
+    const hits = Array.from(options.recentToolTokens).some((token) =>
+      normalizedName.includes(token) || normalizedSlug.includes(token)
+    );
+    if (hits) score -= 20;
+  }
+
+  if (desiredArchetype !== 'any') {
+    if (desiredArchetype === 'safe') {
+      if (archetype.safe) score += 12;
+      else score -= 4;
+    } else if (desiredArchetype === 'alternative') {
+      if (archetype.alternative) score += 11;
+      if (archetype.safe && !archetype.innovative) score -= 8;
+    } else if (desiredArchetype === 'innovative') {
+      if (archetype.innovative) score += 14;
+      else score -= 6;
+      if ((tool.popularity_score || 0) >= 9 && !archetype.innovative) score -= 6;
+    }
   }
 
   return score;
@@ -270,7 +619,8 @@ function dedupeByIdAndSlug(tools: Tool[]): Tool[] {
 function fillBlueprint(
   blueprint: WorkflowSlot[],
   tools: Tool[],
-  goal: string
+  goal: string,
+  options: WorkflowGenerationOptions
 ): ScoredTool[] {
   const goalTokens = tokenize(goal);
   const selectedIds = new Set<number>();
@@ -279,32 +629,58 @@ function fillBlueprint(
   const selectedPricingTiers: number[] = [];
   const result: ScoredTool[] = [];
 
-  // Strict slot fill: process slots in defined order, one winner per slot, max 3 tools.
-  for (const slot of blueprint.slice(0, 3)) {
+  // Strict slot fill: process slots in defined order, one winner per slot.
+  // Blueprint length controls tool count (2–5 depending on goal complexity).
+  for (let slotIndex = 0; slotIndex < blueprint.length; slotIndex += 1) {
+    const slot = blueprint[slotIndex];
+    const desired = options.enforceArchetypeTargets
+      ? desiredArchetypeForSlot(slotIndex, blueprint.length)
+      : 'any';
     // Candidates: tools whose category is in the slot's category list
     const candidates = tools.filter(
-      (t) => slot.categories.includes(t.category) && !selectedIds.has(t.id)
+      (t) => {
+        if (selectedIds.has(t.id)) return false;
+        if (!isToolWithinBudget(t, options.budgetBand)) return false;
+        if (options.strictPrimaryCategory) return t.category === slot.categories[0];
+        return slot.categories.includes(t.category);
+      }
     );
 
     if (candidates.length === 0) continue;
 
-    const scored = candidates
+    // Avoid same-category duplicates unless there are no valid alternatives.
+    const nonDuplicateCandidates = candidates.filter(
+      (candidate) => (selectedCategoriesCount.get(candidate.category) || 0) === 0
+    );
+    const candidatePool = nonDuplicateCandidates.length > 0 ? nonDuplicateCandidates : candidates;
+
+    const scored = candidatePool
       .map((tool) => ({
         tool,
         score: scoreToolForSlot(
           tool,
           slot,
           goalTokens,
+          result.map((entry) => entry.tool),
           selectedCategoriesCount,
           coveredStages,
-          selectedPricingTiers
+          selectedPricingTiers,
+          options,
+          desired
         ),
         slotCategory: tool.category,
         stage: slot.stage,
       }))
       .sort((a, b) => b.score - a.score);
 
-    const best = scored[0];
+    // Session-to-session rotation: alternate choices across top valid candidates per role.
+    const rotationWindow = Math.min(4, scored.length);
+    const intentKey = options.rotationIntent || 'global';
+    const roleCursor = loadRotationCursor(intentKey, slot.role);
+    const seed = hashString(`${goal}:${slot.role}:${options.diversitySalt || 0}`) % Math.max(1, rotationWindow);
+    const rotation = rotationWindow > 0 ? (roleCursor + seed) % rotationWindow : 0;
+    const best = scored[rotation] || scored[0];
+    bumpRotationCursor(intentKey, slot.role);
     selectedIds.add(best.tool.id);
     selectedCategoriesCount.set(best.tool.category, (selectedCategoriesCount.get(best.tool.category) || 0) + 1);
     coveredStages.add(slot.stage);
@@ -319,7 +695,8 @@ function buildAlternativesBySelectedTool(
   selected: ScoredTool[],
   blueprint: WorkflowSlot[],
   tools: Tool[],
-  goal: string
+  goal: string,
+  options: WorkflowGenerationOptions
 ): Record<string, Tool[]> {
   const goalTokens = tokenize(goal);
   const selectedIds = new Set(selected.map((s) => s.tool.id));
@@ -342,6 +719,7 @@ function buildAlternativesBySelectedTool(
     const rankedAlternatives = tools
       .filter((tool) => {
         if (selectedIds.has(tool.id)) return false;
+        if (!isToolWithinBudget(tool, options.budgetBand)) return false;
         return tool.category === selectedItem.tool.category;
       })
       .map((tool) => ({
@@ -350,9 +728,12 @@ function buildAlternativesBySelectedTool(
           tool,
           slot,
           goalTokens,
+          selected.filter((entry) => entry.tool.id !== tool.id).map((entry) => entry.tool),
           selectedCategoriesCount,
           coveredStages,
-          selectedPricingTiers
+          selectedPricingTiers,
+          options,
+          'any'
         ),
       }))
       .sort((a, b) => b.score - a.score)
@@ -363,6 +744,77 @@ function buildAlternativesBySelectedTool(
   });
 
   return alternatives;
+}
+
+function replaceOutOfBudgetSelections(
+  selected: ScoredTool[],
+  blueprint: WorkflowSlot[],
+  allTools: Tool[],
+  goal: string,
+  options: WorkflowGenerationOptions
+): ScoredTool[] {
+  if (options.budgetBand === 'high') return selected;
+
+  const result: ScoredTool[] = [...selected];
+  const selectedIds = new Set(result.map((entry) => entry.tool.id));
+  const goalTokens = tokenize(goal);
+
+  for (let i = 0; i < result.length; i += 1) {
+    const entry = result[i];
+    if (isToolWithinBudget(entry.tool, options.budgetBand)) continue;
+
+    const slot = blueprint[i] ?? blueprint[0];
+    const selectedCategoriesCount = new Map<string, number>();
+    const coveredStages = new Set<WorkflowStage>();
+    const selectedPricingTiers: number[] = [];
+
+    result.forEach((other, idx) => {
+      if (idx === i) return;
+      selectedCategoriesCount.set(other.tool.category, (selectedCategoriesCount.get(other.tool.category) || 0) + 1);
+      coveredStages.add((blueprint[idx] ?? blueprint[0]).stage);
+      selectedPricingTiers.push(getPricingTier(other.tool.pricing_model));
+    });
+
+    const replacement = allTools
+      .filter((tool) => {
+        if (selectedIds.has(tool.id)) return false;
+        if (!isToolWithinBudget(tool, options.budgetBand)) return false;
+        if (options.strictPrimaryCategory) return tool.category === slot.categories[0];
+        return slot.categories.includes(tool.category);
+      })
+      .filter((tool, _, arr) => {
+        const hasNonDuplicate = arr.some((candidate) => (selectedCategoriesCount.get(candidate.category) || 0) === 0);
+        if (!hasNonDuplicate) return true;
+        return (selectedCategoriesCount.get(tool.category) || 0) === 0;
+      })
+      .map((tool) => ({
+        tool,
+        score: scoreToolForSlot(
+          tool,
+          slot,
+          goalTokens,
+          result.filter((_, idx) => idx !== i).map((entry) => entry.tool),
+          selectedCategoriesCount,
+          coveredStages,
+          selectedPricingTiers,
+          options,
+          'any'
+        ),
+      }))
+      .sort((a, b) => b.score - a.score)[0];
+
+    if (!replacement) continue;
+    selectedIds.delete(entry.tool.id);
+    selectedIds.add(replacement.tool.id);
+    result[i] = {
+      tool: replacement.tool,
+      score: replacement.score,
+      slotCategory: replacement.tool.category,
+      stage: slot.stage,
+    };
+  }
+
+  return result;
 }
 
 function findRoleSlotIndex(
@@ -391,11 +843,18 @@ export function recomputeAlternativesForStack(
 ): Record<string, Tool[]> {
   const intent = detectIntentFromGoal(goal);
   const blueprint = WORKFLOW_BLUEPRINTS[intent] ?? WORKFLOW_BLUEPRINTS['creation'];
-  const allowedPricingModels = new Set(getAllowedPricingModels(pricingPreference));
+  const budgetBand = normalizeBudgetBand(pricingPreference);
+  const allowedPricingModels = new Set(getAllowedPricingModelsForBudget(pricingPreference, budgetBand));
   const goalTokens = tokenize(goal);
+  const options: WorkflowGenerationOptions = {
+    budgetBand,
+    strictPrimaryCategory: false,
+    diversitySalt: 0,
+    recentToolSlugs: loadRecentWorkflowToolSlugs(intent),
+  };
 
   const filteredSource = sourceTools.filter(
-    (tool) => tool.active !== false && allowedPricingModels.has(tool.pricing_model)
+    (tool) => tool.active !== false && allowedPricingModels.has(tool.pricing_model) && isToolWithinBudget(tool, budgetBand)
   );
 
   const selectedIds = new Set(selectedTools.map((t) => t.id));
@@ -432,9 +891,12 @@ export function recomputeAlternativesForStack(
           tool,
           slot,
           goalTokens,
+          selectedTools.filter((selected) => selected.id !== tool.id),
           selectedCategoriesCount,
           coveredStages,
-          selectedPricingTiers
+          selectedPricingTiers,
+          options,
+          'any'
         ),
       }))
       .sort((a, b) => b.score - a.score)
@@ -584,6 +1046,31 @@ const INTENT_NOTE_TEMPLATES: Record<string, (goal: string) => string[]> = {
     'Script before you record — time spent on scripting saves 3× the time in editing.',
     'Publish to a landing page or nurture sequence to capture leads from your video audience.',
   ],
+  youtube_creator: (goal) => [
+    `Detected intent: YouTube Channel & Content Creation for "${goal}".`,
+    'Script your first 3 videos before you shoot anything — story clarity multiplies production speed.',
+    'Track watch time and CTR before optimising thumbnails or titles; data beats instinct early on.',
+  ],
+  ecommerce: (goal) => [
+    `Detected intent: Ecommerce Store Launch for "${goal}".`,
+    'Launch with 3–5 hero products before building a full catalogue — validate demand first.',
+    'Set up cart abandonment emails immediately; they typically recover 5–15% of lost revenue.',
+  ],
+  saas_landing: (goal) => [
+    `Detected intent: SaaS Landing Page for "${goal}".`,
+    'Lead with the outcome your software delivers, not its feature list — benefit-first copy converts better.',
+    'Install analytics on day one; track signup CTA clicks and scroll depth from the very start.',
+  ],
+  newsletter: (goal) => [
+    `Detected intent: Newsletter Growth for "${goal}".`,
+    'Write your first 5 issues before opening signups — consistency from issue #1 builds subscriber trust.',
+    'A/B test subject lines before optimising send time; subject line lift outweighs timing effects.',
+  ],
+  marketing_automation: (goal) => [
+    `Detected intent: Marketing Automation for "${goal}".`,
+    'Map the full customer journey manually before automating any step — automate proven paths, not assumptions.',
+    'Start with a single high-impact trigger (e.g. form submit → email sequence) before building complex multi-branch flows.',
+  ],
 };
 
 function buildNotes(intent: string, goal: string, pricingPreference: PricingPreference): string[] {
@@ -610,9 +1097,19 @@ function buildSummary(
   selectedTools: Tool[],
   pricingPreference: PricingPreference
 ): string {
-  const step1 = stack[0]?.tool || 'the first tool';
-  const step2 = stack[1]?.tool || 'the second tool';
-  const step3 = stack[2]?.tool || 'the third tool';
+  const roles = stack.map((s) => s.role);
+  const toolNames = stack.map((s) => s.tool);
+
+  const flowDescription =
+    roles.length >= 3
+      ? `${roles[0]} → ${roles[1]} → ${roles[2]}`
+      : roles.length === 2
+      ? `${roles[0]} → ${roles[1]}`
+      : roles[0] || 'a focused single-tool workflow';
+
+  const step1 = toolNames[0] || 'the first tool';
+  const step2 = toolNames[1] || 'the second tool';
+  const step3 = toolNames[2] ?? null;
 
   const beginnerCount = selectedTools.filter((tool) => tool.beginner_friendly).length;
   const paidCount = selectedTools.filter((tool) => tool.pricing_model === 'paid').length;
@@ -626,7 +1123,11 @@ function buildSummary(
       ? 'It prioritizes feature power and scalability, accepting a higher setup cost for more control.'
       : 'It balances speed and flexibility, so you can launch quickly without locking into a rigid setup.';
 
-  return `This stack follows a setup -> automate -> optimize workflow to move from execution to continuous improvement. ${step1} drives setup outcomes, ${step2} automates the operational layer, and ${step3} handles optimization and feedback. ${tradeoff}`;
+  const toolFlow = step3
+    ? `${step1} drives the ${roles[0] || 'first'} layer, ${step2} handles the ${roles[1] || 'second'} stage, and ${step3} closes the ${roles[2] || 'final'} loop.`
+    : `${step1} drives the ${roles[0] || 'first'} layer, and ${step2} handles the ${roles[1] || 'second'} stage.`;
+
+  return `This stack follows a ${flowDescription} workflow built around your goal. ${toolFlow} ${tradeoff}`;
 }
 
 export function recomputeStackNarrativeFromTools(
@@ -650,11 +1151,13 @@ export function recomputeStackNarrativeFromTools(
 
 export async function recommendStackFromGoal(
   goal: string,
-  pricingPreference: PricingPreference
+  pricingPreference: PricingPreference,
+  options?: StackRecommendationOptions
 ): Promise<StackResponseWithAlternatives> {
   const intent = detectIntentFromGoal(goal);
   const blueprint = WORKFLOW_BLUEPRINTS[intent] ?? WORKFLOW_BLUEPRINTS['creation'];
-  const allowedPricingModels = getAllowedPricingModels(pricingPreference);
+  const budgetBand = normalizeBudgetBand(pricingPreference);
+  const allowedPricingModels = getAllowedPricingModelsForBudget(pricingPreference, budgetBand);
 
   // Fetch from Supabase — single query, filter server-side where possible
   let tools: Tool[] = [];
@@ -674,11 +1177,72 @@ export async function recommendStackFromGoal(
   }
 
   const uniqueTools = dedupeByIdAndSlug(tools);
+  const recentToolSlugs = loadRecentWorkflowToolSlugs(intent);
+  const recentToolTokens = buildRecentToolTokens(options?.recentlyUsedTools);
+  const baseOptions: WorkflowGenerationOptions = {
+    budgetBand,
+    strictPrimaryCategory: false,
+    diversitySalt: 0,
+    recentToolSlugs,
+    recentToolTokens,
+    enforceArchetypeTargets: true,
+    rotationIntent: intent,
+  };
 
-  // Fill blueprint slots strictly and cap at 3 results.
-  const filledSlots = fillBlueprint(blueprint, uniqueTools, goal).slice(0, 3);
+  // Fill blueprint slots and keep workflow output constrained to 3-4 tools.
+  let filledSlots = fillBlueprint(blueprint, uniqueTools, goal, baseOptions).slice(0, 4);
+  filledSlots = replaceOutOfBudgetSelections(filledSlots, blueprint, uniqueTools, goal, baseOptions);
 
-  const alternatives = buildAlternativesBySelectedTool(filledSlots, blueprint, uniqueTools, goal);
+  // Guard against collapsing into the same generic trio; retry with stricter fit.
+  const isGenericTrio = (
+    slots: ScoredTool[]
+  ) => {
+    const cats = slots.map((s) => s.tool.category);
+    if (cats.length < 3) return false;
+    const hasLanding = cats.includes('landing_pages');
+    const hasEmail = cats.includes('email_marketing');
+    const hasAnalytics = cats.includes('analytics');
+    return hasLanding && hasEmail && hasAnalytics;
+  };
+
+  if (isGenericTrio(filledSlots) && !['creation', 'marketing', 'automation'].includes(intent)) {
+    const strictOptions: WorkflowGenerationOptions = {
+      ...baseOptions,
+      strictPrimaryCategory: true,
+      diversitySalt: 1,
+    };
+    const regenerated = fillBlueprint(blueprint, uniqueTools, goal, strictOptions).slice(0, 4);
+    if (regenerated.length >= 3) {
+      filledSlots = replaceOutOfBudgetSelections(regenerated, blueprint, uniqueTools, goal, strictOptions);
+    }
+  }
+
+  if (filledSlots.length > 0 && filledSlots.length < 3) {
+    const broadOptions: WorkflowGenerationOptions = {
+      ...baseOptions,
+      strictPrimaryCategory: false,
+      diversitySalt: 2,
+    };
+    const expanded = fillBlueprint(blueprint, uniqueTools, goal, broadOptions).slice(0, 4);
+    if (expanded.length > filledSlots.length) {
+      filledSlots = replaceOutOfBudgetSelections(expanded, blueprint, uniqueTools, goal, broadOptions);
+    }
+  }
+
+  if (!hasControlledVariation(filledSlots) && filledSlots.length >= 3) {
+    const variationOptions: WorkflowGenerationOptions = {
+      ...baseOptions,
+      strictPrimaryCategory: true,
+      diversitySalt: 3,
+      enforceArchetypeTargets: true,
+    };
+    const regenerated = fillBlueprint(blueprint, uniqueTools, goal, variationOptions).slice(0, 4);
+    if (hasControlledVariation(regenerated)) {
+      filledSlots = replaceOutOfBudgetSelections(regenerated, blueprint, uniqueTools, goal, variationOptions);
+    }
+  }
+
+  const alternatives = buildAlternativesBySelectedTool(filledSlots, blueprint, uniqueTools, goal, baseOptions);
 
   // Build stack response items
   const stack: StackResponse['stack'] = filledSlots.map((entry, index) => {
@@ -697,6 +1261,8 @@ export async function recommendStackFromGoal(
   const notes = buildNotes(intent, goal, pricingPreference);
   const summary = buildSummary(stack, filledSlots.map((slot) => slot.tool), pricingPreference);
   const internal_stack_score = computeInternalStackScore(filledSlots.map((slot) => slot.tool));
+
+  saveRecentWorkflowToolSlugs(intent, filledSlots.map((slot) => slot.tool));
 
   return { goal, stack, comparison, notes, summary, alternatives, internal_stack_score };
 }

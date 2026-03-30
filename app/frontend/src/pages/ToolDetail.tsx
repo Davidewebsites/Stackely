@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   ArrowLeft,
@@ -10,23 +12,20 @@ import {
   X,
   Lightbulb,
   Loader2,
-  Users,
   Gauge,
   TrendingUp,
   Sparkles,
   GitCompare,
   Layers,
   BarChart3,
-  Target,
   Clock3,
 } from 'lucide-react';
 import { fetchToolBySlug, fetchToolsByCategories, CATEGORIES, type Tool } from '@/lib/api';
 import StackelyLogo from '@/components/StackelyLogo';
 import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
-import CompareDrawer from '@/components/CompareDrawer';
-import SelectedStackBar from '@/components/SelectedStackBar';
-import { loadWorkflowSelection, saveWorkflowSelection } from '@/lib/workflowSelection';
+import { buildAddToStackGuidance, useStack } from '@/contexts/StackContext';
+import { useCompare } from '@/contexts/CompareContext';
 import { usePageSeo } from '@/lib/seo';
 
 const pricingStyles: Record<string, string> = {
@@ -53,6 +52,10 @@ function splitCsv(value?: string): string[] {
   return value?.split(',').map((s) => s.trim()).filter(Boolean) || [];
 }
 
+function humanizeToken(value: string): string {
+  return value.replace(/_/g, ' ').trim();
+}
+
 function firstOrFallback(values: string[], fallback: string): string {
   return values[0] || fallback;
 }
@@ -71,6 +74,43 @@ function pricingRank(model?: string): number {
   return 3;
 }
 
+function stabilizeNumberGrouping(value: string): string {
+  return value.replace(/(\d)\s(\d{3})/g, '$1\u00A0$2');
+}
+
+function formatSignalPrice(value?: string | null, pricingModel?: string): { primary: string; secondary?: string } {
+  const normalized = value?.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return { primary: pricingModel ? pricingModel.charAt(0).toUpperCase() + pricingModel.slice(1) : '—' };
+  }
+
+  const explicitSplit = normalized.split(/\s*[·•|]\s*/, 2).map((part) => part.trim()).filter(Boolean);
+  if (explicitSplit.length >= 2) {
+    return {
+      primary: stabilizeNumberGrouping(explicitSplit[0]),
+      secondary: stabilizeNumberGrouping(explicitSplit[1]),
+    };
+  }
+
+  const commaSplit = normalized.split(/,\s+(?!\d)/, 2).map((part) => part.trim()).filter(Boolean);
+  if (commaSplit.length >= 2) {
+    return {
+      primary: stabilizeNumberGrouping(commaSplit[0]),
+      secondary: stabilizeNumberGrouping(commaSplit[1]),
+    };
+  }
+
+  const quantityTailMatch = normalized.match(/^(.*?\b\d[\d\s.,]*)(\s+[A-Za-z][A-Za-z\-/]*)$/);
+  if (quantityTailMatch) {
+    return {
+      primary: stabilizeNumberGrouping(quantityTailMatch[1].trim()),
+      secondary: stabilizeNumberGrouping(quantityTailMatch[2].trim()),
+    };
+  }
+
+  return { primary: stabilizeNumberGrouping(normalized) };
+}
+
 export default function ToolDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -78,9 +118,42 @@ export default function ToolDetail() {
   const [loading, setLoading] = useState(true);
   const [relatedTools, setRelatedTools] = useState<Tool[]>([]);
 
-  const [selectedForCompare, setSelectedForCompare] = useState<Tool[]>([]);
-  const [stackSelection, setStackSelection] = useState<Tool[]>(() => loadWorkflowSelection());
-  const [compareDrawerOpen, setCompareDrawerOpen] = useState(false);
+  const { toggleTool: toggleCompare, compareTools } = useCompare();
+  const { stackTools: stackSelection, toggleStack, isInStack } = useStack();
+
+  const toggleStackWithFeedback = (toolToToggle: Tool) => {
+    const wasInStack = isInStack(toolToToggle);
+    const newStackSize = wasInStack ? stackSelection.length - 1 : stackSelection.length + 1;
+    
+    if (!wasInStack && newStackSize <= 5) {
+      const feedback = buildAddToStackGuidance(toolToToggle, stackSelection);
+      toggleStack(toolToToggle);
+      if (feedback.tone === 'warning') {
+        toast.warning(feedback.title, {
+          description: (
+            <div className="space-y-1">
+              <p>{feedback.primaryLine}</p>
+              <p>{feedback.secondaryLine}</p>
+            </div>
+          ),
+        });
+      } else {
+        toast.success(feedback.title, {
+          description: (
+            <div className="space-y-1">
+              <p>{feedback.primaryLine}</p>
+              <p>{feedback.secondaryLine}</p>
+            </div>
+          ),
+        });
+      }
+    } else if (wasInStack) {
+      toggleStack(toolToToggle);
+      toast.info(`Removed ${toolToToggle.name} from stack (${newStackSize}/5)`);
+    } else if (newStackSize > 5) {
+      toast.error('Stack is full (5/5). Remove a tool before adding another.');
+    }
+  };
 
   usePageSeo({
     title: tool ? `${tool.name} review and alternatives - Stackely` : 'Tool details - Stackely',
@@ -90,10 +163,6 @@ export default function ToolDetail() {
     canonicalPath: slug ? `/tools/${slug}` : '/tools',
     robots: tool ? 'index' : 'noindex',
   });
-
-  useEffect(() => {
-    saveWorkflowSelection(stackSelection);
-  }, [stackSelection]);
 
   useEffect(() => {
     if (!slug) return;
@@ -124,7 +193,6 @@ export default function ToolDetail() {
   const pros = splitCsv(tool?.pros);
   const cons = splitCsv(tool?.cons);
   const useCases = splitCsv(tool?.best_use_cases);
-  const tags = splitCsv(tool?.tags);
   const toolUseCases = splitCsv(tool?.use_cases);
   const targetAudience = splitCsv(tool?.target_audience);
   const recommendedFor = splitCsv(tool?.recommended_for);
@@ -132,6 +200,7 @@ export default function ToolDetail() {
   const contentWhenToUse = tool?.content?.when_to_use ?? [];
   const contentWhenToAvoid = tool?.content?.when_to_avoid ?? [];
   const contentFaq = tool?.content?.faq ?? [];
+  const sidebarFaq = contentFaq.slice(0, 3);
 
   const qualityLabel = metricLabel(tool?.internal_score, 55, 80, ['Needs validation', 'Solid option', 'Strong performer']);
   const popularityLabel = metricLabel(tool?.popularity_score, 4, 7, ['Niche adoption', 'Steady adoption', 'Widely adopted']);
@@ -181,28 +250,39 @@ export default function ToolDetail() {
     };
   }, [tool, recommendedFor, targetAudience, toolUseCases, pros, cons, useCases, qualityLabel, contentDecisionSummary]);
 
-  const toggleCompare = (candidate: Tool) => {
-    setSelectedForCompare((prev) => {
-      const exists = prev.some((t) => t.id === candidate.id);
-      if (exists) return prev.filter((t) => t.id !== candidate.id);
-      if (prev.length >= 4) return prev;
-      return [...prev, candidate];
-    });
-  };
+  const whatGetsEasier = useMemo(() => {
+    const benefitSignals = pros.slice(0, 5);
+    const useCaseSignals = [...toolUseCases, ...useCases].slice(0, 4).map((item) => `Streamlines ${humanizeToken(item).toLowerCase()}`);
+    const audienceSignals = [...recommendedFor, ...targetAudience].slice(0, 3).map((item) => `Purpose-built for ${humanizeToken(item).toLowerCase()}`);
+    const list = [...benefitSignals, ...useCaseSignals, ...audienceSignals];
+    return Array.from(new Set(list.filter(Boolean))).slice(0, 7);
+  }, [pros, toolUseCases, useCases, recommendedFor, targetAudience]);
 
-  const toggleStack = (candidate: Tool) => {
-    setStackSelection((prev) => {
-      const exists = prev.some((t) => t.id === candidate.id);
-      if (exists) return prev.filter((t) => t.id !== candidate.id);
-      if (prev.length >= 5) return prev;
-      return [...prev, candidate];
-    });
-  };
+  const whatStillNeedsWork = useMemo(() => {
+    const frictionSignals: string[] = [];
+    if (tool?.difficulty_score && tool.difficulty_score >= 4) {
+      frictionSignals.push('Steeper learning curve — plan extra time to ramp up.');
+    }
+    if (tool?.beginner_friendly === false) {
+      frictionSignals.push('Not the easiest starting point for new teams.');
+    }
+    const list = [...cons.slice(0, 5), ...frictionSignals];
+    return Array.from(new Set(list.filter(Boolean))).slice(0, 7);
+  }, [cons, tool?.difficulty_score, tool?.beginner_friendly]);
 
-  const clearSelections = () => {
-    setSelectedForCompare([]);
-    setStackSelection([]);
-  };
+  const howTeamsUse = useMemo(() => {
+    const bullets: string[] = [];
+    const audiencePool = [...recommendedFor, ...targetAudience];
+    const casePool = [...toolUseCases, ...useCases];
+    casePool.slice(0, 4).forEach((uc, i) => {
+      const aud = audiencePool[i] ? `${humanizeToken(audiencePool[i])} teams` : 'Teams';
+      bullets.push(`${aud} use it for ${humanizeToken(uc).toLowerCase()}.`);
+    });
+    if (decisionSummary.strongestUseCase && bullets.length < 4) {
+      bullets.push(decisionSummary.strongestUseCase);
+    }
+    return Array.from(new Set(bullets.filter(Boolean))).slice(0, 4);
+  }, [toolUseCases, useCases, recommendedFor, targetAudience, decisionSummary.strongestUseCase]);
 
   if (loading) {
     return (
@@ -240,35 +320,35 @@ export default function ToolDetail() {
       />
 
       {/* Header */}
-      <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
         <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate(-1)}
-              className="h-8 px-2 text-slate-500 hover:text-slate-900 shadow-none"
+              className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
             <div className="h-5 w-px bg-slate-200" />
             <div className="cursor-pointer" onClick={() => navigate('/')}>
-              <StackelyLogo size="sm" />
+              <StackelyLogo size="sm" showText={false} />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="page-shell py-10 relative">
+      <div className="page-shell py-8 lg:py-9 relative">
         {/* Hero */}
-        <Card className="border-slate-200/80 shadow-none overflow-hidden mb-8 bg-white/95">
-          <CardContent className="p-7">
-            <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr] gap-8 items-start">
+        <Card className="border-slate-200/80 shadow-none overflow-hidden mb-7 bg-white/95">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.45fr_0.65fr] gap-6 items-start">
               <div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-3.5">
                   {categoryInfo && (
-                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#2F80ED' }}>
+                    <span className="text-[11px] font-semibold tracking-[0.08em]" style={{ color: '#2F80ED' }}>
                       {categoryInfo.label}
                     </span>
                   )}
@@ -280,7 +360,7 @@ export default function ToolDetail() {
                   )}
                 </div>
 
-                <div className="flex items-start gap-3.5 mb-4">
+                <div className="flex items-start gap-3.5 mb-3.5">
                   <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={50} />
                   <div className="min-w-0">
                     <div className="flex items-center flex-wrap gap-2">
@@ -292,13 +372,13 @@ export default function ToolDetail() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[15px] text-slate-600 mt-1.5 leading-relaxed max-w-[62ch]">
+                    <p className="text-[15px] text-slate-600 mt-1.5 leading-relaxed max-w-[72ch]">
                       {tool.short_description}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5 mb-5">
+                <div className="flex flex-wrap items-center gap-2.5 mb-4">
                   <Badge variant="outline" className={`text-[11px] font-medium border ${pricingStyles[tool.pricing_model] || 'border-slate-200 text-slate-500'}`}>
                     {tool.pricing_model}
                   </Badge>
@@ -313,9 +393,9 @@ export default function ToolDetail() {
                   )}
                 </div>
 
-                <div className="rounded-xl border border-blue-200/80 bg-gradient-to-r from-blue-50/85 to-indigo-50/60 p-4 mb-5">
-                  <p className="text-[10px] uppercase tracking-[0.1em] font-medium text-blue-600/80 mb-1.5">Decision snapshot</p>
-                  <p className="text-[15px] font-medium text-slate-800 leading-relaxed mb-2.5">{decisionSummary.oneLiner}</p>
+                <div className="rounded-xl border border-blue-200/80 bg-gradient-to-r from-blue-50/85 to-indigo-50/60 p-3.5 mb-4">
+                  <p className="text-[11px] font-semibold text-blue-700/85 mb-1.5">Decision snapshot</p>
+                  <p className="text-[15px] font-medium text-slate-800 leading-relaxed mb-2">{decisionSummary.oneLiner}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
                     <p className="text-[11px] text-slate-600 leading-snug"><span className="text-slate-400">Primary fit:</span> {decisionSummary.bestFor}</p>
                     <p className="text-[11px] text-slate-600 leading-snug"><span className="text-slate-400">Key watchout:</span> {decisionSummary.avoidIf}</p>
@@ -323,10 +403,10 @@ export default function ToolDetail() {
                 </div>
 
                 {(contentWhenToUse.length > 0 || contentWhenToAvoid.length > 0) && (
-                  <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {contentWhenToUse.length > 0 && (
                       <div className="rounded-lg border border-emerald-100 bg-emerald-50/45 p-3.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700 mb-2 flex items-center gap-1.5">
+                        <p className="text-[11px] font-semibold text-emerald-700 mb-2 flex items-center gap-1.5">
                           <Check className="w-3 h-3" />
                           When to use
                         </p>
@@ -342,7 +422,7 @@ export default function ToolDetail() {
                     )}
                     {contentWhenToAvoid.length > 0 && (
                       <div className="rounded-lg border border-red-100 bg-red-50/45 p-3.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-red-600 mb-2 flex items-center gap-1.5">
+                        <p className="text-[11px] font-semibold text-red-600 mb-2 flex items-center gap-1.5">
                           <X className="w-3 h-3" />
                           When to avoid
                         </p>
@@ -359,82 +439,179 @@ export default function ToolDetail() {
                   </div>
                 )}
 
-                {contentFaq.length > 0 && (
-                  <div className="mb-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8A2BE2]/80 mb-2.5 flex items-center gap-1.5">
-                      <Lightbulb className="w-3 h-3" style={{ color: '#8A2BE2' }} />
-                      Common questions before choosing this tool
-                    </p>
-                    <div className="space-y-2">
-                      {contentFaq.map((item, i) => (
-                        <div key={`faq-${i}`} className="rounded-lg border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
-                          <p className="text-[12px] font-semibold text-slate-900 leading-snug">{item.question}</p>
-                          <p className="text-[12px] text-slate-600 leading-relaxed mt-1">{item.answer}</p>
-                        </div>
+                {howTeamsUse.length > 0 && (
+                  <div className="rounded-xl border border-slate-200/60 bg-slate-50/50 p-3.5">
+                    <p className="text-[11px] font-semibold text-slate-700 mb-2.5">How teams actually use this tool</p>
+                    <ul className="space-y-1.5">
+                      {howTeamsUse.map((item, i) => (
+                        <li key={`htu-${i}`} className="text-[12px] text-slate-600 leading-relaxed flex items-start gap-2">
+                          <span className="mt-[5px] w-1 h-1 rounded-full bg-slate-400 flex-shrink-0" />
+                          {item}
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2.5">
-                  {tool.website_url && (
-                    <Button
-                      onClick={() => window.open(tool.website_url, '_blank')}
-                      className="h-10 px-5 text-[13px] text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/25"
-                      style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 mr-2" />
-                      Visit website
-                    </Button>
-                  )}
-                  <Button
-                    variant={stackSelection.some((t) => t.id === tool.id) ? 'default' : 'outline'}
-                    onClick={() => toggleStack(tool)}
-                    className="h-10 px-5 text-[13px] border-slate-200 shadow-none"
-                    style={stackSelection.some((t) => t.id === tool.id) ? { background: '#8A2BE2' } : undefined}
-                  >
-                    <Layers className="w-3.5 h-3.5 mr-2" />
-                    {stackSelection.some((t) => t.id === tool.id) ? 'In workflow' : 'Add to workflow'}
-                  </Button>
-                  <Button
-                    variant={selectedForCompare.some((t) => t.id === tool.id) ? 'default' : 'outline'}
-                    onClick={() => toggleCompare(tool)}
-                    className="h-10 px-5 text-[13px] border-slate-200 shadow-none"
-                    style={selectedForCompare.some((t) => t.id === tool.id) ? { background: '#2F80ED' } : undefined}
-                  >
-                    <GitCompare className="w-3.5 h-3.5 mr-2" />
-                    {selectedForCompare.some((t) => t.id === tool.id) ? 'In compare' : 'Compare'}
-                  </Button>
-                  {tool.affiliate_url && (
-                    <Button
-                      variant="outline"
-                      onClick={() => window.open(tool.affiliate_url, '_blank')}
-                      className="h-10 px-5 text-[13px] border-slate-200 text-slate-600 shadow-none hover:border-[#2F80ED]/40 hover:text-[#2F80ED]"
-                    >
-                      Get special offer
-                    </Button>
-                  )}
+                <div className={`${howTeamsUse.length > 0 ? 'mt-4' : ''} pt-4 border-t border-slate-200/70`}>
+                  <p className="text-[11px] font-semibold text-slate-700 mb-2.5">Tool signals</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div className="rounded-lg border border-slate-200/80 bg-slate-50/65 p-3.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[11px] text-slate-500 font-medium">Quality</p>
+                        <BarChart3 className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <p className="text-[20px] font-medium text-slate-900 tracking-tight leading-none">{tool.internal_score || '—'}</p>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{qualityLabel}</p>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200/80 bg-slate-50/65 p-3.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[11px] text-slate-500 font-medium">Popularity</p>
+                        <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <p className="text-[20px] font-medium text-slate-900 tracking-tight leading-none">
+                        {tool.popularity_score || '—'}
+                        {tool.popularity_score && <span className="text-[11px] font-normal text-slate-400 ml-0.5">/10</span>}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{popularityLabel}</p>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200/80 bg-slate-50/65 p-3.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[11px] text-slate-500 font-medium">Difficulty</p>
+                        <Gauge className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <p className="text-[20px] font-medium text-slate-900 tracking-tight leading-none">
+                        {tool.difficulty_score || '—'}
+                        {tool.difficulty_score && <span className="text-[11px] font-normal text-slate-400 ml-0.5">/5</span>}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{difficultyLabel}</p>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200/80 bg-slate-50/65 p-3.5 min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[11px] text-slate-500 font-medium">Price</p>
+                        <Clock3 className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      {(() => {
+                        const formattedPrice = formatSignalPrice(tool.starting_price, tool.pricing_model);
+                        return (
+                          <>
+                            <p className="text-[16px] font-medium text-slate-900 tracking-tight leading-snug whitespace-normal break-normal [word-break:keep-all]">
+                              {formattedPrice.primary}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-1 whitespace-normal break-normal [word-break:keep-all] line-clamp-2">
+                              {formattedPrice.secondary || <span className="capitalize">{tool.pricing_model}</span>}
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="lg:pl-6 lg:border-l lg:border-slate-100">
-                <p className="text-[10px] uppercase tracking-[0.12em] font-medium text-slate-400 mb-3">Decision summary</p>
-                <div className="space-y-4">
-                  <div className="pb-3 border-b border-slate-100">
-                    <p className="text-[9px] uppercase tracking-[0.12em] font-medium text-slate-400 mb-1.5">Best for</p>
-                    <p className="text-[14px] text-slate-900 leading-relaxed">{decisionSummary.bestFor}</p>
+              <div className="lg:pl-5 lg:border-l lg:border-slate-100">
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-slate-200/80 bg-white p-4">
+                    <p className="text-[12px] font-semibold text-slate-900 mb-3 flex items-center gap-1.5">
+                      <Lightbulb className="w-3.5 h-3.5" style={{ color: '#2F80ED' }} />
+                      Decision summary
+                    </p>
+                    <div className="space-y-3.5">
+                      <div className="pb-2.5 border-b border-slate-100">
+                        <p className="text-[11px] font-medium text-slate-500 mb-1.5">Best for</p>
+                        <p className="text-[14px] text-slate-900 leading-relaxed">{decisionSummary.bestFor}</p>
+                      </div>
+                      <div className="pb-2.5 border-b border-slate-100">
+                        <p className="text-[11px] font-medium text-slate-500 mb-1.5">Why choose it</p>
+                        <p className="text-[14px] text-slate-700 leading-relaxed">{decisionSummary.whyChooseIt}</p>
+                      </div>
+                      <div className="pb-2.5 border-b border-amber-100">
+                        <p className="text-[11px] font-medium text-amber-700/90 mb-1.5">Avoid if</p>
+                        <p className="text-[14px] text-amber-700 leading-relaxed">{decisionSummary.avoidIf}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-500 mb-1.5">Strongest use case</p>
+                        <p className="text-[14px] text-slate-700 leading-relaxed">{decisionSummary.strongestUseCase}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="pb-3 border-b border-slate-100">
-                    <p className="text-[9px] uppercase tracking-[0.12em] font-medium text-slate-400 mb-1.5">Why choose it</p>
-                    <p className="text-[14px] text-slate-700 leading-relaxed">{decisionSummary.whyChooseIt}</p>
-                  </div>
-                  <div className="pb-3 border-b border-amber-100">
-                    <p className="text-[9px] uppercase tracking-[0.12em] font-medium text-amber-600/80 mb-1.5">Avoid if</p>
-                    <p className="text-[14px] text-amber-700 leading-relaxed">{decisionSummary.avoidIf}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase tracking-[0.12em] font-medium text-slate-400 mb-1.5">Strongest use case</p>
-                    <p className="text-[14px] text-slate-700 leading-relaxed">{decisionSummary.strongestUseCase}</p>
+
+                  {sidebarFaq.length > 0 && (
+                    <div className="rounded-xl border border-[#8A2BE2]/20 bg-[linear-gradient(180deg,rgba(138,43,226,0.045)_0%,rgba(255,255,255,0.98)_100%)] p-4">
+                      <p className="text-[12px] font-semibold text-slate-900 mb-2.5 flex items-center gap-1.5">
+                        <Lightbulb className="w-3 h-3" style={{ color: '#8A2BE2' }} />
+                        Common questions before choosing
+                      </p>
+                      <Accordion type="multiple" defaultValue={sidebarFaq.length > 0 ? ['faq-0'] : undefined} className="space-y-1.5">
+                        {sidebarFaq.map((item, i) => (
+                          <AccordionItem key={`sidebar-faq-${i}`} value={`faq-${i}`} className="rounded-lg border border-slate-100 bg-white/90 px-3">
+                            <AccordionTrigger className="py-2.5 text-left text-[12px] font-semibold text-slate-900 hover:no-underline">
+                              {item.question}
+                            </AccordionTrigger>
+                            <AccordionContent className="pb-2.5 text-[12px] text-slate-600 leading-relaxed">
+                              {item.answer}
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
+                    <p className="text-[12px] font-semibold text-slate-900 mb-3">Actions</p>
+                    <div className="space-y-2.5">
+                      <Button
+                        variant={stackSelection.some((t) => t.id === tool.id) ? 'default' : 'outline'}
+                        onClick={() => toggleStackWithFeedback(tool)}
+                        className="h-10 w-full justify-start px-4 text-[13px] border-slate-200 shadow-none"
+                        style={stackSelection.some((t) => t.id === tool.id) ? { background: '#8A2BE2' } : undefined}
+                      >
+                        <Layers className="w-3.5 h-3.5 mr-2" />
+                        {stackSelection.some((t) => t.id === tool.id) ? 'In stack' : 'Add to stack'}
+                      </Button>
+                      <Button
+                              variant={compareTools.some((t) => t.id === tool.id) ? 'default' : 'outline'}
+                        onClick={() => toggleCompare(tool)}
+                        className="h-10 w-full justify-start px-4 text-[13px] border-slate-200 shadow-none"
+                        style={compareTools.some((t) => t.id === tool.id) ? { background: '#2F80ED' } : undefined}
+                              disabled={compareTools.length >= 4 && !compareTools.some((t) => t.id === tool.id)}
+                      >
+                        <GitCompare className="w-3.5 h-3.5 mr-2" />
+                        {compareTools.some((t) => t.id === tool.id) ? 'In compare' : 'Compare'}
+                      </Button>
+                      {relatedTools.length > 0 && (
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById('tool-alternatives')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                          className="h-10 w-full justify-start px-4 text-[13px] border-slate-200 shadow-none text-slate-700"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5 mr-2 rotate-[135deg]" />
+                          View alternatives
+                        </Button>
+                      )}
+                      {tool.website_url && (
+                        <Button
+                          onClick={() => window.open(tool.website_url, '_blank')}
+                          className="h-10 w-full justify-start px-4 text-[13px] text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/25"
+                          style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 mr-2" />
+                          Visit website
+                        </Button>
+                      )}
+                      {tool.affiliate_url && (
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(tool.affiliate_url, '_blank')}
+                          className="h-10 w-full justify-start px-4 text-[13px] border-slate-200 text-slate-600 shadow-none hover:border-[#2F80ED]/40 hover:text-[#2F80ED]"
+                        >
+                          Get special offer
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -442,184 +619,88 @@ export default function ToolDetail() {
           </CardContent>
         </Card>
 
-        {/* Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-8">
-          <Card className="border-slate-100 shadow-none bg-slate-50/55">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500 font-semibold">Quality score</p>
-                <BarChart3 className="w-3.5 h-3.5 text-blue-500/80" />
-              </div>
-              <p className="text-[22px] font-bold text-slate-900 tracking-tight leading-none">{tool.internal_score || '—'}</p>
-              <p className="text-[11px] text-slate-500 mt-1.5">{qualityLabel}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-100 shadow-none bg-slate-50/55">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500 font-semibold">Popularity</p>
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
-              </div>
-              <p className="text-[22px] font-bold text-slate-900 tracking-tight leading-none">
-                {tool.popularity_score || '—'}
-                {tool.popularity_score && <span className="text-[12px] font-normal text-slate-400 ml-0.5">/10</span>}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1.5">{popularityLabel}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-100 shadow-none bg-slate-50/55">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500 font-semibold">Difficulty</p>
-                <Gauge className="w-3.5 h-3.5 text-amber-500/80" />
-              </div>
-              <p className="text-[22px] font-bold text-slate-900 tracking-tight leading-none">
-                {tool.difficulty_score || '—'}
-                {tool.difficulty_score && <span className="text-[12px] font-normal text-slate-400 ml-0.5">/5</span>}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1.5">{difficultyLabel}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-100 shadow-none bg-slate-50/55">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500 font-semibold">Starting price</p>
-                <Clock3 className="w-3.5 h-3.5 text-violet-500/80" />
-              </div>
-              {(() => {
-                const raw = tool.starting_price || '';
-                const [priceMain, priceDetail] = raw.split(/\s*[·•|,]\s*/, 2);
-                return (
-                  <>
-                    <p className="text-[22px] font-bold text-slate-900 tracking-tight leading-none truncate">{priceMain || '—'}</p>
-                    <p className="text-[11px] text-slate-500 mt-1.5 truncate">
-                      {priceDetail ? priceDetail : <span className="capitalize">{tool.pricing_model}</span>}
-                    </p>
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
+        <div className="mb-4 max-w-[72ch]">
+          <h2 className="text-[18px] font-semibold text-slate-900 tracking-tight">What to expect in real use</h2>
+          <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">Practical signals drawn from strengths, limitations, and use context. Complements the decision summary above without repeating it.</p>
         </div>
 
-        <div className="mb-4 max-w-2xl">
-          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#2F80ED]/85">Evaluation</p>
-          <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">Review where this tool fits, who it tends to serve best, why teams choose it, and what to watch before committing.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-4 mb-8">
-          <Card className="border-slate-100 shadow-none bg-white/95">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          <Card className="border-emerald-100/80 shadow-none bg-gradient-to-b from-emerald-50/40 to-white rounded-xl">
             <CardContent className="p-6">
-              <div className="pb-5 border-b border-slate-100">
-                <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <Target className="w-4 h-4" style={{ color: '#2F80ED' }} />
-                  Fit and use cases
-                </h3>
-                {(toolUseCases.length > 0 || useCases.length > 0) ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {[...toolUseCases, ...useCases].slice(0, 10).map((uc, i) => (
-                      <Badge key={`${uc}-${i}`} variant="secondary" className="text-[11px] bg-blue-50 text-blue-700 font-normal">
-                        {uc.replace(/_/g, ' ')}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[13px] text-slate-500">No specific use cases have been documented yet.</p>
-                )}
-              </div>
+              <h3 className="text-[16px] font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                What gets easier
+              </h3>
+              <p className="text-[12px] text-slate-500 mb-4">Benefits and workflows this tool tends to simplify in practice.</p>
 
-              <div className="pt-5">
-                <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <Users className="w-4 h-4" style={{ color: '#2F80ED' }} />
-                  Audience
-                </h3>
-                {(targetAudience.length > 0 || recommendedFor.length > 0) ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {[...recommendedFor, ...targetAudience].slice(0, 10).map((item, i) => (
-                      <Badge key={`${item}-${i}`} variant="secondary" className="text-[11px] bg-slate-100 text-slate-600 font-normal">
-                        {item.replace(/_/g, ' ')}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[13px] text-slate-500">No clear audience guidance has been documented yet.</p>
-                )}
-              </div>
+              {whatGetsEasier.length > 0 ? (
+                <ul className="space-y-2.5">
+                  {whatGetsEasier.map((item, i) => (
+                    <li key={`easier-${i}`} className="flex items-start gap-2 text-[13px] text-slate-700 leading-relaxed">
+                      <Check className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[13px] text-slate-500">Not enough signals have been documented yet.</p>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="border-slate-100 shadow-none bg-white/95">
+          <Card className="border-rose-100/80 shadow-none bg-gradient-to-b from-rose-50/40 to-white rounded-xl">
             <CardContent className="p-6">
-              <div className="pb-5 border-b border-slate-100">
-                <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500" />
-                  Why teams pick it
-                </h3>
-                {pros.length > 0 ? (
-                  <ul className="space-y-2.5">
-                    {pros.slice(0, 5).map((pro, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[13px] text-slate-600 leading-relaxed">
-                        <Check className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                        {pro}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-[13px] text-slate-500">No explicit advantages have been documented yet.</p>
-                )}
-              </div>
+              <h3 className="text-[16px] font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
+                <X className="w-4 h-4 text-rose-600" />
+                What still needs work
+              </h3>
+              <p className="text-[12px] text-slate-500 mb-4">Known limitations and friction points to plan for before committing.</p>
 
-              <div className="pt-5">
-                <h3 className="text-[14px] font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <X className="w-4 h-4 text-red-500" />
-                  Watchouts
-                </h3>
-                {cons.length > 0 ? (
-                  <ul className="space-y-2.5">
-                    {cons.slice(0, 5).map((con, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[13px] text-slate-600 leading-relaxed">
-                        <X className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
-                        {con}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-[13px] text-slate-500">No explicit drawbacks have been documented yet.</p>
-                )}
-              </div>
+              {whatStillNeedsWork.length > 0 ? (
+                <ul className="space-y-2.5">
+                  {whatStillNeedsWork.map((item, i) => (
+                    <li key={`needs-work-${i}`} className="flex items-start gap-2 text-[13px] text-slate-700 leading-relaxed">
+                      <X className="w-3.5 h-3.5 text-rose-500 mt-0.5 flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[13px] text-slate-500">No significant limitations have been documented yet.</p>
+              )}
             </CardContent>
           </Card>
         </div>
 
         {/* Comparison-ready alternatives */}
         {relatedTools.length > 0 && (
-          <Card className="border-slate-100 shadow-none mb-9 bg-white/95">
+          <Card id="tool-alternatives" className="border-slate-200/80 shadow-none mb-9 bg-[linear-gradient(180deg,rgba(47,128,237,0.03)_0%,rgba(255,255,255,0.98)_100%)] rounded-xl">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-[15px] font-semibold text-slate-900">Consider these instead</h3>
-                  <p className="text-[12px] text-slate-500 mt-1">Substitute options to review if this tool is not the right fit on price, complexity, or overall profile.</p>
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+                <div className="max-w-[72ch]">
+                  <p className="text-[11px] font-medium text-[#2F80ED]/85 mb-1.5">Alternatives</p>
+                  <h3 className="text-[21px] sm:text-[24px] font-semibold text-slate-900 tracking-tight">Consider these instead</h3>
+                  <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">If this tool feels misaligned on cost, complexity, or expected outcomes, these options may be a better decision path.</p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-8 text-[12px] border-slate-200 shadow-none"
                   onClick={() => {
-                    if (selectedForCompare.length >= 2) setCompareDrawerOpen(true);
+                    toast.info('Use the Compare pill on the right to open compare');
                   }}
-                  disabled={selectedForCompare.length < 2}
+                  disabled={compareTools.length < 2}
                 >
                   <GitCompare className="w-3.5 h-3.5 mr-1.5" />
-                  Open compare ({selectedForCompare.length})
+                  Open compare ({compareTools.length})
                 </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {relatedTools.map((alt) => {
-                  const inCompare = selectedForCompare.some((t) => t.id === alt.id);
+                  const inCompare = compareTools.some((t) => t.id === alt.id);
+                  const compareLimitReached = compareTools.length >= 4;
+                  const disableCompareToggle = compareLimitReached && !inCompare;
                   const inStack = stackSelection.some((t) => t.id === alt.id);
                   const compareHints = [
                     pricingRank(alt.pricing_model) < pricingRank(tool.pricing_model) ? 'Lower cost' : null,
@@ -627,8 +708,8 @@ export default function ToolDetail() {
                     typeof alt.internal_score === 'number' && typeof tool.internal_score === 'number' && alt.internal_score > tool.internal_score ? 'Higher score' : null,
                   ].filter(Boolean).slice(0, 2) as string[];
                   return (
-                    <div key={alt.id} className="rounded-xl border border-slate-200 p-4 bg-white">
-                      <div className="flex items-start justify-between gap-3 mb-3">
+                    <div key={alt.id} className="rounded-xl border border-slate-200/90 bg-white/95 p-4">
+                      <div className="flex items-start justify-between gap-3 mb-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <ToolLogo logoUrl={alt.logo_url} websiteUrl={alt.website_url} toolName={alt.name} size={34} />
                           <div className="min-w-0">
@@ -638,7 +719,7 @@ export default function ToolDetail() {
                             >
                               {alt.name}
                             </button>
-                            <p className="text-[12px] text-slate-500 truncate">{alt.short_description}</p>
+                            <p className="text-[12px] text-slate-500 leading-relaxed line-clamp-2">{alt.short_description}</p>
                           </div>
                         </div>
                         <Badge variant="outline" className={`text-[10px] font-medium border ${pricingStyles[alt.pricing_model] || 'border-slate-200 text-slate-500'}`}>
@@ -646,26 +727,20 @@ export default function ToolDetail() {
                         </Badge>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 mb-2.5">
-                        <span className="text-[11px] text-slate-500">Score {alt.internal_score || '—'}</span>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mb-3">
+                        <span>Score {alt.internal_score || '—'}</span>
                         <span className="text-slate-200">·</span>
-                        <span className="text-[11px] text-slate-500">Popularity {alt.popularity_score || '—'}/10</span>
+                        <span>Popularity {alt.popularity_score || '—'}/10</span>
                         <span className="text-slate-200">·</span>
-                        <span className="text-[11px] text-slate-500 capitalize">{alt.skill_level}</span>
+                        <span className="capitalize">{alt.skill_level}</span>
                       </div>
 
-                      {compareHints.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-[11px] text-slate-500 mb-1.5">Worth a look if you need:</p>
-                          <div className="flex flex-wrap gap-1.5">
-                          {compareHints.map((hint) => (
-                            <Badge key={hint} variant="outline" className="text-[10px] border-[#2F80ED]/25 text-[#2F80ED] bg-blue-50/50">
-                              {hint}
-                            </Badge>
-                          ))}
-                          </div>
-                        </div>
-                      )}
+                      <div className="mb-3 rounded-lg border border-blue-200/70 bg-blue-50/55 px-3 py-2.5">
+                        <p className="text-[11px] text-slate-700 leading-relaxed">
+                          <span className="font-semibold text-[#2F80ED]">Reason to switch:</span>{' '}
+                          {compareHints.length > 0 ? compareHints.join(' · ') : 'Similar profile, but with different tradeoffs that may fit your workflow better.'}
+                        </p>
+                      </div>
 
                       <div className="flex flex-wrap gap-2">
                         <Button
@@ -674,6 +749,7 @@ export default function ToolDetail() {
                           className="h-7 text-[11px] px-3 border-slate-200 shadow-none"
                           style={inCompare ? { background: '#2F80ED' } : undefined}
                           onClick={() => toggleCompare(alt)}
+                          disabled={disableCompareToggle}
                         >
                           <GitCompare className="w-3 h-3 mr-1" />
                           {inCompare ? 'In compare' : 'Compare'}
@@ -683,10 +759,10 @@ export default function ToolDetail() {
                           size="sm"
                           className="h-7 text-[11px] px-3 border-slate-200 shadow-none"
                           style={inStack ? { background: '#8A2BE2' } : undefined}
-                          onClick={() => toggleStack(alt)}
+                          onClick={() => toggleStackWithFeedback(alt)}
                         >
                           <Layers className="w-3 h-3 mr-1" />
-                          {inStack ? 'In workflow' : 'Add to workflow'}
+                          {inStack ? 'In stack' : 'Add to stack'}
                         </Button>
                         <Button
                           variant="ghost"
@@ -717,20 +793,6 @@ export default function ToolDetail() {
           </Card>
         )}
 
-        {/* Tags */}
-        {tags.length > 0 && (
-          <div className="mb-10">
-            <h3 className="text-[13px] font-semibold text-slate-900 mb-3">Tags</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((tag, i) => (
-                <Badge key={i} variant="outline" className="text-[11px] text-slate-400 border-slate-200 font-normal">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Draft workflow preview */}
         {stackSelection.length > 0 && (
           <Card id="stack-draft" className="border-slate-200 shadow-none mb-10">
@@ -750,20 +812,6 @@ export default function ToolDetail() {
           </Card>
         )}
       </div>
-
-      <SelectedStackBar
-        compareCount={selectedForCompare.length}
-        stackCount={stackSelection.length}
-        onOpenCompare={() => setCompareDrawerOpen(true)}
-        onViewStack={() => document.getElementById('stack-draft')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-        onClearAll={clearSelections}
-      />
-
-      <CompareDrawer
-        open={compareDrawerOpen}
-        onOpenChange={setCompareDrawerOpen}
-        tools={selectedForCompare}
-      />
 
       {/* Footer */}
       <SiteFooter />

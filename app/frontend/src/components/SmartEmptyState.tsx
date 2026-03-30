@@ -5,6 +5,7 @@ import { type Tool } from '@/lib/api';
 interface SmartEmptyStateProps {
   onSelectStack: (tools: Tool[]) => void;
   compact?: boolean;
+  reasonLine?: string;
 }
 
 // Predefined minimal Tool objects for suggested stacks
@@ -217,17 +218,20 @@ const STACK_OPTIONS: StackOption[] = [
   },
 ];
 
-export default function SmartEmptyState({ onSelectStack, compact = false }: SmartEmptyStateProps) {
+export default function SmartEmptyState({ onSelectStack, compact = false, reasonLine }: SmartEmptyStateProps) {
   return (
     <div className={compact ? 'py-10 px-0' : 'py-20 px-6'}>
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className={`text-center ${compact ? 'mb-8' : 'mb-12'}`}>
+          {reasonLine && (
+            <p className="text-[12px] text-slate-500 mb-2">{reasonLine}</p>
+          )}
           <h2 className={`font-bold text-slate-900 tracking-tight mb-2 ${compact ? 'text-[24px] sm:text-[28px]' : 'text-[28px] sm:text-[32px]'}`}>
-            Get Started with a Starter Stack
+            Explore ready-made stacks
           </h2>
           <p className="text-[15px] text-slate-500">
-            Compare intent, trade-offs, and role coverage before choosing
+            Pick a proven template based on trade-off, audience, and role coverage
           </p>
         </div>
 

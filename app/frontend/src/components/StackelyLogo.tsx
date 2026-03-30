@@ -9,7 +9,7 @@ interface StackelyLogoProps {
  * sm = navbar — uses /favicon-main.png icon + optional wordmark text
  * lg = hero   — uses /logo.png (160px width)
  */
-export default function StackelyLogo({ size = 'sm', showText = false }: StackelyLogoProps) {
+export default function StackelyLogo({ size = 'sm', showText = true }: StackelyLogoProps) {
   if (size === 'lg') {
     return (
       <div className="flex items-center justify-center">
@@ -25,7 +25,7 @@ export default function StackelyLogo({ size = 'sm', showText = false }: Stackely
 
   // sm — navbar: icon-only by default for compact branded headers
   return (
-    <div className="flex items-center gap-2.5 mt-[0px] mr-[0px] mb-[0px] ml-[0px] pt-[0px] pr-[0px] pb-[0px] pl-[0px] rounded-none text-[16px] font-normal text-[#020817] bg-[#00000000] opacity-100">
+    <div className="flex items-center gap-2.5">
       <img
         src="/favicon-main.png"
         alt="Stackely icon"
@@ -35,7 +35,7 @@ export default function StackelyLogo({ size = 'sm', showText = false }: Stackely
         className="flex-shrink-0 rounded-md object-contain block"
       />
       {showText && (
-        <span className="text-[17px] font-semibold tracking-tight text-slate-900">
+        <span className="text-[17px] font-semibold tracking-tight bg-[linear-gradient(135deg,#2F80ED_0%,#4F46E5_58%,#8A2BE2_100%)] bg-clip-text text-transparent">
           Stackely
         </span>
       )}

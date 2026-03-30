@@ -541,6 +541,17 @@ export {
   getIntentCategories,
 } from './stackRecommendation';
 
+// Structured stack generation — rule-based selection + AI-enriched explanations.
+export {
+  generateStructuredStack,
+  ROLE_TAXONOMY,
+  type RoleDefinition,
+  type ToolEnrichmentMeta,
+  type StructuredStackTool,
+  type StructuredStack,
+  type GenerateStackOptions,
+} from './stackGeneration';
+
 // Compute relevance score for a tool based on classification
 export function computeRelevanceScore(
   tool: Tool,
@@ -912,6 +923,11 @@ export async function searchTools(
 }
 
 function searchInTools(tools: Tool[], query: string, limit: number): Tool[] {
+  const normalizedQuery = normalizeQueryTypos(query).trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const minimumResults = Math.min(tools.length, Math.min(limit, 10));
+
   // Strict search first: deterministic includes match across core fields.
   const strictResults = tools.filter(tool => {
     const searchFields = [
@@ -926,7 +942,7 @@ function searchInTools(tools: Tool[], query: string, limit: number): Tool[] {
       tool.recommended_for || '',
     ].join(' ').toLowerCase();
 
-    return searchFields.includes(query.toLowerCase());
+    return searchFields.includes(normalizedQuery);
   });
 
   if (strictResults.length > 0) {
@@ -936,7 +952,25 @@ function searchInTools(tools: Tool[], query: string, limit: number): Tool[] {
     }));
 
     resultsWithScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    return resultsWithScores.slice(0, limit).map(item => item.tool);
+
+    const rankedStrict = resultsWithScores.slice(0, limit).map(item => item.tool);
+    if (rankedStrict.length >= minimumResults) {
+      return rankedStrict;
+    }
+
+    const strictIds = new Set(rankedStrict.map((tool) => tool.id));
+    const secondary = getSecondarySearchResults(
+      tools.filter((tool) => !strictIds.has(tool.id)),
+      normalizedQuery,
+      limit
+    );
+
+    return mergeSearchResults(rankedStrict, secondary).slice(0, limit);
+  }
+
+  const secondaryResults = getSecondarySearchResults(tools, normalizedQuery, limit);
+  if (secondaryResults.length > 0) {
+    return secondaryResults;
   }
 
   const fuzzyResults = getFuzzyFallbackResults(tools, query, limit);
@@ -1006,6 +1040,151 @@ function buildFuzzyTokens(tool: Tool): string[] {
   }
 
   return Array.from(tokens);
+}
+
+function mergeSearchResults(primary: Tool[], secondary: Tool[]): Tool[] {
+  const seenIds = new Set<number>();
+  const merged: Tool[] = [];
+
+  for (const tool of [...primary, ...secondary]) {
+    if (seenIds.has(tool.id)) continue;
+    seenIds.add(tool.id);
+    merged.push(tool);
+  }
+
+  return merged;
+}
+
+function detectSearchRelevantCategories(query: string): string[] {
+  const normalizedQuery = normalizeQueryTypos(query).toLowerCase();
+  const detected = Object.entries(SEARCH_INTENT_KEYWORDS)
+    .filter(([, keywords]) => keywords.some((keyword) => normalizedQuery.includes(keyword)))
+    .map(([intent]) => mapSearchIntentToCategory(intent))
+    .filter((category): category is string => !!category);
+
+  return Array.from(new Set(detected));
+}
+
+function getBestFuzzyDistance(tool: Tool, query: string): number {
+  const tokens = buildFuzzyTokens(tool);
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const token of tokens) {
+    const distance = token.includes(query) || query.includes(token)
+      ? 0
+      : levenshteinDistance(query, token);
+    if (distance < bestDistance) bestDistance = distance;
+    if (bestDistance === 0) break;
+  }
+
+  return bestDistance;
+}
+
+function getSecondarySearchResults(tools: Tool[], rawQuery: string, limit: number): Tool[] {
+  const query = normalizeForFuzzy(rawQuery);
+  if (!query) return [];
+
+  const terms = query.split(/\s+/).filter((term) => term.length >= 2);
+  const relevantCategories = detectSearchRelevantCategories(query);
+  const categoryScopedTools = relevantCategories.length > 0
+    ? tools.filter((tool) => relevantCategories.includes(tool.category))
+    : tools;
+
+  const fuzzyThreshold = query.length <= 5 ? 1 : query.length <= 8 ? 2 : 3;
+
+  const scored = categoryScopedTools
+    .map((tool) => {
+      const name = normalizeForFuzzy(tool.name || '');
+      const slug = normalizeForFuzzy((tool.slug || '').replace(/-/g, ' '));
+      const useCases = normalizeForFuzzy(tool.use_cases || '');
+      const tags = normalizeForFuzzy(tool.tags || '');
+      const description = normalizeForFuzzy(`${tool.short_description || ''} ${tool.full_description || ''}`);
+      const audience = normalizeForFuzzy(`${tool.target_audience || ''} ${tool.recommended_for || ''}`);
+
+      let score = 0;
+      let matchedTerms = 0;
+      let directSignals = 0;
+
+      if (name === query || slug === query) {
+        score += 90;
+        directSignals += 1;
+      } else if (name.includes(query) || slug.includes(query)) {
+        score += 60;
+        directSignals += 1;
+      }
+
+      if (useCases.includes(query)) {
+        score += 42;
+        directSignals += 1;
+      }
+      if (tags.includes(query)) {
+        score += 34;
+        directSignals += 1;
+      }
+      if (description.includes(query)) {
+        score += 22;
+        directSignals += 1;
+      }
+      if (audience.includes(query)) {
+        score += 14;
+        directSignals += 1;
+      }
+
+      for (const term of terms) {
+        if (name.includes(term) || slug.includes(term)) {
+          score += 12;
+          matchedTerms += 1;
+          continue;
+        }
+        if (useCases.includes(term) || tags.includes(term)) {
+          score += 8;
+          matchedTerms += 1;
+          continue;
+        }
+        if (description.includes(term) || audience.includes(term)) {
+          score += 4;
+          matchedTerms += 1;
+        }
+      }
+
+      const termCoverage = terms.length > 0 ? matchedTerms / terms.length : 0;
+      score += termCoverage * 22;
+
+      if (relevantCategories.includes(tool.category)) {
+        score += 16;
+      }
+
+      const bestDistance = getBestFuzzyDistance(tool, query);
+      const fuzzyBonus = Number.isFinite(bestDistance) && bestDistance <= fuzzyThreshold
+        ? (fuzzyThreshold - bestDistance + 1) * 6
+        : 0;
+      score += fuzzyBonus;
+
+      score += ((tool.internal_score || 0) / 100) * 18;
+      score += ((tool.popularity_score || 0) / 10) * 4;
+
+      const hasSignal = directSignals > 0 || matchedTerms > 0 || fuzzyBonus > 0;
+      const minimumScore = relevantCategories.length > 0 ? 30 : 38;
+
+      return {
+        tool,
+        score,
+        bestDistance,
+        hasSignal,
+        minimumScore,
+      };
+    })
+    .filter((entry) => entry.hasSignal && entry.score >= entry.minimumScore)
+    .sort((a, b) => {
+      if (Math.abs(b.score - a.score) > 0.001) return b.score - a.score;
+      if (a.bestDistance !== b.bestDistance) return a.bestDistance - b.bestDistance;
+      if ((b.tool.internal_score || 0) !== (a.tool.internal_score || 0)) {
+        return (b.tool.internal_score || 0) - (a.tool.internal_score || 0);
+      }
+      return a.tool.name.localeCompare(b.tool.name);
+    });
+
+  return scored.slice(0, Math.max(limit, 10)).map((entry) => entry.tool);
 }
 
 function getFuzzyFallbackResults(tools: Tool[], rawQuery: string, limit: number): Tool[] {
@@ -1106,22 +1285,41 @@ function calculateRelevanceScore(tool: Tool, query: string): number {
 // Detect query intent for relevance scoring
 function detectQueryIntent(query: string): string {
   const normalizedQuery = normalizeQueryTypos(query);
-  const intentKeywords = {
-    automation: ['automate', 'automation', 'workflow', 'process', 'integrate', 'sync'],
-    email_marketing: ['email', 'newsletter', 'campaign', 'audience', 'marketing', 'subscribe'],
-    writing: ['write', 'writing', 'copy', 'content', 'text', 'article', 'blog'],
-    video: ['video', 'film', 'media', 'production', 'broadcast', 'stream'],
-    landing_pages: ['landing', 'landing page', 'website', 'site builder', 'ecommerce', 'store', 'shop', 'checkout'],
-    analytics: ['analytics', 'track', 'measure', 'report', 'metrics', 'insights', 'dashboard']
-  };
-
-  for (const [intent, keywords] of Object.entries(intentKeywords)) {
+  for (const [intent, keywords] of Object.entries(SEARCH_INTENT_KEYWORDS)) {
     if (keywords.some(keyword => normalizedQuery.includes(keyword))) {
       return intent;
     }
   }
 
   return 'general'; // No specific intent detected
+}
+
+const SEARCH_INTENT_KEYWORDS: Record<string, string[]> = {
+  automation: ['automate', 'automation', 'workflow', 'process', 'integrate', 'sync'],
+  email_marketing: ['email', 'newsletter', 'campaign', 'audience', 'marketing', 'subscribe'],
+  writing: ['write', 'writing', 'copy', 'content', 'text', 'article', 'blog'],
+  video: ['video', 'film', 'media', 'production', 'broadcast', 'stream'],
+  landing_pages: ['landing', 'landing page', 'website', 'site builder', 'ecommerce', 'store', 'shop', 'checkout'],
+  analytics: ['analytics', 'track', 'measure', 'report', 'metrics', 'insights', 'dashboard'],
+};
+
+function mapSearchIntentToCategory(intent: string): string | null {
+  switch (intent) {
+    case 'automation':
+      return 'automation';
+    case 'email_marketing':
+      return 'email_marketing';
+    case 'writing':
+      return 'copywriting';
+    case 'video':
+      return 'video';
+    case 'landing_pages':
+      return 'landing_pages';
+    case 'analytics':
+      return 'analytics';
+    default:
+      return null;
+  }
 }
 
 // ---- Stack sharing utilities ----
@@ -1134,7 +1332,33 @@ export interface SavedStack {
   pricing: PricingPreference;
   toolIds: number[];
   toolNames: string[];
+  tools?: Tool[];
+  toolStatuses?: Record<number, SavedStackItemStatus>;
   createdAt: string;
+  lastUsedAt?: string;
+  pinned?: boolean;
+}
+
+export type SavedStackItemStatus = 'not_started' | 'in_progress' | 'completed';
+
+export interface StackShareStatePayload {
+  goal: string;
+  pricing: PricingPreference;
+  tools: Tool[];
+  toolStatuses?: Record<number, SavedStackItemStatus>;
+  createdAt: string;
+}
+
+function slugifySharedGoal(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
+export function getSharedStackLookupId(rawId: string): string {
+  return rawId.split('--')[0] || rawId;
 }
 
 /** Generate a short unique ID for a stack */
@@ -1146,16 +1370,27 @@ function generateStackId(): string {
 export function saveStack(
   goal: string,
   pricing: PricingPreference,
-  tools: Array<{ id: number; name: string }>
+  tools: Array<{ id: number; name: string }>,
+  options?: {
+    fullTools?: Tool[];
+    toolStatuses?: Record<number, SavedStackItemStatus>;
+  }
 ): string {
   const stacks = getSavedStacks();
   const id = generateStackId();
+  const selectedTools = (options?.fullTools || []).slice(0, 5);
+  const selectedStatuses: Record<number, SavedStackItemStatus> = {};
+  for (const tool of selectedTools) {
+    selectedStatuses[tool.id] = sanitizeSavedStackStatus(options?.toolStatuses?.[tool.id]);
+  }
   const newStack: SavedStack = {
     id,
     goal,
     pricing,
     toolIds: tools.map((t) => t.id),
     toolNames: tools.map((t) => t.name),
+    tools: selectedTools.length > 0 ? selectedTools : undefined,
+    toolStatuses: selectedTools.length > 0 ? selectedStatuses : undefined,
     createdAt: new Date().toISOString(),
   };
   stacks.push(newStack);
@@ -1163,11 +1398,194 @@ export function saveStack(
   return id;
 }
 
+function sanitizeSavedStackStatus(value: unknown): SavedStackItemStatus {
+  if (value === 'in_progress' || value === 'completed') return value;
+  return 'not_started';
+}
+
+function toBase64Url(value: string): string {
+  const encoded = btoa(unescape(encodeURIComponent(value)));
+  return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function fromBase64Url(value: string): string | null {
+  try {
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = `${base64}${'='.repeat((4 - (base64.length % 4)) % 4)}`;
+    return decodeURIComponent(escape(atob(padded)));
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeSharedTool(tool: unknown): Tool | null {
+  if (!tool || typeof tool !== 'object') return null;
+
+  const candidate = tool as Partial<Tool>;
+  if (typeof candidate.id !== 'number') return null;
+  if (typeof candidate.name !== 'string' || !candidate.name.trim()) return null;
+  if (typeof candidate.slug !== 'string' || !candidate.slug.trim()) return null;
+  if (typeof candidate.category !== 'string' || !candidate.category.trim()) return null;
+  if (typeof candidate.pricing_model !== 'string' || !candidate.pricing_model.trim()) return null;
+  if (typeof candidate.skill_level !== 'string' || !candidate.skill_level.trim()) return null;
+
+  return candidate as Tool;
+}
+
+function sanitizeSavedStack(value: unknown): SavedStack | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const candidate = value as Partial<SavedStack>;
+  if (typeof candidate.id !== 'string' || !candidate.id.trim()) return null;
+
+  const tools = Array.isArray(candidate.tools)
+    ? candidate.tools
+        .map((tool) => sanitizeSharedTool(tool))
+        .filter((tool): tool is Tool => tool !== null)
+        .slice(0, 5)
+    : undefined;
+
+  const toolIds = Array.isArray(candidate.toolIds)
+    ? candidate.toolIds.filter((toolId): toolId is number => typeof toolId === 'number' && Number.isFinite(toolId))
+    : tools?.map((tool) => tool.id) || [];
+
+  const toolNames = Array.isArray(candidate.toolNames)
+    ? candidate.toolNames.filter((toolName): toolName is string => typeof toolName === 'string' && !!toolName.trim())
+    : tools?.map((tool) => tool.name) || [];
+
+  const statuses: Record<number, SavedStackItemStatus> = {};
+  const rawStatuses = candidate.toolStatuses && typeof candidate.toolStatuses === 'object'
+    ? candidate.toolStatuses as Record<string, unknown>
+    : {};
+
+  for (const tool of tools || []) {
+    statuses[tool.id] = sanitizeSavedStackStatus(rawStatuses[String(tool.id)]);
+  }
+
+  return {
+    id: candidate.id,
+    goal: typeof candidate.goal === 'string' && candidate.goal.trim() ? candidate.goal : 'Saved stack',
+    pricing: sanitizePricingPreference(candidate.pricing),
+    toolIds,
+    toolNames,
+    tools,
+    toolStatuses: tools && tools.length > 0 ? statuses : undefined,
+    createdAt: typeof candidate.createdAt === 'string' && candidate.createdAt.trim()
+      ? candidate.createdAt
+      : new Date().toISOString(),
+    lastUsedAt: typeof candidate.lastUsedAt === 'string' && candidate.lastUsedAt.trim()
+      ? candidate.lastUsedAt
+      : undefined,
+    pinned: candidate.pinned === true,
+  };
+}
+
+function sanitizePricingPreference(value: unknown): PricingPreference {
+  return PRICING_OPTIONS.some((option) => option.id === value)
+    ? (value as PricingPreference)
+    : 'any';
+}
+
+export function encodeStackShareState(payload: StackShareStatePayload): string {
+  const selectedTools = payload.tools.slice(0, 5);
+  const toolStatuses: Record<number, SavedStackItemStatus> = {};
+  for (const tool of selectedTools) {
+    toolStatuses[tool.id] = sanitizeSavedStackStatus(payload.toolStatuses?.[tool.id]);
+  }
+
+  const serialized: StackShareStatePayload = {
+    goal: payload.goal,
+    pricing: sanitizePricingPreference(payload.pricing),
+    tools: selectedTools,
+    toolStatuses,
+    createdAt: payload.createdAt,
+  };
+
+  return toBase64Url(JSON.stringify(serialized));
+}
+
+export function decodeStackShareState(encodedState: string): StackShareStatePayload | null {
+  const decoded = fromBase64Url(encodedState);
+  if (!decoded) return null;
+
+  try {
+    const parsed = JSON.parse(decoded) as Partial<StackShareStatePayload>;
+    const tools = Array.isArray(parsed.tools)
+      ? parsed.tools
+          .map((tool) => sanitizeSharedTool(tool))
+          .filter((tool): tool is Tool => tool !== null)
+          .slice(0, 5)
+      : [];
+
+    if (tools.length === 0) return null;
+
+    const statuses: Record<number, SavedStackItemStatus> = {};
+    const rawStatuses =
+      parsed.toolStatuses && typeof parsed.toolStatuses === 'object'
+        ? (parsed.toolStatuses as Record<string, unknown>)
+        : {};
+
+    for (const tool of tools) {
+      statuses[tool.id] = sanitizeSavedStackStatus(rawStatuses[String(tool.id)]);
+    }
+
+    return {
+      goal: typeof parsed.goal === 'string' && parsed.goal.trim() ? parsed.goal : 'Shared stack',
+      pricing: sanitizePricingPreference(parsed.pricing),
+      tools,
+      toolStatuses: statuses,
+      createdAt:
+        typeof parsed.createdAt === 'string' && parsed.createdAt.trim()
+          ? parsed.createdAt
+          : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function createShareableStackUrl(payload: {
+  goal: string;
+  pricing: PricingPreference;
+  tools: Tool[];
+  toolStatuses?: Record<number, SavedStackItemStatus>;
+}): string {
+  const stackId = saveStack(
+    payload.goal,
+    payload.pricing,
+    payload.tools.map((tool) => ({ id: tool.id, name: tool.name })),
+    {
+      fullTools: payload.tools,
+      toolStatuses: payload.toolStatuses,
+    },
+  );
+
+  const state = encodeStackShareState({
+    goal: payload.goal,
+    pricing: payload.pricing,
+    tools: payload.tools,
+    toolStatuses: payload.toolStatuses,
+    createdAt: new Date().toISOString(),
+  });
+
+  const goalSlug = slugifySharedGoal(payload.goal);
+  const pathId = goalSlug || stackId;
+  const baseUrl = `${window.location.origin}/view-stack/${pathId}`;
+  return `${baseUrl}?s=${encodeURIComponent(state)}`;
+}
+
 /** Get all saved stacks */
 export function getSavedStacks(): SavedStack[] {
   try {
     const raw = localStorage.getItem(SAVED_STACKS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) => sanitizeSavedStack(item))
+      .filter((item): item is SavedStack => item !== null);
   } catch {
     return [];
   }
@@ -1176,11 +1594,75 @@ export function getSavedStacks(): SavedStack[] {
 /** Get a single saved stack by ID */
 export function getSavedStackById(id: string): SavedStack | null {
   const stacks = getSavedStacks();
-  return stacks.find((s) => s.id === id) || null;
+  const lookupId = getSharedStackLookupId(id);
+  return stacks.find((s) => s.id === lookupId) || null;
+}
+
+/** Mark a saved stack as recently used by id or slug. */
+export function touchSavedStackLastUsed(idOrSlug: string): void {
+  const stacks = getSavedStacks();
+  if (stacks.length === 0) return;
+
+  const lookupId = getSharedStackLookupId(idOrSlug);
+  let index = stacks.findIndex((stack) => stack.id === lookupId);
+
+  if (index < 0) {
+    index = stacks.findIndex((stack) => slugifySharedGoal(stack.goal) === lookupId);
+  }
+
+  if (index < 0) return;
+
+  const updated: SavedStack = {
+    ...stacks[index],
+    lastUsedAt: new Date().toISOString(),
+  };
+  const next = [...stacks];
+  next[index] = updated;
+
+  try {
+    localStorage.setItem(SAVED_STACKS_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore storage write failures for this best-effort client cache.
+  }
+}
+
+/** Toggle pinned state for a saved stack by id or slug. */
+export function toggleSavedStackPinned(idOrSlug: string): boolean | null {
+  const stacks = getSavedStacks();
+  if (stacks.length === 0) return null;
+
+  const lookupId = getSharedStackLookupId(idOrSlug);
+  let index = stacks.findIndex((stack) => stack.id === lookupId);
+
+  if (index < 0) {
+    index = stacks.findIndex((stack) => slugifySharedGoal(stack.goal) === lookupId);
+  }
+
+  if (index < 0) return null;
+
+  const nextPinned = !stacks[index].pinned;
+  const updated: SavedStack = {
+    ...stacks[index],
+    pinned: nextPinned,
+  };
+  const next = [...stacks];
+  next[index] = updated;
+
+  try {
+    localStorage.setItem(SAVED_STACKS_KEY, JSON.stringify(next));
+    return nextPinned;
+  } catch {
+    // Ignore storage write failures for this best-effort client cache.
+    return null;
+  }
 }
 
 /** Remove a saved stack by ID */
 export function removeSavedStack(id: string): void {
   const stacks = getSavedStacks().filter((s) => s.id !== id);
-  localStorage.setItem(SAVED_STACKS_KEY, JSON.stringify(stacks));
+  try {
+    localStorage.setItem(SAVED_STACKS_KEY, JSON.stringify(stacks));
+  } catch {
+    // Ignore storage write failures for this best-effort client cache.
+  }
 }

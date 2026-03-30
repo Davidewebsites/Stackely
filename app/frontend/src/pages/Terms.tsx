@@ -16,10 +16,10 @@ export default function Terms() {
       />
 
       {/* Header */}
-      <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
         <div className="page-shell h-[72px] flex items-center justify-between">
           <Link to="/">
-            <StackelyLogo size="sm" />
+            <StackelyLogo size="sm" showText={false} />
           </Link>
           <nav className="flex items-center gap-5" />
         </div>

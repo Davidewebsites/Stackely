@@ -53,30 +53,30 @@ export default function GoalPage() {
   const isStackMode = stack.length > 0;
 
   return (
-    <div className="min-h-screen bg-white relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50/40 relative overflow-hidden">
 
       {/* Header */}
-      <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
         <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => { reset(); navigate('/'); }}
-              className="h-8 px-2 text-slate-500 hover:text-slate-900 shadow-none"
+              className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
             <div className="h-5 w-px bg-slate-200" />
             <div className="cursor-pointer" onClick={() => navigate('/')}>
-              <StackelyLogo size="sm" />
+              <StackelyLogo size="sm" showText={false} />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="page-shell py-8 relative">
+      <div className="page-shell page-section pt-8 relative">
         {/* Loading */}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-36">
@@ -122,35 +122,27 @@ export default function GoalPage() {
             {/* Header */}
             <div className="mb-10">
               <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span className="text-[11px] font-medium uppercase tracking-widest" style={{ color: '#2F80ED' }}>
+                <span className="eyebrow-label" style={{ color: '#2F80ED' }}>
                   Goal
                 </span>
               </div>
 
-              <h1 className="text-[32px] sm:text-[40px] font-bold text-slate-900 tracking-tight mb-4 capitalize">
+              <h1 className="hero-title mb-4 capitalize leading-[1.12]">
                 {classification.goal || goalQuery}
               </h1>
-              <p className="text-[16px] text-slate-500 leading-relaxed mb-5 max-w-5xl">{classification.reasoning}</p>
+              <p className="hero-copy mb-5">{classification.reasoning}</p>
 
               {classification.use_cases && classification.use_cases.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {classification.use_cases.map((uc) => (
-                    <Badge
-                      key={uc}
-                      variant="outline"
-                      className="text-[11px] text-slate-500 border-slate-200 font-normal px-2.5 py-1"
-                    >
-                      {uc.replace(/_/g, ' ')}
-                    </Badge>
-                  ))}
-                </div>
+                <p className="body-copy">
+                  <span className="font-medium text-slate-800">Relevant workflow cues:</span> {classification.use_cases.map((uc) => uc.replace(/_/g, ' ')).join(' · ')}
+                </p>
               )}
             </div>
 
-            {/* Recommended stack */}
             <div className="mb-7">
-              <h2 className="text-[20px] font-semibold text-slate-900">Recommended stack</h2>
-              <p className="text-[13px] text-slate-400 mt-1">
+              <div className="eyebrow-label mb-2" style={{ color: '#2F80ED' }}>Recommended stack</div>
+              <h2 className="text-[20px] sm:text-[22px] leading-[1.18] font-semibold text-slate-900 tracking-tight">Recommended stack</h2>
+              <p className="text-[13px] text-slate-500 mt-1">
                 {stack.length} tool{stack.length !== 1 ? 's' : ''} — one per role
               </p>
             </div>
@@ -164,28 +156,21 @@ export default function GoalPage() {
             {/* AI Accelerator Section */}
             {aiAccelerators.length > 0 && (
               <div className="mt-12">
-                <div className="flex items-center gap-3 mb-5">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4FD1C5 55%, #8A2BE2 100%)' }}
-                  >
-                    <Sparkles className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-[20px] font-semibold text-slate-900">
-                      AI tools that can accelerate this stack
-                    </h2>
-                    <p className="text-[13px] text-slate-400 mt-0.5">
-                      AI-powered tools that can speed up your workflow
-                    </p>
-                  </div>
+                <div className="mb-5 max-w-[72ch]">
+                  <div className="eyebrow-label mb-2" style={{ color: '#8A2BE2' }}>AI acceleration</div>
+                  <h2 className="text-[20px] sm:text-[22px] leading-[1.18] font-semibold text-slate-900 tracking-tight">
+                    AI tools that can accelerate this stack
+                  </h2>
+                  <p className="body-copy mt-1.5">
+                    AI-powered tools that can speed up execution around the core workflow.
+                  </p>
                 </div>
 
                 <div className="space-y-3.5">
                   {aiAccelerators.map((tool) => (
                     <div
                       key={tool.id}
-                      className="group flex items-start gap-4 p-5 rounded-xl border border-slate-200 bg-white hover:border-[#8A2BE2]/35 hover:bg-violet-50/15 transition-all cursor-pointer"
+                      className="group panel-card flex items-start gap-4 p-5 hover:border-[#8A2BE2]/35 hover:bg-violet-50/15 transition-all cursor-pointer"
                       onClick={() => navigate(`/tools/${tool.slug}`)}
                     >
                       <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
@@ -213,14 +198,10 @@ export default function GoalPage() {
             {/* Alternative Tools Section */}
             {alternatives.length > 0 && (
               <div className="mt-16">
-                <div className="flex items-center gap-3 mb-7">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                    <Layers className="w-5 h-5 text-slate-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-[20px] font-semibold text-slate-900">Alternative tools</h2>
-                    <p className="text-[13px] text-slate-400 mt-0.5">Other relevant tools for this goal</p>
-                  </div>
+                <div className="mb-7 max-w-[72ch]">
+                  <div className="eyebrow-label mb-2">Alternatives</div>
+                  <h2 className="text-[22px] font-semibold text-slate-900 tracking-tight">Alternative tools</h2>
+                  <p className="body-copy mt-1.5">Other relevant tools for this goal.</p>
                 </div>
 
                 <div className="content-grid">

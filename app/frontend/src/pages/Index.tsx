@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-const routerLocation = useLocation();
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight,
@@ -367,6 +366,7 @@ function TopPickCard({ tool }: { tool: Tool }) {
 }
 
 export default function Index() {
+  const routerLocation = useLocation();
   const navigate = useNavigate();
   const { addTool, clearCompare, openDrawer, setCompareSessionContext } = useCompare();
   const [query, setQuery] = useState('');

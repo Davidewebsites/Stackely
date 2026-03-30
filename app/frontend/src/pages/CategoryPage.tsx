@@ -328,7 +328,7 @@ export default function CategoryPage() {
                 <Link
                   key={cat.id}
                   to={`/categories/${cat.id}`}
-                  state={{ from: routerLocation.pathname + routerLocation.search }}
+                  state={{ from: routerLocation.state?.from || (routerLocation.pathname + routerLocation.search) }}
                   className="group panel-card flex flex-col items-start gap-2.5 p-5 hover:border-[#2F80ED]/40 hover:bg-blue-50/20 transition-all text-left"
                 >
                   <span className="text-[14px] font-semibold text-slate-900 group-hover:text-[#2F80ED] transition-colors">

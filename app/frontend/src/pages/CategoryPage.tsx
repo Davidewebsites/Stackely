@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { CATEGORIES, fetchToolsByCategories, type Tool } from '@/lib/api';
+import { getCategoryIntro } from '@/lib/categoryIntros';
 import ToolCard from '@/components/ToolCard';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
@@ -124,6 +125,15 @@ export default function CategoryPage() {
               : `Browse tools in the ${category} category.`}
           </p>
         </div>
+
+        {/* SEO Intro Section */}
+        {categoryInfo && (
+          <div className="mb-8 max-w-[80rem] bg-gradient-to-br from-indigo-50/40 to-blue-50/30 border border-indigo-200/30 rounded-lg px-6 py-5">
+            <p className="text-[14px] md:text-[15px] leading-[1.68] text-slate-700">
+              {getCategoryIntro(category)}
+            </p>
+          </div>
+        )}
 
         {/* Loading */}
         {loading && (

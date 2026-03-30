@@ -95,26 +95,89 @@ async function fetchAllTools() {
 
   const tools = [];
   let skip = 0;
-  const limit = 200;
+  const limit = 500;
 
-  while (true) {
+  // First attempt: fetch all ACTIVE tools
+  console.log('   Fetching active tools...');
+  let hasMore = true;
+  while (hasMore) {
     const queryParam = encodeURIComponent(JSON.stringify({ active: true }));
-    const url = `${apiBase}/all?query=${queryParam}&limit=${limit}&skip=${skip}&sort=-internal_score&fields=slug,category`;
+    const url = `${apiBase}/all?query=${queryParam}&limit=${limit}&skip=${skip}&sort=-internal_score`;
 
-    const res = await fetch(url);
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
 
-    if (!res.ok) {
-      console.error(`   API error (status ${res.status}) at skip=${skip}`);
+      if (!res.ok) {
+        console.error(`   API error (status ${res.status}) at skip=${skip}`);
+        break;
+      }
+
+      const data = await res.json();
+      const items = data?.items || data?.data?.items || [];
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // Filter out tools without slug
+      const validItems = items.filter(t => t.slug && t.slug.trim());
+      tools.push(...validItems);
+      
+      console.log(`   Fetched batch: skip=${skip}, received=${items.length}, valid=${validItems.length}`);
+      
+      if (items.length < limit) {
+        hasMore = false;
+      } else {
+        skip += limit;
+      }
+    } catch (err) {
+      console.error(`   Fetch error at skip=${skip}: ${err.message}`);
       break;
     }
+  }
 
-    const data = await res.json();
-    const items = data?.items || data?.data?.items || [];
-    if (!Array.isArray(items) || items.length === 0) break;
+  console.log(`   Total active tools fetched: ${tools.length}`);
 
-    tools.push(...items);
-    if (items.length < limit) break;
-    skip += limit;
+  // If no active tools found, try fetching ALL tools (fallback for data issues)
+  if (tools.length === 0) {
+    console.log('   ⚠ No active tools found. Attempting fallback: fetching ALL tools...');
+    skip = 0;
+    hasMore = true;
+    
+    while (hasMore) {
+      const url = `${apiBase}/all?limit=${limit}&skip=${skip}&sort=-internal_score`;
+      
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        
+        if (!res.ok) break;
+        
+        const data = await res.json();
+        const items = data?.items || data?.data?.items || [];
+        
+        if (!Array.isArray(items) || items.length === 0) {
+          hasMore = false;
+          break;
+        }
+        
+        const validItems = items.filter(t => t.slug && t.slug.trim());
+        tools.push(...validItems);
+        
+        console.log(`   Fallback batch: skip=${skip}, received=${items.length}, valid=${validItems.length}`);
+        
+        if (items.length < limit) {
+          hasMore = false;
+        } else {
+          skip += limit;
+        }
+      } catch (err) {
+        console.error(`   Fallback fetch error at skip=${skip}: ${err.message}`);
+        break;
+      }
+    }
+    
+    console.log(`   Fallback total tools: ${tools.length}`);
   }
 
   return tools;
@@ -179,11 +242,21 @@ async function main() {
 
   // Tool pages
   for (const tool of uniqueTools) {
-    entries.push(urlEntry(`${SITE_URL}/tools/${tool.slug}`, date, 'weekly', '0.8'));
+    if (tool.slug) {
+      entries.push(urlEntry(`${SITE_URL}/tools/${tool.slug}`, date, 'weekly', '0.8'));
+    }
   }
 
-  // Category pages
-  for (const category of [...categorySet].sort()) {
+  // Category pages - include fallback categories if database is incomplete
+  const FALLBACK_CATEGORIES = [
+    'ads', 'design', 'copywriting', 'video', 'landing_pages',
+    'analytics', 'automation', 'email_marketing'
+  ];
+  
+  // Merge detected categories with fallback
+  const allCategories = new Set([...categorySet, ...FALLBACK_CATEGORIES]);
+  
+  for (const category of [...allCategories].sort()) {
     entries.push(urlEntry(`${SITE_URL}/categories/${category}`, date, 'weekly', '0.7'));
   }
 
@@ -211,7 +284,7 @@ async function main() {
   writeFileSync(OUTPUT_PATH, xml, 'utf-8');
 
   console.log(`   ✅ sitemap.xml written to ${OUTPUT_PATH}`);
-  console.log(`   📊 ${uniqueTools.length} tool pages, ${categorySet.size} category pages, ${GOAL_SLUGS.length} goal pages`);
+  console.log(`   📊 ${uniqueTools.length} tool pages, ${allCategories.size} category pages, ${GOAL_SLUGS.length} goal pages`);
   console.log(`   📄 Total URLs: ${entries.length}`);
 }
 

@@ -388,6 +388,7 @@ export default function Index() {
       'Find and compare the best tools for your goal. Stackely helps you build practical tool stacks for marketing, growth, and automation workflows.',
     canonicalPath: '/',
     robots: 'index',
+    ogImage: 'https://stackely.com/og-image.png',
   });
 
   useEffect(() => {

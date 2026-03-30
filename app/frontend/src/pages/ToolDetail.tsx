@@ -158,11 +158,54 @@ export default function ToolDetail() {
   usePageSeo({
     title: tool ? `${tool.name} review and alternatives - Stackely` : 'Tool details - Stackely',
     description: tool
-      ? `${tool.name}: pricing, skill level, fit, and alternatives. Compare before you choose your stack.`
+      ? (tool.full_description || tool.short_description || `${tool.name}: pricing, skill level, fit, and alternatives.`).substring(0, 160)
       : 'Detailed tool analysis, pricing, and alternatives on Stackely.',
     canonicalPath: slug ? `/tools/${slug}` : '/tools',
     robots: tool ? 'index' : 'noindex',
+    ogImage: tool?.logo_url,
+    ogType: 'product',
   });
+
+  // Render JSON-LD structured data for social/search crawlers
+  useEffect(() => {
+    if (!tool || !slug) return;
+
+    const structuredData = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: tool.name,
+      description: (tool.full_description || tool.short_description || tool.name),
+      image: tool.logo_url || `https://stackely.com/og-default.png`,
+      brand: { '@type': 'Brand', name: 'Stackely' },
+      category: tool.category ? humanizeToken(tool.category) : 'Software',
+      ...(tool.pricing_model && { offers: {
+        '@type': 'Offer',
+        priceCurrency: 'USD',
+        price: tool.starting_price ? tool.starting_price.split(/[^0-9.]/)[0] : '0',
+        priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        availability: 'https://schema.org/InStock',
+      }}),
+      ...(tool.internal_score && { aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: Math.min(5, Math.max(1, tool.internal_score / 20)),
+        ratingCount: 1,
+      }}),
+      url: `https://stackely.com/tools/${slug}`,
+    };
+
+    let scriptTag = document.head.querySelector('script[data-stackely-product-schema]') as HTMLScriptElement | null;
+    if (!scriptTag) {
+      scriptTag = document.createElement('script');
+      scriptTag.setAttribute('type', 'application/ld+json');
+      scriptTag.setAttribute('data-stackely-product-schema', 'true');
+      document.head.appendChild(scriptTag);
+    }
+    scriptTag.textContent = JSON.stringify(structuredData);
+
+    return () => {
+      // Cleanup is optional; schema stays for better crawl continuation
+    };
+  }, [tool, slug]);
 
   useEffect(() => {
     if (!slug) return;

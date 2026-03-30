@@ -41,6 +41,23 @@ foreach ($tool in $tools) {
   foreach ($p in $tool.PSObject.Properties) {
     Add-Member -InputObject $toolObj -MemberType NoteProperty -Name $p.Name -Value $p.Value
   }
+
+  # Backward-compatible field mapping:
+  # accept camelCase `url` / `affiliateUrl` and map to DB snake_case columns.
+  if (
+    ($toolObj.PSObject.Properties.Name -contains 'url') -and
+    -not ($toolObj.PSObject.Properties.Name -contains 'website_url')
+  ) {
+    Add-Member -InputObject $toolObj -MemberType NoteProperty -Name 'website_url' -Value $toolObj.url
+  }
+
+  if (
+    ($toolObj.PSObject.Properties.Name -contains 'affiliateUrl') -and
+    -not ($toolObj.PSObject.Properties.Name -contains 'affiliate_url')
+  ) {
+    Add-Member -InputObject $toolObj -MemberType NoteProperty -Name 'affiliate_url' -Value $toolObj.affiliateUrl
+  }
+
   $toolObj.slug = $slug
 
   $bySlug[$slug] = $true
@@ -59,7 +76,7 @@ $inserted = 0
 
 $allowedColumns = @(
   'name','slug','short_description','full_description','category','subcategory','tags','pricing_model',
-  'starting_price','skill_level','website_url','logo_url','internal_score','is_featured','pros','cons',
+  'starting_price','skill_level','website_url','affiliate_url','logo_url','internal_score','is_featured','pros','cons',
   'best_use_cases','tool_type','active','use_cases','target_audience','difficulty_score',
   'recommended_for','popularity_score','beginner_friendly'
 )

@@ -21,6 +21,7 @@ import {
   Clock3,
 } from 'lucide-react';
 import { fetchToolBySlug, fetchToolsByCategories, CATEGORIES, type Tool } from '@/lib/api';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 import StackelyLogo from '@/components/StackelyLogo';
 import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
@@ -637,7 +638,7 @@ export default function ToolDetail() {
                       )}
                       {tool.website_url && (
                         <Button
-                          onClick={() => window.open(tool.website_url, '_blank')}
+                          onClick={() => openOutboundToolLink(tool, '/tools/' + tool.slug)}
                           className="h-10 w-full justify-start px-4 text-[13px] text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/25"
                           style={{ background: 'linear-gradient(135deg, #2F80ED, #8A2BE2)' }}
                         >
@@ -648,7 +649,7 @@ export default function ToolDetail() {
                       {tool.affiliate_url && (
                         <Button
                           variant="outline"
-                          onClick={() => window.open(tool.affiliate_url, '_blank')}
+                          onClick={() => openOutboundToolLink(tool, '/tools/' + tool.slug)}
                           className="h-10 w-full justify-start px-4 text-[13px] border-slate-200 text-slate-600 shadow-none hover:border-[#2F80ED]/40 hover:text-[#2F80ED]"
                         >
                           Get special offer

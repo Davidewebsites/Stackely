@@ -1,9 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Sparkles, GitCompare, Layers } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CATEGORIES, type Tool } from '@/lib/api';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 import ToolLogo from '@/components/ToolLogo';
 import { getBestFor, getWhyRecommended, getAvoidIf, getDisplayTags, buildContextualFallback } from '@/lib/toolInsights';
 import { useCompare } from '@/contexts/CompareContext';
@@ -96,6 +97,7 @@ export default function ToolCard({
   whyItMatches,
 }: ToolCardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     compareTools,
     toggleTool: toggleCompareFromContext,
@@ -302,7 +304,7 @@ export default function ToolCard({
               onClick={(e) => {
                 e.stopPropagation();
                 trackToolClick(tool.id);
-                window.open(tool.website_url, '_blank');
+                openOutboundToolLink(tool, location.pathname);
               }}
             >
               <ExternalLink className="w-3 h-3" />

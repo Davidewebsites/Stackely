@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,7 @@ import { useCompare } from '@/contexts/CompareContext';
 import StackCard from '@/components/StackCard';
 import ToolCard from '@/components/ToolCard';
 import { trackToolClick } from '@/components/ToolCard';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 import ToolLogo from '@/components/ToolLogo';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
@@ -697,6 +698,7 @@ function classifyQueryMode(query: string, requestedMode: string | null): 'stack'
 export default function Results() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const query = searchParams.get('q') || '';
   const categoryParam = searchParams.get('category') || '';
   const budgetParam = normalizeBudgetFilter(searchParams.get('budget'));
@@ -2088,9 +2090,7 @@ export default function Results() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   trackToolClick(item.tool.id);
-                                  const url = item.tool.affiliate_url || item.tool.website_url;
-                                  if (!url) return;
-                                  window.open(url, '_blank', 'noopener,noreferrer');
+                                  openOutboundToolLink(item.tool, location.pathname);
                                 }}
                               >
                                 Try this tool

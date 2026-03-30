@@ -1,8 +1,9 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, ArrowUpRight, Target, Lightbulb, Sparkles } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CATEGORIES, type StackTool } from '@/lib/api';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 import ToolLogo from '@/components/ToolLogo';
 import { getBestFor, getWhyRecommended, getAvoidIf, getDisplayTags } from '@/lib/toolInsights';
 
@@ -37,6 +38,7 @@ function stabilizeCompactLabel(value: string): string {
 
 export default function StackCard({ tool, position }: StackCardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const catInfo = CATEGORIES.find((c) => c.id === tool.category);
   const isAI = tool.tool_type === 'ai' || tool.tool_type === 'hybrid';
   const accent = getToolAccent(`${tool.name}-${tool.logo_url || tool.website_url || tool.category}`);
@@ -145,7 +147,7 @@ export default function StackCard({ tool, position }: StackCardProps) {
               className="h-7 px-3 text-[12px] text-slate-500 hover:text-[#2F80ED] hover:border-[#2F80ED]/40 border-slate-200 shadow-none rounded-md"
               onClick={(e) => {
                 e.stopPropagation();
-                window.open(tool.website_url, '_blank');
+                openOutboundToolLink(tool, location.pathname);
               }}
             >
               <ExternalLink className="w-3 h-3 mr-1" />

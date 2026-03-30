@@ -70,6 +70,8 @@ export interface Tool {
   pricing_model: string;
   starting_price?: string;
   skill_level: string;
+  url?: string;
+  affiliateUrl?: string;
   website_url?: string;
   logo_url?: string;
   affiliate_url?: string;
@@ -95,6 +97,32 @@ export interface ClassificationResult {
   use_cases: string[];
   reasoning: string;
 }
+
+type ToolRecord = Tool & {
+  url?: string;
+  affiliateUrl?: string;
+  website_url?: string;
+  affiliate_url?: string;
+};
+
+function normalizeToolRecord<T extends ToolRecord>(tool: T): T {
+  const canonicalUrl = (tool.url || tool.website_url || '').trim();
+  const canonicalAffiliateUrl = (tool.affiliateUrl || tool.affiliate_url || '').trim();
+
+  return {
+    ...tool,
+    url: canonicalUrl || undefined,
+    website_url: canonicalUrl || undefined,
+    affiliateUrl: canonicalAffiliateUrl || undefined,
+    affiliate_url: canonicalAffiliateUrl || undefined,
+  };
+}
+
+function normalizeToolRecords<T extends ToolRecord>(tools: T[]): T[] {
+  return tools.map((tool) => normalizeToolRecord(tool));
+}
+
+const NORMALIZED_LOCAL_TOOLS: Tool[] = normalizeToolRecords(LOCAL_TOOLS as ToolRecord[]);
 
 export interface RankedTool extends Tool {
   relevance_score: number;
@@ -401,7 +429,7 @@ function buildFallbackToolContent(tool: Tool): ToolContent {
 
 function findLocalToolBySlugOrName(slug: string, name?: string): Tool | undefined {
   const normalizedName = name ? normalizeName(name) : '';
-  return LOCAL_TOOLS.find((tool) => tool.slug === slug || (normalizedName && normalizeName(tool.name) === normalizedName));
+  return NORMALIZED_LOCAL_TOOLS.find((tool) => tool.slug === slug || (normalizedName && normalizeName(tool.name) === normalizedName));
 }
 
 function resolveToolContent(tool: Tool, localTool?: Tool): ToolContent {
@@ -611,7 +639,7 @@ export async function buildFocusedStack(
         limit: 20,
       });
       if (response?.data?.items) {
-        allTools.push(...response.data.items);
+        allTools.push(...normalizeToolRecords(response.data.items as ToolRecord[]));
       }
     } catch (error) {
       console.error(`Error fetching tools for category ${category}:`, error);
@@ -673,7 +701,7 @@ export async function fetchAlternativeTools(
         limit: 15,
       });
       if (response?.data?.items) {
-        allTools.push(...response.data.items);
+        allTools.push(...normalizeToolRecords(response.data.items as ToolRecord[]));
       }
     } catch (error) {
       console.error(`Error fetching alternative tools for ${category}:`, error);
@@ -721,7 +749,7 @@ export async function fetchAIAcceleratorTools(
         limit: 10,
       });
       if (response?.data?.items) {
-        allAITools.push(...response.data.items);
+        allAITools.push(...normalizeToolRecords(response.data.items as ToolRecord[]));
       }
     } catch (error) {
       console.error(`Error fetching AI tools for ${category}:`, error);
@@ -734,7 +762,7 @@ export async function fetchAIAcceleratorTools(
         limit: 10,
       });
       if (response?.data?.items) {
-        allAITools.push(...response.data.items);
+        allAITools.push(...normalizeToolRecords(response.data.items as ToolRecord[]));
       }
     } catch (error) {
       console.error(`Error fetching hybrid tools for ${category}:`, error);
@@ -770,7 +798,7 @@ export async function fetchToolsByCategories(categories: string[]) {
     .order('internal_score', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  return normalizeToolRecords((data ?? []) as ToolRecord[]);
 }
 
 /**
@@ -789,7 +817,7 @@ export async function fetchFeaturedTools() {
     .limit(8);
 
   if (error) throw error;
-  return data ?? [];
+  return normalizeToolRecords((data ?? []) as ToolRecord[]);
 }
 
 // Fetch single tool by slug — merges local content enrichment if DB lacks it
@@ -807,19 +835,22 @@ export async function fetchToolBySlug(slug: string) {
     if (error) throw error;
     if (!data) {
       if (localTool) {
-        return { ...localTool, content: resolveToolContent(localTool, localTool) };
+        const normalizedLocalTool = normalizeToolRecord(localTool);
+        return { ...normalizedLocalTool, content: resolveToolContent(normalizedLocalTool, normalizedLocalTool) };
       }
       throw new Error(`Tool not found for slug: ${slug}`);
     }
 
-    const matchedLocalTool = findLocalToolBySlugOrName(slug, data.name);
+    const normalizedData = normalizeToolRecord(data as ToolRecord);
+    const matchedLocalTool = findLocalToolBySlugOrName(slug, normalizedData.name);
     return {
-      ...data,
-      content: resolveToolContent(data as Tool, matchedLocalTool),
+      ...normalizedData,
+      content: resolveToolContent(normalizedData, matchedLocalTool),
     };
   } catch (error) {
     if (localTool) {
-      return { ...localTool, content: resolveToolContent(localTool, localTool) };
+      const normalizedLocalTool = normalizeToolRecord(localTool);
+      return { ...normalizedLocalTool, content: resolveToolContent(normalizedLocalTool, normalizedLocalTool) };
     }
     throw error;
   }
@@ -833,7 +864,7 @@ export async function fetchAllTools(): Promise<Tool[]> {
       sort: '-internal_score',
       limit: 100,
     });
-    return response?.data?.items || [];
+    return normalizeToolRecords((response?.data?.items || []) as ToolRecord[]);
   } catch (error) {
     console.error('Error fetching all tools:', error);
     return [];
@@ -880,7 +911,7 @@ export async function searchTools(
 
   const allowedModels = getAllowedPricingModels(pricingPreference);
   let sourceTools: Tool[] = [];
-  const fallbackTools = LOCAL_TOOLS.filter((tool) => {
+  const fallbackTools = NORMALIZED_LOCAL_TOOLS.filter((tool) => {
     if (tool.active === false) return false;
     if (category && tool.category !== category) return false;
     return allowedModels.includes(tool.pricing_model);
@@ -901,7 +932,7 @@ export async function searchTools(
 
     const { data, error } = await queryBuilder;
     if (error) throw error;
-    sourceTools = (data ?? []) as Tool[];
+    sourceTools = normalizeToolRecords((data ?? []) as ToolRecord[]);
   } catch (error) {
     console.warn('Search source fallback to LOCAL_TOOLS due to tools-table fetch issue:', error);
   }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+const routerLocation = useLocation();
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight,
@@ -349,6 +350,7 @@ function TopPickCard({ tool }: { tool: Tool }) {
   return (
     <Link
       to={`/tools/${tool.slug}`}
+      state={{ from: location.pathname + location.search }}
       className="group rounded-2xl border border-slate-200 bg-white p-7 min-h-[220px] flex flex-col items-center justify-center text-center shadow-sm transition-all duration-300 hover:scale-[1.015] hover:border-[#4F46E5]/35 hover:shadow-[0_14px_30px_rgba(79,70,229,0.14)] hover:bg-[linear-gradient(160deg,rgba(47,128,237,0.05)_0%,rgba(138,43,226,0.06)_100%)]"
     >
       <ToolLogo
@@ -412,23 +414,27 @@ export default function Index() {
     return LANDING_USE_CASES.filter((useCase) => hasStableUseCaseCoverage(useCase.query, catalogTools));
   }, [catalogTools]);
 
-  const displayedLandingUseCases = useMemo(() => {
-    const trendingUseCase = {
-      title: communityPick.stackName,
-      description: `Community-ranked winner in ${communityPick.categoryLabel}. Explore this stack and adapt it to your workflow.`,
-      query: communityPick.stackName,
-      categoryId: communityPick.categoryId,
-      isTrending: true,
-    };
-
-    const baseUseCases = visibleLandingUseCases.filter((useCase) => {
-      const sameCategory = useCase.categoryId === trendingUseCase.categoryId;
-      const sameTitle = normalizeCompact(useCase.title) === normalizeCompact(trendingUseCase.title);
-      return !sameCategory && !sameTitle;
-    });
-
-    return [trendingUseCase, ...baseUseCases].slice(0, 3);
-  }, [communityPick, visibleLandingUseCases]);
+  // STATIC: Editorially chosen workflows for homepage section
+  const displayedLandingUseCases = [
+    {
+      title: 'Build a website',
+      description: 'Find landing page, design, and automation tools to launch faster.',
+      query: 'i want to create a website',
+      categoryId: 'landing_pages',
+    },
+    {
+      title: 'Automate marketing',
+      description: 'Combine automation tools and triggers to remove repetitive work.',
+      query: 'automate marketing workflows',
+      categoryId: 'automation',
+    },
+    {
+      title: 'Start email campaigns',
+      description: 'Choose email platforms for broadcasts, onboarding, and growth loops.',
+      query: 'start email campaigns',
+      categoryId: 'email_marketing',
+    },
+  ];
 
   const dailyRankingsBySide = useMemo(() => {
     const a = getStackRanking({
@@ -1263,6 +1269,7 @@ export default function Index() {
                   <Link
                     key={cat.id}
                     to={`/categories/${cat.id}`}
+                    state={{ from: routerLocation.pathname + routerLocation.search }}
                     className={`group rounded-xl border bg-white p-5 hover:border-[#4F46E5]/40 hover:shadow-[0_10px_22px_rgba(79,70,229,0.14)] transition-all ${isCommunityPickCat ? 'border-slate-300 bg-slate-50/50' : 'border-slate-200'}`}
                   >
                     <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3" />

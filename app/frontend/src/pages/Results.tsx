@@ -28,6 +28,7 @@ import {
   createShareableStackUrl,
   saveStack,
   searchTools,
+  dedupeTools,
   type Tool,
   type PricingPreference,
 } from '@/lib/api';
@@ -1165,10 +1166,11 @@ export default function Results() {
   const activePricingOption = PRICING_OPTIONS.find((o) => o.id === activePricing);
 
   const filteredDirectTools = useMemo(() => {
-    return applyBudgetFilter(directTools, pricingFilter).filter((tool) => {
+    const filtered = applyBudgetFilter(directTools, pricingFilter).filter((tool) => {
       if (skillFilter !== 'all' && tool.skill_level !== skillFilter) return false;
       return true;
     });
+    return dedupeTools(filtered);
   }, [directTools, pricingFilter, skillFilter]);
 
   const groupedDirectTools = useMemo(() => {
@@ -1223,7 +1225,7 @@ export default function Results() {
     return [] as Tool[];
   }, [searchResults, queryIntent?.type, goalFallbackTools]);
   const filteredKeywordTools = useMemo(
-    () => applyBudgetFilter(primaryKeywordTools, budgetParam),
+    () => dedupeTools(applyBudgetFilter(primaryKeywordTools, budgetParam)),
     [primaryKeywordTools, budgetParam]
   );
   const displayedSearchCount = filteredKeywordTools.length;

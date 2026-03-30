@@ -94,13 +94,10 @@ class DatabaseManager:
                 return
 
         raw_database_url = os.environ.get("DATABASE_URL")
-        if not raw_database_url:
-            logger.error("Live database not configured")
-            raise ValueError("Live database not configured")
-
-        if raw_database_url.lower().startswith("sqlite") or "stackely.db" in raw_database_url.lower():
-            logger.error("Live database not configured")
-            raise ValueError("Live database not configured")
+        if not raw_database_url or raw_database_url.lower().startswith("sqlite") or "stackely.db" in (raw_database_url or "").lower():
+            logger.warning("No live database configured, using local SQLite fallback for development.")
+            raw_database_url = "sqlite+aiosqlite:///./localdev.db"
+            os.environ["DATABASE_URL"] = raw_database_url
 
         try:
             logger.info("Normalizing database URL for async compatibility...")

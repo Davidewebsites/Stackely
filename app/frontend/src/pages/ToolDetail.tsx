@@ -370,7 +370,19 @@ export default function ToolDetail() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                if (location.state?.from) {
+                  navigate(location.state.from, {
+                    state: {
+                      from: location.state?.parentFrom || "/"
+                    }
+                  });
+                } else if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/");
+                }
+              }}
               className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />

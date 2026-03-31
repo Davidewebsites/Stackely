@@ -145,7 +145,12 @@ export default function ToolCard({
       }`}
       onClick={() => {
         if (disableNavigation) return;
-        navigate(`/tools/${tool.slug}`);
+        navigate(`/tools/${tool.slug}`, {
+          state: {
+            from: location.pathname + location.search,
+            parentFrom: location.state?.from || "/"
+          }
+        });
       }}
     >
       {/* Header */}
@@ -317,7 +322,12 @@ export default function ToolCard({
               className="h-6 px-2 text-[10px] font-medium text-slate-500 hover:text-[#4F46E5] hover:bg-indigo-50/70"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/tools/${tool.slug}`);
+                navigate(`/tools/${tool.slug}`, {
+                  state: {
+                    from: location.pathname + location.search,
+                    parentFrom: location.state?.from || "/"
+                  }
+                });
               }}
             >
               Details

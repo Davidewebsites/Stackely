@@ -109,6 +109,7 @@ export default function CategoryPage() {
   const [skillFilter, setSkillFilter] = useState('all');
   const { toggleStack, isInStack, stackTools: stackSelection } = useStack();
 
+
   const categoryInfo = CATEGORIES.find((c) => c.id === category);
   const categoryDescription = category ? CATEGORY_DESCRIPTIONS[category] : undefined;
 
@@ -180,25 +181,11 @@ export default function CategoryPage() {
       <header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
         <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Back button with real navigation logic */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                // Robust SPA-aware back handler with routerLocation.state?.from
-                if (routerLocation.state?.from) {
-                  navigate(routerLocation.state.from);
-                } else if (document.referrer && document.referrer.startsWith(window.location.origin)) {
-                  navigate(-1);
-                } else {
-                  navigate("/");
-                }
-              }}
-              className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
-            >
+            {/* Deterministic navigation link to home */}
+            <Link to="/" tabIndex={0} className="h-8 px-2 flex items-center text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 rounded-md text-sm font-medium transition-colors">
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
-            </Button>
+              Back to home
+            </Link>
             <div className="h-5 w-px bg-slate-200" />
             {/* Logo as real Link to="/" */}
             <Link to="/" className="cursor-pointer flex items-center" tabIndex={-1} aria-label="Go to homepage">
@@ -328,7 +315,7 @@ export default function CategoryPage() {
                 <Link
                   key={cat.id}
                   to={`/categories/${cat.id}`}
-                  state={{ from: routerLocation.state?.from || (routerLocation.pathname + routerLocation.search) }}
+                  state={{ from: routerLocation.pathname + routerLocation.search }}
                   className="group panel-card flex flex-col items-start gap-2.5 p-5 hover:border-[#2F80ED]/40 hover:bg-blue-50/20 transition-all text-left"
                 >
                   <span className="text-[14px] font-semibold text-slate-900 group-hover:text-[#2F80ED] transition-colors">

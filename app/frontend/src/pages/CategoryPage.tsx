@@ -109,7 +109,6 @@ export default function CategoryPage() {
   const [skillFilter, setSkillFilter] = useState('all');
   const { toggleStack, isInStack, stackTools: stackSelection } = useStack();
 
-
   const categoryInfo = CATEGORIES.find((c) => c.id === category);
   const categoryDescription = category ? CATEGORY_DESCRIPTIONS[category] : undefined;
 
@@ -176,20 +175,22 @@ export default function CategoryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/40 relative overflow-hidden">
-
       {/* Header */}
       <header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
         <div className="page-shell h-[72px] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Deterministic navigation link to home */}
-            <Link to="/" tabIndex={0} className="h-8 px-2 flex items-center text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 rounded-md text-sm font-medium transition-colors">
+            <Link
+              to="/"
+              tabIndex={0}
+              className="h-8 px-2 flex items-center text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 rounded-md text-sm font-medium transition-colors"
+            >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to home
             </Link>
             <div className="h-5 w-px bg-slate-200" />
             {/* Logo as real Link to="/" */}
             <Link to="/" className="cursor-pointer flex items-center" tabIndex={-1} aria-label="Go to homepage">
-              <StackelyLogo size="sm" showText={false} /> {/* <-- JSX line with Link to="/" */}
+              <StackelyLogo size="sm" showText={false} />
             </Link>
           </div>
         </div>
@@ -206,7 +207,7 @@ export default function CategoryPage() {
           <h1 className="hero-title mb-2.5">
             {categoryInfo?.label || category}
           </h1>
-          {categoryDescription ? (
+          {categoryDescription && (
             <div
               className="category-description-strong w-full rounded-xl border border-[#2F80ED]/30 bg-gradient-to-br from-white via-slate-50 to-blue-50 px-8 py-6 mb-2 shadow-md overflow-hidden"
             >
@@ -218,24 +219,13 @@ export default function CategoryPage() {
                       <li key={i}>{point}</li>
                     ))}
                   </ul>
-                  <p className="mb-1 text-[15px] leading-relaxed text-slate-700">{categoryDescription.outro}</p>
+                  <p className="mb-3 text-[15px] leading-relaxed text-slate-700">{categoryDescription.outro}</p>
+                  {categoryDescription.bestFor && (
+                    <p className="mb-3 text-[15px] text-blue-700 font-semibold">Best for: {categoryDescription.bestFor}</p>
+                  )}
                 </div>
-                {categoryDescription.bestFor && (
-                  <div className="md:w-auto w-full flex-shrink-0 flex items-start md:items-center justify-center md:justify-end mt-6 md:mt-0">
-                    <div className="bestfor-panel bg-white/90 border border-[#2F80ED]/15 rounded-lg px-5 py-3 shadow-sm flex flex-col items-center md:items-center w-full md:w-auto">
-                      <div className="text-[13px] uppercase tracking-wide text-[#2F80ED] font-semibold mb-1">Best for</div>
-                      <div className="text-[15px] text-slate-700 font-medium text-center leading-snug">{categoryDescription.bestFor}</div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
-          ) : (
-            <p className="text-[15px] md:text-[16px] leading-[1.72] text-slate-600">
-              {categoryInfo
-                ? `Explore the best ${categoryInfo.label.toLowerCase()} tools. ${categoryInfo.description} — curated and ranked by Stackely to help you find the right fit for your workflow.`
-                : `Browse tools in the ${category} category.`}
-            </p>
           )}
         </div>
 
@@ -296,7 +286,7 @@ export default function CategoryPage() {
               <div className="text-center py-24">
                 <p className="text-[15px] text-slate-500 mb-5">No tools found in this category.</p>
                 <Button
-                  onClick={() => navigate('/')}
+                  onClick={() => routerLocation && (window.location.href = '/')}
                   className="h-10 text-[13px] text-white shadow-none bg-blue-600 hover:bg-blue-700"
                 >
                   Go home

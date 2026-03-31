@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -114,7 +114,13 @@ function formatSignalPrice(value?: string | null, pricingModel?: string): { prim
 
 export default function ToolDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
+const navigate = useNavigate();
+const location = useLocation();
+type ToolDetailNavState = {
+  from?: string;
+  parentFrom?: string;
+};
+const navState = (location.state as ToolDetailNavState | null) ?? null;
   const [tool, setTool] = useState<Tool | null>(null);
   const [loading, setLoading] = useState(true);
   const [relatedTools, setRelatedTools] = useState<Tool[]>([]);
@@ -155,6 +161,8 @@ export default function ToolDetail() {
       toast.error('Stack is full (5/5). Remove a tool before adding another.');
     }
   };
+
+  
 
   usePageSeo({
     title: tool ? `${tool.name} review and alternatives - Stackely` : 'Tool details - Stackely',
@@ -364,37 +372,37 @@ export default function ToolDetail() {
       />
 
       {/* Header */}
-      <header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
-        <div className="page-shell h-[72px] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (location.state?.from) {
-                  navigate(location.state.from, {
-                    state: {
-                      from: location.state?.parentFrom || "/"
-                    }
-                  });
-                } else if (window.history.length > 1) {
-                  navigate(-1);
-                } else {
-                  navigate("/");
-                }
-              }}
-              className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
-            </Button>
-            <div className="h-5 w-px bg-slate-200" />
-            <div className="cursor-pointer" onClick={() => navigate('/')}>
-              <StackelyLogo size="sm" showText={false} />
-            </div>
-          </div>
-        </div>
-      </header>
+<header className="border-b border-[#2F80ED]/20 bg-white/92 backdrop-blur-sm sticky top-0 z-50 shadow-[0_2px_18px_rgba(79,70,229,0.08)]">
+  <div className="page-shell h-[72px] flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          if (navState?.from) {
+            navigate(navState.from, {
+              state: {
+                from: navState?.parentFrom || "/"
+              }
+            });
+          } else if (window.history.length > 1) {
+            navigate(-1);
+          } else {
+            navigate("/");
+          }
+        }}
+        className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1" />
+        Back
+      </Button>
+      <div className="h-5 w-px bg-slate-200" />
+      <div className="cursor-pointer" onClick={() => navigate('/')}>
+        <StackelyLogo size="sm" showText={false} />
+      </div>
+    </div>
+  </div>
+</header>
 
       <div className="page-shell py-8 lg:py-9 relative">
         {/* Hero */}

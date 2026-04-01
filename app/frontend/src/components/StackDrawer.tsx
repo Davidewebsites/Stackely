@@ -6,6 +6,7 @@ import { CATEGORIES } from '@/lib/api';
 import { createShareableStackUrl } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
 import { useStack, type CoverageRole } from '@/contexts/StackContext';
+import { useCompare } from '@/contexts/CompareContext';
 import { useState } from 'react';
 import { getAvoidIf, getWhyRecommended } from '@/lib/toolInsights';
 import html2canvas from 'html2canvas';
@@ -15,15 +16,16 @@ const STATUS_CONFIG: Record<
   CoverageRole['status'],
   { icon: React.ElementType; color: string; bg: string; label: string }
 > = {
-  covered: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Covered' },
-  missing: { icon: Circle, color: 'text-slate-400', bg: 'bg-slate-50', label: 'Missing' },
-  overlap: { icon: AlertCircle, color: 'text-amber-500', bg: 'bg-amber-50', label: 'Overlap' },
+  covered: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Step covered' },
+  missing: { icon: Circle, color: 'text-slate-400', bg: 'bg-slate-50', label: 'Step missing' },
+  overlap: { icon: AlertCircle, color: 'text-amber-500', bg: 'bg-amber-50', label: 'Resolve overlap' },
 };
 
 export default function StackDrawer() {
   const navigate = useNavigate();
   const [shareCopied, setShareCopied] = useState(false);
   const [, setExportFallbackReady] = useState(false);
+  const { drawerOpen: compareDrawerOpen } = useCompare();
   const {
     stackTools,
     drawerOpen,
@@ -237,13 +239,34 @@ export default function StackDrawer() {
           ? 'Most tools are free or freemium, keeping adoption cost relatively low.'
           : 'Cost profile is not fully estimated due to limited pricing metadata.';
 
-      const subtitle = 'Personalized stack recommendation';
+      const subtitle = 'Workflow decision document';
       const whyThisStackWorks =
-        `This stack is designed to move from setup to execution and optimization with minimal overlap. ` +
-        `Each tool has a specific role in the workflow, helping you cover the most important functions while keeping implementation practical.`;
+        `This workflow is designed to move from setup to execution and optimization with minimal overlap. ` +
+        `Each confirmed choice covers one workflow step, so the team can move forward with a clear operating sequence while keeping missing steps visible.`;
       const workflowOverview = steps
         .map((step) => `${step.toolName} (${step.roleLabel})`)
         .join(' -> ');
+      // Group by workflow step (roleLabel) — one confirmed tool per step.
+      // If multiple tools share the same step, pick the primary (Completed > In progress > first)
+      // and surface the count of alternatives so the PDF row stays unambiguous.
+      const _stepGroups = new Map<string, typeof steps>();
+      for (const step of steps) {
+        if (!_stepGroups.has(step.roleLabel)) _stepGroups.set(step.roleLabel, []);
+        _stepGroups.get(step.roleLabel)!.push(step);
+      }
+      const decisionSummary = Array.from(_stepGroups.entries()).map(([stepName, group]) => {
+        const primary =
+          group.find((s) => s.statusLabel === 'Completed') ??
+          group.find((s) => s.statusLabel === 'In progress') ??
+          group[0];
+        return {
+          stepName,
+          chosenTool: primary.toolName,
+          whySelected: primary.whySelected,
+          statusLabel: primary.statusLabel,
+          alternativeCount: group.length - 1,
+        };
+      });
 
       const roleCounts = new Map<string, number>();
       const categoryCounts = new Map<string, number>();
@@ -276,27 +299,29 @@ export default function StackDrawer() {
       const missingRoleLabels = coverage.filter((item) => !item.covered).map((item) => item.label);
       const executiveRecommendation =
         missingCount === 0 && coveredCount >= 4
-          ? 'Recommended as a strong operating stack with credible coverage from setup through optimization.'
+          ? 'Recommended as a strong workflow decision set with one confirmed choice per key step from setup through optimization.'
           : missingCount <= 1 && coveredCount >= 3
-          ? 'Recommended with one final gap to close before this stack is ready for broader rollout.'
-          : 'Promising as a foundation, but it still needs coverage work before it can be treated as a complete operating stack.';
+          ? 'Recommended with one final workflow gap to close before this decision set is ready for broader rollout.'
+          : 'Promising as a workflow foundation, but it still needs more confirmed step decisions before it can be treated as complete.';
 
       const nextActions = [
-        nextAction,
+        `Next decision: ${nextAction}`,
         missingRoleLabels.length > 0
-          ? `Close the remaining coverage gaps in ${missingRoleLabels.join(', ')}.`
-          : 'Move from selection into implementation sequencing and ownership.',
+          ? `Close the remaining workflow gaps in ${missingRoleLabels.join(', ')}.`
+          : 'Move from confirmed choices into implementation sequencing and ownership.',
         hasPaid
-          ? 'Validate ROI and contract exposure for the paid layer before standardizing the stack.'
+          ? 'Validate ROI and contract exposure for the paid workflow steps before standardizing this system.'
           : 'Keep the initial rollout lean and document the operating playbook before adding complexity.',
       ].filter(Boolean);
 
       return {
         title,
         subtitle,
+        workflowGoal: title,
         createdAtIso,
         createdAtLabel: exportDateLabel,
         totalTools: stackTools.length,
+        decidedSteps: decisionSummary.length,
         completed: completedCount,
         estimatedCost: stackCost === 0 ? 'Free' : `~$${stackCost}/mo`,
         completeness: `${stackProgressPercentage}% (${stackProgressLabel})`,
@@ -307,6 +332,7 @@ export default function StackDrawer() {
         executiveRecommendation,
         whyThisStackWorks,
         workflowOverview,
+        decisionSummary,
         coverage,
         strongestPart,
         biggestWeakness,
@@ -345,19 +371,19 @@ export default function StackDrawer() {
                   <img src="${escapeHtml(brandMarkUrl)}" alt="Stackely" class="brand-mark" />
                   <div>
                     <p class="brand-name">Stackely</p>
-                    <p class="brand-context">Stack report</p>
+                    <p class="brand-context">Workflow decision document</p>
                   </div>
                 </div>
                 <div class="topbar-meta">
                   <span>${escapeHtml(pageDate)}</span>
-                  <span>Decision document</span>
+                  <span>Workflow step detail</span>
                 </div>
               </header>
 
               <section class="page-heading">
-                <p class="eyebrow">Tool Detail</p>
-                <h2 class="page-title">Implementation notes for selected tools</h2>
-                <p class="page-subtitle">Each tool is positioned by role, inclusion rationale, trade-off, pricing, and operating fit.</p>
+                <p class="eyebrow">Workflow Step Detail</p>
+                <h2 class="page-title">Decision notes for confirmed workflow steps</h2>
+                <p class="page-subtitle">Each workflow step shows the confirmed choice, why it was selected, its current status, and the main trade-off to watch next.</p>
               </section>
 
               <div class="editorial-stack">
@@ -395,15 +421,15 @@ export default function StackDrawer() {
 
                         <div class="tool-editorial-grid">
                           <div class="editorial-field">
-                            <p class="editorial-label">Role in the stack</p>
+                            <p class="editorial-label">Workflow step</p>
                             <p class="editorial-value">${escapeHtml(step.roleLabel)}</p>
                           </div>
                           <div class="editorial-field">
-                            <p class="editorial-label">Why it is included</p>
+                            <p class="editorial-label">Why this choice was confirmed</p>
                             <p class="editorial-value">${escapeHtml(step.whySelected)}</p>
                           </div>
                           <div class="editorial-field">
-                            <p class="editorial-label">Main trade-off</p>
+                            <p class="editorial-label">Key trade-off</p>
                             <p class="editorial-value">${escapeHtml(step.watchout)}</p>
                           </div>
                           <div class="editorial-field">
@@ -411,7 +437,7 @@ export default function StackDrawer() {
                             <p class="editorial-value">${escapeHtml(pricingSnapshot)} · ${escapeHtml(step.pricingModel)}</p>
                           </div>
                           <div class="editorial-field editorial-field-wide">
-                            <p class="editorial-label">Fit / use case</p>
+                            <p class="editorial-label">Best fit for this step</p>
                             <p class="editorial-value">${escapeHtml(step.useCase)}</p>
                           </div>
                         </div>
@@ -708,6 +734,95 @@ export default function StackDrawer() {
               background: var(--brand-blue);
             }
 
+            .decision-summary {
+              display: grid;
+              gap: 10px;
+            }
+
+            .decision-row {
+              display: grid;
+              grid-template-columns: 92px minmax(0, 1fr) 78px;
+              gap: 14px;
+              align-items: start;
+              padding: 12px 0;
+              border-top: 1px solid var(--line-soft);
+            }
+
+            .decision-row:first-child {
+              padding-top: 0;
+              border-top: none;
+            }
+
+            .decision-step-name {
+              font-size: 10px;
+              font-weight: 700;
+              color: var(--brand-blue);
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+            }
+
+            .decision-choice {
+              min-width: 0;
+            }
+
+            .decision-choice strong {
+              display: block;
+              font-size: 13px;
+              color: var(--ink-900);
+              margin-bottom: 4px;
+            }
+
+            .decision-choice p {
+              margin: 0;
+              font-size: 11px;
+              line-height: 1.55;
+              color: var(--ink-750);
+            }
+
+            .decision-status {
+              font-size: 10px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--ink-500);
+              text-align: right;
+            }
+
+            .alt-count {
+              display: block;
+              margin-top: 4px;
+              font-size: 9px;
+              font-weight: 500;
+              text-transform: none;
+              letter-spacing: 0;
+              color: var(--ink-400);
+            }
+
+            .snapshot-note {
+              margin-top: 20px;
+              padding: 14px 16px;
+              background: var(--surface-soft);
+              border-left: 3px solid var(--brand-blue);
+              border-radius: 3px;
+            }
+
+            .snapshot-note strong {
+              display: block;
+              font-size: 10px;
+              font-weight: 700;
+              color: var(--ink-900);
+              text-transform: uppercase;
+              letter-spacing: 0.07em;
+              margin-bottom: 6px;
+            }
+
+            .snapshot-note p {
+              margin: 0;
+              font-size: 11px;
+              line-height: 1.65;
+              color: var(--ink-700);
+            }
+
             .sidebar-card {
               padding: 16px 16px 14px;
               border: 1px solid var(--line-soft);
@@ -926,7 +1041,7 @@ export default function StackDrawer() {
                     <img src="${escapeHtml(brandMarkUrl)}" alt="Stackely" class="brand-mark" />
                     <div>
                       <p class="brand-name">Stackely</p>
-                      <p class="brand-context">Executive stack report</p>
+                      <p class="brand-context">Workflow decision document</p>
                     </div>
                   </div>
                   <div class="topbar-meta">
@@ -936,11 +1051,12 @@ export default function StackDrawer() {
                 </header>
 
                 <section class="page-heading">
-                  <p class="eyebrow">Technology Stack Report</p>
+                  <p class="eyebrow">Workflow Decision Document</p>
                   <h1 class="page-title">${escapeHtml(serializedStack.title)}</h1>
-                  <p class="page-subtitle">A decision-oriented view of the recommended operating stack, its current strengths, and the next actions required to make it rollout-ready.</p>
+                  <p class="page-subtitle">A decision-oriented view of your workflow goal, the steps already confirmed, the gaps still open, and the next action required to move forward.</p>
                   <div class="identity-row">
-                    <span class="identity-chip">${serializedStack.totalTools} selected tools</span>
+                    <span class="identity-chip">${serializedStack.decidedSteps} confirmed step${serializedStack.decidedSteps !== 1 ? 's' : ''}</span>
+                    <span class="identity-chip">${serializedStack.missingRoles} missing step${serializedStack.missingRoles !== 1 ? 's' : ''}</span>
                     <span class="identity-chip">${escapeHtml(serializedStack.estimatedCost)}</span>
                     <span class="identity-chip">${escapeHtml(serializedStack.completeness)}</span>
                   </div>
@@ -949,51 +1065,78 @@ export default function StackDrawer() {
                 <div class="summary-layout">
                   <div class="summary-main">
                     <section class="section recommendation-callout">
-                      <h2 class="section-title">Executive Recommendation</h2>
-                      <p class="recommendation-text">${escapeHtml(serializedStack.executiveRecommendation)}</p>
+                      <h2 class="section-title">Workflow Goal</h2>
+                      <p class="recommendation-text">${escapeHtml(serializedStack.workflowGoal)}</p>
                     </section>
 
                     <section class="section">
-                      <h2 class="section-title">Why This Stack Works</h2>
-                      <div class="section-body">${escapeHtml(serializedStack.whyThisStackWorks)}</div>
+                      <h2 class="section-title">Decision Summary</h2>
+                      <div class="section-body">${escapeHtml(serializedStack.executiveRecommendation)}</div>
                     </section>
 
                     <section class="section">
-                      <h2 class="section-title">Decision Signals</h2>
+                      <h2 class="section-title">Workflow Status</h2>
                       <div class="metrics-grid">
                         <div class="metric-card">
-                          <div class="metric-label">Stack coverage</div>
-                          <div class="metric-value">${serializedStack.coverage.filter((item) => item.covered).length}/5 roles</div>
+                          <div class="metric-label">Decided steps</div>
+                          <div class="metric-value">${serializedStack.decidedSteps}</div>
                         </div>
                         <div class="metric-card">
-                          <div class="metric-label">Workflow status</div>
+                          <div class="metric-label">Missing steps</div>
+                          <div class="metric-value">${serializedStack.missingRoles}</div>
+                        </div>
+                        <div class="metric-card">
+                          <div class="metric-label">Next action</div>
                           <div class="metric-value">${escapeHtml(serializedStack.nextStep)}</div>
-                        </div>
-                        <div class="metric-card">
-                          <div class="metric-label">Recommended sequence</div>
-                          <div class="metric-value">${escapeHtml(serializedStack.workflowOverview)}</div>
                         </div>
                       </div>
                     </section>
 
                     <section class="section">
-                      <h2 class="section-title">Next Best Actions</h2>
+                      <h2 class="section-title">Decision Per Step</h2>
+                      <div class="decision-summary">
+                        ${serializedStack.decisionSummary
+                          .map(
+                            (item) => `
+                              <div class="decision-row">
+                                <div class="decision-step-name">${escapeHtml(item.stepName)}</div>
+                                <div class="decision-choice">
+                                  <strong>${escapeHtml(item.chosenTool)}</strong>
+                                  <p>${escapeHtml(item.whySelected)}</p>
+                                </div>
+                                <div class="decision-status">
+                                  ${escapeHtml(item.statusLabel)}
+                                  ${item.alternativeCount > 0 ? `<span class="alt-count">+${item.alternativeCount} in review</span>` : ''}
+                                </div>
+                              </div>
+                            `,
+                          )
+                          .join('')}
+                      </div>
+                    </section>
+
+                    <section class="section">
+                      <h2 class="section-title">Next Actions</h2>
                       <ol class="action-list">
                         ${serializedStack.nextActions.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
                       </ol>
+                      <div class="snapshot-note">
+                        <strong>How to read this document</strong>
+                        <p>Each row in the Decision Per Step table represents one confirmed workflow step — one tool, one step. Where multiple tools were evaluated for the same step, the primary confirmed choice is shown and alternatives are noted. Tool detail pages follow in sequence.</p>
+                      </div>
                     </section>
                   </div>
 
                   <aside class="summary-side">
                     <section class="sidebar-card section">
-                      <h2 class="section-title">Coverage Snapshot</h2>
+                      <h2 class="section-title">Step Coverage</h2>
                       <div class="coverage-inline">
                         ${serializedStack.coverage
                           .map(
                             (item) => `
                               <div class="coverage-row">
                                 <span class="coverage-label">${escapeHtml(item.label)}</span>
-                                <span class="coverage-status ${item.covered ? 'covered' : 'missing'}">${item.covered ? 'Covered' : 'Missing'}</span>
+                                <span class="coverage-status ${item.covered ? 'covered' : 'missing'}">${item.covered ? 'Covered step' : 'Missing step'}</span>
                               </div>
                             `,
                           )
@@ -1002,16 +1145,16 @@ export default function StackDrawer() {
                     </section>
 
                     <section class="sidebar-card section">
-                      <h2 class="section-title">Missing Roles / Risks</h2>
+                      <h2 class="section-title">Missing Steps / Risks</h2>
                       <ul class="risk-list">
                         <li>${escapeHtml(serializedStack.biggestWeakness)}</li>
                         <li>${escapeHtml(serializedStack.costConcentration)}</li>
-                        ${serializedStack.missingRoleLabels.length > 0 ? `<li>Missing roles: ${escapeHtml(serializedStack.missingRoleLabels.join(', '))}.</li>` : '<li>No critical role gaps detected in the current stack.</li>'}
+                        ${serializedStack.missingRoleLabels.length > 0 ? `<li>Missing steps: ${escapeHtml(serializedStack.missingRoleLabels.join(', '))}.</li>` : '<li>No critical workflow gaps detected in the current decision set.</li>'}
                       </ul>
                     </section>
 
                     <section class="sidebar-card section">
-                      <h2 class="section-title">Strength to Preserve</h2>
+                      <h2 class="section-title">Why This Workflow Works</h2>
                       <p class="workflow-line">${escapeHtml(serializedStack.strongestPart)}</p>
                     </section>
                   </aside>
@@ -1176,7 +1319,7 @@ export default function StackDrawer() {
   };
 
   if (!drawerOpen) return null;
-
+  const isSecondaryMode = compareDrawerOpen && drawerOpen;
   const freeCount = stackTools.filter((t) => t.pricing_model === 'free').length;
   const freemiumCount = stackTools.filter((t) => t.pricing_model === 'freemium').length;
   const paidCount = stackTools.filter((t) => t.pricing_model === 'paid').length;
@@ -1184,14 +1327,19 @@ export default function StackDrawer() {
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[2px]"
-        onClick={closeDrawer}
-      />
+      {/* Backdrop - hidden in secondary mode */}
+      {!isSecondaryMode && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[2px]"
+          onClick={closeDrawer}
+        />
+      )}
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-[61] w-full max-w-[420px] bg-white shadow-2xl flex flex-col overflow-hidden">
+      <div
+        className="fixed right-0 top-0 bottom-0 w-full max-w-[420px] bg-white shadow-2xl flex flex-col overflow-hidden"
+        style={{ zIndex: isSecondaryMode ? 55 : 61 }}
+      >
         {/* Header */}
         <div className="border-b border-slate-100 px-6 py-5 flex-shrink-0">
           <div className="rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.98)_100%)] p-4 shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
@@ -1206,14 +1354,14 @@ export default function StackDrawer() {
                 </div>
                 <div className="min-w-0 flex-1 pt-0.5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Stack workspace
+                    Workflow stack
                   </p>
                   <h2 className="mt-1 text-[17px] font-bold leading-tight text-slate-900 truncate">
                     {stackLabel || 'Your stack'}
                   </h2>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
-                      {stackTools.length} tool{stackTools.length !== 1 ? 's' : ''}
+                      {stackTools.length} step{stackTools.length !== 1 ? 's' : ''}
                     </span>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
                       {stackCost > 0 ? `~$${stackCost}/mo` : 'Free to start'}
@@ -1251,7 +1399,7 @@ export default function StackDrawer() {
                       background:
                         stackProgressLabel === 'Complete'
                           ? 'linear-gradient(135deg, #16a34a, #22c55e)'
-                          : stackProgressLabel === 'Missing critical step'
+                          : stackProgressLabel === 'Your workflow is incomplete'
                           ? 'linear-gradient(135deg, #f59e0b, #f97316)'
                           : 'linear-gradient(135deg, #2F80ED, #8A2BE2)',
                     }}
@@ -1259,15 +1407,15 @@ export default function StackDrawer() {
                 </div>
                 <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
                   {missingCount === 0
-                    ? 'Core workflow coverage is in place. Keep refining execution details.'
-                    : `${missingCount} core role${missingCount > 1 ? 's are' : ' is'} still missing from this stack.`}
+                    ? 'All core workflow steps are covered. You can now refine details or finalize this stack.'
+                    : `${missingCount} workflow step${missingCount > 1 ? 's are' : ' is'} still missing before this workflow is complete.`}
                 </p>
               </div>
             )}
 
             {stackTools.length > 0 && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span title="PDF export is temporarily disabled while the report design is being rebuilt.">
+                <span title="PDF export is being redesigned.">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1321,9 +1469,9 @@ export default function StackDrawer() {
               <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
                 <Layers className="w-5 h-5 text-indigo-400" />
               </div>
-              <p className="text-[14px] font-semibold text-slate-700 mb-1.5">No tools yet</p>
+              <p className="text-[14px] font-semibold text-slate-700 mb-1.5">No workflow steps yet</p>
               <p className="text-[12px] text-slate-400 max-w-[22ch] leading-relaxed">
-                Add tools from results or category pages to build your stack.
+                Add one tool per step from results or category pages to build your workflow.
               </p>
             </div>
           )}
@@ -1333,9 +1481,9 @@ export default function StackDrawer() {
             <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
-                  Progress
+                  Workflow progress
                 </p>
-                <span className="text-[12px] font-semibold text-slate-800">{stackProgressPercentage}%</span>
+                <span className="text-[12px] font-semibold text-slate-800">{stackProgressPercentage}% decided</span>
               </div>
               <div className="h-2 w-full rounded-full bg-slate-200/70 overflow-hidden">
                 <div
@@ -1345,27 +1493,28 @@ export default function StackDrawer() {
                     background:
                       stackProgressLabel === 'Complete'
                         ? 'linear-gradient(135deg, #16a34a, #22c55e)'
-                        : stackProgressLabel === 'Missing critical step'
+                        : stackProgressLabel === 'Your workflow is incomplete'
                         ? 'linear-gradient(135deg, #f59e0b, #f97316)'
                         : 'linear-gradient(135deg, #2F80ED, #8A2BE2)',
                   }}
                 />
               </div>
-              <div className="mt-2 flex items-center justify-between text-[11px]">
-                <span
-                  className={`font-medium ${
-                    stackProgressLabel === 'Complete'
-                      ? 'text-emerald-700'
-                      : stackProgressLabel === 'Missing critical step'
-                      ? 'text-amber-700'
-                      : 'text-slate-600'
-                  }`}
-                >
-                  {stackProgressLabel}
-                </span>
-                <span className="text-slate-400">
-                  {completedCount}/{stackTools.length} completed · {missingCount} missing roles
-                </span>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 text-[11px]">
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">Already decided</p>
+                  <p className="mt-1 font-semibold text-slate-900">{stackTools.length} covered step{stackTools.length !== 1 ? 's' : ''}</p>
+                  <p className="mt-1 text-slate-500">{completedCount} step{completedCount !== 1 ? 's' : ''} marked done.</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">Still missing</p>
+                  <p className="mt-1 font-semibold text-slate-900">{missingCount} missing step{missingCount !== 1 ? 's' : ''}</p>
+                  <p className="mt-1 text-slate-500">Complete the uncovered workflow roles before launch.</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">Next step</p>
+                  <p className="mt-1 font-semibold text-slate-900">{stackProgressLabel}</p>
+                  <p className="mt-1 text-slate-500">{nextAction}</p>
+                </div>
               </div>
             </div>
           )}
@@ -1373,7 +1522,7 @@ export default function StackDrawer() {
           {stackTools.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 mb-3">
-                Selected tools
+                Workflow steps
               </p>
               <div className="space-y-2">
                 {stackTools.map((tool) => {
@@ -1457,7 +1606,7 @@ export default function StackDrawer() {
           {stackTools.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 mb-3">
-                Stack coverage
+                Workflow coverage
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {coverageRoles.map((role) => {
@@ -1519,12 +1668,31 @@ export default function StackDrawer() {
               <div className="flex items-center gap-2 mb-2">
                 <AlertCircle className="w-3.5 h-3.5 text-[#4F46E5]" />
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#4F46E5]/80">
-                  Recommended next action
+                  Workflow next step
                 </p>
               </div>
               <p className="text-[14px] font-semibold text-slate-900 leading-snug mb-3">
                 {nextAction}
               </p>
+              <div className="mb-3">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 px-3 text-[11px] font-semibold text-white"
+                  style={{ background: 'linear-gradient(135deg,#2F80ED 0%,#4F46E5 100%)' }}
+                  onClick={() => {
+                    if (missingRoles.length > 0) {
+                      closeDrawer();
+                      navigate(`/results?q=${encodeURIComponent(missingRoles[0].label.toLowerCase() + ' tools')}&pricing=any`);
+                      return;
+                    }
+                    closeDrawer();
+                    navigate('/results?mode=stack');
+                  }}
+                >
+                  Continue building
+                </Button>
+              </div>
               {missingCount > 0 && missingRoles.length > 0 && (
                 <>
                   <div className="flex flex-wrap gap-1.5 mb-2.5">

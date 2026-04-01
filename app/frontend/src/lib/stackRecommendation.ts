@@ -18,6 +18,7 @@ import { supabase } from './supabase';
 import type { Tool, PricingPreference, StackResponse } from './api';
 import { getAllowedPricingModels } from './api';
 import { normalizeQueryTypos } from './queryNormalization';
+import { matchWorkflowTemplate } from '../data/workflowTemplates';
 
 export type StackResponseWithAlternatives = StackResponse & {
   summary: string;
@@ -37,7 +38,8 @@ interface ScoredTool {
 }
 
 interface WorkflowGenerationOptions {
-  budgetBand: 'low' | 'medium' | 'high';
+  budgetBand: 'none' | 'low' | 'medium' | 'high';
+  skillPreference?: 'beginner' | 'intermediate' | 'advanced' | null;
   strictPrimaryCategory?: boolean;
   diversitySalt?: number;
   recentToolSlugs?: Set<string>;
@@ -59,6 +61,7 @@ const CATEGORY_COMPLEMENTS: Record<string, string[]> = {
 
 export interface StackRecommendationOptions {
   recentlyUsedTools?: string[];
+  skillPreference?: 'beginner' | 'intermediate' | 'advanced' | null;
 }
 
 type ToolArchetype = 'safe' | 'alternative' | 'innovative' | 'any';
@@ -80,6 +83,13 @@ interface WorkflowSlot {
   purpose: string;
   /** Workflow stage covered by this slot */
   stage: WorkflowStage;
+}
+
+function stageForIndex(index: number): WorkflowStage {
+  if (index === 0) return 'acquire';
+  if (index === 1) return 'convert';
+  if (index === 2) return 'analyze';
+  return 'nurture';
 }
 
 // ---------------------------------------------------------------------------
@@ -261,14 +271,16 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
-function normalizeBudgetBand(pricingPreference: PricingPreference | string): 'low' | 'medium' | 'high' {
+function normalizeBudgetBand(pricingPreference: PricingPreference | string): 'none' | 'low' | 'medium' | 'high' {
   const value = String(pricingPreference || '').toLowerCase();
+  if (value === 'any') return 'none';
   if (value === 'low' || value === 'free_only' || value === 'free_freemium') return 'low';
   if (value === 'high' || value === 'freemium_paid') return 'high';
   return 'medium';
 }
 
-function getAllowedPricingModelsForBudget(pricingPreference: PricingPreference | string, budgetBand: 'low' | 'medium' | 'high'): string[] {
+function getAllowedPricingModelsForBudget(pricingPreference: PricingPreference | string, budgetBand: 'none' | 'low' | 'medium' | 'high'): string[] {
+  if (budgetBand === 'none') return ['free', 'freemium', 'paid'];
   if (budgetBand === 'low') return ['free', 'freemium'];
   if (budgetBand === 'high') return ['free', 'freemium', 'paid'];
   // Medium budget still allows all models, but additional monthly-price filtering
@@ -305,7 +317,8 @@ function parseMonthlyPrice(tool: Tool): number | null {
   return Math.round(monthly * 100) / 100;
 }
 
-function isToolWithinBudget(tool: Tool, budgetBand: 'low' | 'medium' | 'high'): boolean {
+function isToolWithinBudget(tool: Tool, budgetBand: 'none' | 'low' | 'medium' | 'high'): boolean {
+  if (budgetBand === 'none') return true;
   if (budgetBand === 'high') return true;
   if (budgetBand === 'low') {
     return tool.pricing_model === 'free' || tool.pricing_model === 'freemium';
@@ -469,6 +482,219 @@ function computeComplementarityScore(category: string, selectedCategories: strin
   return score;
 }
 
+type SlotSemanticKind =
+  | 'builder_landing'
+  | 'copywriting_content'
+  | 'ads_platform'
+  | 'analytics_core'
+  | 'analytics_reporting'
+  | 'automation'
+  | 'distribution'
+  | 'list_capture'
+  | 'visual_layer';
+
+type SlotSemanticRule = {
+  positive: string[];
+  strongPositive: string[];
+  negative: string[];
+};
+
+const SLOT_SEMANTIC_RULES: Record<SlotSemanticKind, SlotSemanticRule> = {
+  builder_landing: {
+    positive: ['landing page', 'lead capture', 'signup form', 'opt in', 'cta', 'conversion', 'sales page'],
+    strongPositive: ['a/b test', 'split test', 'conversion rate', 'funnel'],
+    negative: ['portfolio', 'blog theme', 'generic website', 'document editor'],
+  },
+  copywriting_content: {
+    positive: ['copywriting', 'content writing', 'headline', 'subject line', 'sales copy', 'ad copy', 'script'],
+    strongPositive: ['brand voice', 'seo copy', 'content brief', 'email copy'],
+    negative: ['image editor', 'video editing', 'dashboard', 'integration platform'],
+  },
+  ads_platform: {
+    positive: ['ads', 'ad campaign', 'ppc', 'targeting', 'bid', 'ad spend', 'paid traffic'],
+    strongPositive: ['google ads', 'meta ads', 'facebook ads', 'tiktok ads', 'campaign manager'],
+    negative: ['organic only', 'seo only', 'newsletter only'],
+  },
+  analytics_core: {
+    positive: ['analytics', 'event tracking', 'attribution', 'funnel analysis', 'retention', 'cohort'],
+    strongPositive: ['product analytics', 'event schema', 'session tracking', 'instrumentation'],
+    negative: ['presentation', 'slide deck', 'graphic design'],
+  },
+  analytics_reporting: {
+    positive: [
+      'dashboard', 'reporting', 'reports', 'kpi', 'visualization', 'metrics dashboard',
+      'report builder', 'custom reports', 'data visualization',
+    ],
+    strongPositive: [
+      'business intelligence', 'bi', 'data studio', 'executive dashboard', 'charting',
+      'power bi', 'looker', 'marketing dashboard',
+    ],
+    negative: [
+      'sdk', 'tracking pixel', 'event collector',
+      'competitive intelligence', 'market research', 'web intelligence',
+      'session recording', 'heatmap',
+    ],
+  },
+  automation: {
+    positive: ['automation', 'workflow', 'trigger', 'integration', 'sync', 'webhook'],
+    strongPositive: ['no code automation', 'multi-step workflow', 'workflow builder'],
+    negative: ['theme builder', 'graphic template', 'video editor'],
+  },
+  distribution: {
+    positive: ['distribution', 'publish', 'publishing', 'schedule', 'channel', 'audience', 'delivery'],
+    strongPositive: ['content distribution', 'social publishing', 'newsletter delivery'],
+    negative: ['image generation only', 'logo maker', 'dashboarding', 'landing page builder', 'form builder only'],
+  },
+  list_capture: {
+    positive: ['lead capture', 'capture form', 'signup form', 'opt in', 'subscribe', 'popup', 'landing page'],
+    strongPositive: ['lead magnet', 'form builder', 'email capture'],
+    negative: ['invoice', 'project management', 'screen recorder', 'website builder', 'store builder', 'blog platform'],
+  },
+  visual_layer: {
+    positive: ['design', 'visual', 'graphics', 'template', 'brand kit', 'thumbnail', 'creative'],
+    strongPositive: ['video template', 'motion graphics', 'social creative', 'image editing'],
+    negative: ['crm', 'database', 'analytics ingestion'],
+  },
+};
+
+function detectSlotSemanticKind(slot: WorkflowSlot): SlotSemanticKind | null {
+  const role = (slot.role || '').toLowerCase();
+  const purpose = (slot.purpose || '').toLowerCase();
+  const primaryCategory = slot.categories[0] || '';
+  const context = `${role} ${purpose}`;
+
+  if (context.includes('list capture') || /\b(capture|signup|opt\s*in|subscribe|form)\b/.test(context)) return 'list_capture';
+  if (context.includes('reporting') || context.includes('dashboard')) return 'analytics_reporting';
+  if (context.includes('analytics core') || context.includes('tracking core') || context.includes('tracking')) return 'analytics_core';
+  if (context.includes('ads platform') || primaryCategory === 'ads') return 'ads_platform';
+  if (context.includes('distribution') || /\b(publish|channel|audience)\b/.test(context)) return 'distribution';
+  if (context.includes('visual') || context.includes('video & design') || /\b(design|visual|creative)\b/.test(context)) return 'visual_layer';
+  if (context.includes('automation') || /\b(orchestrator|trigger|integration|hub)\b/.test(context) || primaryCategory === 'automation') return 'automation';
+  if (context.includes('copy') || /\b(writer|writing|script|content)\b/.test(context)) return 'copywriting_content';
+  if (context.includes('builder') || context.includes('landing') || /\b(page|store)\b/.test(context) || primaryCategory === 'landing_pages') return 'builder_landing';
+  if (primaryCategory === 'analytics') return 'analytics_core';
+  return null;
+}
+
+function normalizeSearchableText(value: unknown): string {
+  if (!value) return '';
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeSearchableText(item)).filter(Boolean).join(' ');
+  }
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>)
+      .map((item) => normalizeSearchableText(item))
+      .filter(Boolean)
+      .join(' ');
+  }
+  return String(value || '');
+}
+
+function countKeywordHits(text: string, keywords: string[]): number {
+  let hits = 0;
+  for (const keyword of keywords) {
+    if (text.includes(keyword)) hits += 1;
+  }
+  return hits;
+}
+
+function getSlotSemanticAdjustment(slot: WorkflowSlot, tool: Tool): number {
+  const kind = detectSlotSemanticKind(slot);
+  if (!kind) return 0;
+
+  const blob = normalizeSearchableText([
+    tool.name,
+    tool.short_description,
+    tool.tags,
+    tool.use_cases,
+    tool.best_use_cases,
+    tool.recommended_for,
+    tool.target_audience,
+    tool.pros,
+    tool.cons,
+    tool.content,
+    tool.subcategory,
+    tool.category,
+  ]).toLowerCase();
+
+  if (!blob) return -4;
+
+  const rule = SLOT_SEMANTIC_RULES[kind];
+  const positiveHits = countKeywordHits(blob, rule.positive);
+  const strongPositiveHits = countKeywordHits(blob, rule.strongPositive);
+  const negativeHits = countKeywordHits(blob, rule.negative);
+  const genericHits = countKeywordHits(blob, ['general purpose', 'all in one', 'ai assistant', 'assistant tool']);
+
+  // Hard floor: reporting slot requires at least one explicit reporting/dashboard signal.
+  // Tools with zero positive hits (e.g. competitive-intel, session-recording) are disqualified.
+  if (kind === 'analytics_reporting' && positiveHits === 0 && strongPositiveHits === 0) {
+    return -100;
+  }
+
+  // Core-analytics disambiguation: tools that are primarily event-tracking/instrumentation
+  // platforms (Mixpanel, Amplitude) can contain incidental "reporting" terms but are not
+  // dashboard-first. Penalise them unless they carry a strong BI/dashboard signal.
+  const coreAnalyticsSignals = [
+    'product analytics', 'event tracking', 'behavioral analytics',
+    'user behavior', 'instrumentation', 'tracking sdk',
+  ];
+  const coreAnalyticsHits = kind === 'analytics_reporting'
+    ? countKeywordHits(blob, coreAnalyticsSignals)
+    : 0;
+
+  let adjustment = positiveHits * 2 + strongPositiveHits * 4 - negativeHits * 3;
+  if (positiveHits === 0 && strongPositiveHits === 0) adjustment -= 6;
+  if (genericHits > 0 && strongPositiveHits === 0) adjustment -= 4;
+  if (coreAnalyticsHits > 0 && strongPositiveHits === 0) adjustment -= 12;
+
+  return Math.max(-16, Math.min(18, adjustment));
+}
+
+function isCriticalSemanticKind(kind: SlotSemanticKind | null): kind is 'analytics_reporting' | 'list_capture' | 'distribution' {
+  return kind === 'analytics_reporting' || kind === 'list_capture' || kind === 'distribution';
+}
+
+function isSemanticallyValidForCriticalSlot(slot: WorkflowSlot, tool: Tool): boolean {
+  const kind = detectSlotSemanticKind(slot);
+  if (!isCriticalSemanticKind(kind)) return true;
+
+  const blob = normalizeSearchableText([
+    tool.name,
+    tool.short_description,
+    tool.tags,
+    tool.use_cases,
+    tool.best_use_cases,
+    tool.recommended_for,
+    tool.target_audience,
+    tool.pros,
+    tool.cons,
+    tool.content,
+    tool.subcategory,
+    tool.category,
+  ]).toLowerCase();
+
+  if (!blob) return false;
+
+  const rule = SLOT_SEMANTIC_RULES[kind];
+  const positiveHits = countKeywordHits(blob, rule.positive);
+  const strongPositiveHits = countKeywordHits(blob, rule.strongPositive);
+  const negativeHits = countKeywordHits(blob, rule.negative);
+
+  if (positiveHits === 0 && strongPositiveHits === 0) return false;
+
+  if (kind === 'analytics_reporting') {
+    const coreAnalyticsHits = countKeywordHits(blob, [
+      'product analytics', 'event tracking', 'behavioral analytics',
+      'user behavior', 'instrumentation', 'tracking sdk',
+    ]);
+    if (coreAnalyticsHits > 0 && strongPositiveHits === 0) return false;
+  }
+
+  if (negativeHits > 0 && strongPositiveHits === 0 && positiveHits <= negativeHits) return false;
+
+  return true;
+}
+
 /**
  * Composite score for a tool relative to a specific workflow slot.
  *
@@ -495,6 +721,7 @@ function scoreToolForSlot(
 ): number {
   let score = tool.internal_score || 0;
   const archetype = getToolArchetypeProfile(tool);
+  const skillLevel = String(tool.skill_level || '').toLowerCase();
 
   const cat = tool.category;
 
@@ -527,6 +754,9 @@ function scoreToolForSlot(
     }
   }
 
+  // Slot-level semantic fit: reward tools whose metadata clearly matches the slot's exact job.
+  score += getSlotSemanticAdjustment(slot, tool);
+
   // Long-tail visibility: if relevance is strong, boost less obvious options.
   if ((tool.popularity_score || 0) <= 5 && matchedTokens >= 2) {
     score += 7;
@@ -534,6 +764,22 @@ function scoreToolForSlot(
 
   // Beginner-friendly
   if (tool.beginner_friendly) score += 6;
+
+  // Skill alignment: explicitly prefer tools matching the selected user skill level.
+  if (options.skillPreference === 'beginner') {
+    if (tool.beginner_friendly) score += 8;
+    if (skillLevel === 'beginner') score += 8;
+    if (skillLevel === 'intermediate') score += 2;
+    if (skillLevel === 'advanced') score -= 8;
+  } else if (options.skillPreference === 'intermediate') {
+    if (skillLevel === 'intermediate') score += 6;
+    if (skillLevel === 'beginner') score += 2;
+    if (skillLevel === 'advanced') score += 2;
+  } else if (options.skillPreference === 'advanced') {
+    if (skillLevel === 'advanced') score += 8;
+    if (skillLevel === 'intermediate') score += 2;
+    if (tool.beginner_friendly || skillLevel === 'beginner') score -= 6;
+  }
 
   // Keep popularity as a weak signal only; avoid always selecting the same top-popularity tools.
   score += Math.min((tool.popularity_score || 0) / 4, 2.5);
@@ -653,8 +899,25 @@ function fillBlueprint(
       (candidate) => (selectedCategoriesCount.get(candidate.category) || 0) === 0
     );
     const candidatePool = nonDuplicateCandidates.length > 0 ? nonDuplicateCandidates : candidates;
+    const semanticallyValidCandidates = candidatePool.filter((tool) => isSemanticallyValidForCriticalSlot(slot, tool));
+    const kind = detectSlotSemanticKind(slot);
 
-    const scored = candidatePool
+    if (isCriticalSemanticKind(kind) && semanticallyValidCandidates.length === 0) {
+      const placeholder = createMissingStepPlaceholder(slot, slotIndex);
+      result.push({
+        tool: placeholder,
+        score: 0,
+        slotCategory: placeholder.category,
+        stage: slot.stage,
+      });
+      coveredStages.add(slot.stage);
+      selectedPricingTiers.push(getPricingTier(placeholder.pricing_model));
+      continue;
+    }
+
+    const scoringPool = semanticallyValidCandidates.length > 0 ? semanticallyValidCandidates : candidatePool;
+
+    const scored = scoringPool
       .map((tool) => ({
         tool,
         score: scoreToolForSlot(
@@ -686,6 +949,114 @@ function fillBlueprint(
     coveredStages.add(slot.stage);
     selectedPricingTiers.push(getPricingTier(best.tool.pricing_model));
     result.push(best);
+  }
+
+  return result;
+}
+
+function createMissingStepPlaceholder(slot: WorkflowSlot, slotIndex: number): Tool {
+  const fallbackCategory = slot.categories[0] || 'automation';
+  return {
+    id: -(slotIndex + 1),
+    name: `No strong tools found for this step (${slot.role})`,
+    slug: `missing-step-${slotIndex + 1}`,
+    short_description: `No matching tools were found in ${fallbackCategory.replace(/_/g, ' ')} for this workflow step.`,
+    category: fallbackCategory,
+    pricing_model: 'free',
+    skill_level: 'intermediate',
+  };
+}
+
+function fillTemplateBlueprintStrict(
+  blueprint: WorkflowSlot[],
+  tools: Tool[],
+  goal: string,
+  options: WorkflowGenerationOptions
+): ScoredTool[] {
+  const goalTokens = tokenize(goal);
+  const selectedIds = new Set<number>();
+  const selectedCategoriesCount = new Map<string, number>();
+  const coveredStages = new Set<WorkflowStage>();
+  const selectedPricingTiers: number[] = [];
+  const result: ScoredTool[] = [];
+
+  for (let slotIndex = 0; slotIndex < blueprint.length; slotIndex += 1) {
+    const slot = blueprint[slotIndex];
+    const slotCategories = new Set(slot.categories);
+
+    const unusedCandidates = tools.filter((tool) => {
+      if (!slotCategories.has(tool.category)) return false;
+      if (selectedIds.has(tool.id)) return false;
+      if (!isToolWithinBudget(tool, options.budgetBand)) return false;
+      return true;
+    });
+
+    // Strict template mode: keep the slot category; if no unused tool exists,
+    // allow reuse of the same-category tool before emitting a placeholder.
+    const reusableCandidates = tools.filter((tool) => {
+      if (!slotCategories.has(tool.category)) return false;
+      if (!isToolWithinBudget(tool, options.budgetBand)) return false;
+      return true;
+    });
+
+    const candidatePool = unusedCandidates.length > 0 ? unusedCandidates : reusableCandidates;
+
+    const semanticallyValidCandidates = candidatePool.filter((tool) => isSemanticallyValidForCriticalSlot(slot, tool));
+    const kind = detectSlotSemanticKind(slot);
+
+    if (isCriticalSemanticKind(kind) && semanticallyValidCandidates.length === 0) {
+      const placeholder = createMissingStepPlaceholder(slot, slotIndex);
+      result.push({
+        tool: placeholder,
+        score: 0,
+        slotCategory: placeholder.category,
+        stage: slot.stage,
+      });
+      coveredStages.add(slot.stage);
+      selectedPricingTiers.push(getPricingTier(placeholder.pricing_model));
+      continue;
+    }
+
+    const scoringPool = semanticallyValidCandidates.length > 0 ? semanticallyValidCandidates : candidatePool;
+
+    if (scoringPool.length === 0) {
+      const placeholder = createMissingStepPlaceholder(slot, slotIndex);
+      result.push({
+        tool: placeholder,
+        score: 0,
+        slotCategory: placeholder.category,
+        stage: slot.stage,
+      });
+      coveredStages.add(slot.stage);
+      selectedPricingTiers.push(getPricingTier(placeholder.pricing_model));
+      continue;
+    }
+
+    const scored = scoringPool
+      .map((tool) => ({
+        tool,
+        score: scoreToolForSlot(
+          tool,
+          slot,
+          goalTokens,
+          result.map((entry) => entry.tool),
+          selectedCategoriesCount,
+          coveredStages,
+          selectedPricingTiers,
+          options,
+          'any'
+        ),
+        slotCategory: tool.category,
+        stage: slot.stage,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const best = scored[0];
+    result.push(best);
+    selectedIds.add(best.tool.id);
+    selectedCategoriesCount.set(best.tool.category, (selectedCategoriesCount.get(best.tool.category) || 0) + 1);
+    coveredStages.add(slot.stage);
+    selectedPricingTiers.push(getPricingTier(best.tool.pricing_model));
   }
 
   return result;
@@ -782,6 +1153,7 @@ function replaceOutOfBudgetSelections(
         if (options.strictPrimaryCategory) return tool.category === slot.categories[0];
         return slot.categories.includes(tool.category);
       })
+      .filter((tool) => isSemanticallyValidForCriticalSlot(slot, tool))
       .filter((tool, _, arr) => {
         const hasNonDuplicate = arr.some((candidate) => (selectedCategoriesCount.get(candidate.category) || 0) === 0);
         if (!hasNonDuplicate) return true;
@@ -1155,7 +1527,16 @@ export async function recommendStackFromGoal(
   options?: StackRecommendationOptions
 ): Promise<StackResponseWithAlternatives> {
   const intent = detectIntentFromGoal(goal);
-  const blueprint = WORKFLOW_BLUEPRINTS[intent] ?? WORKFLOW_BLUEPRINTS['creation'];
+  const matchedTemplate = matchWorkflowTemplate(goal);
+  const templateBlueprint: WorkflowSlot[] | null = matchedTemplate
+    ? matchedTemplate.steps.map((step, index) => ({
+        role: step.label,
+        categories: step.categories,
+        purpose: `execute the ${step.label.toLowerCase()} step in this workflow`,
+        stage: stageForIndex(index),
+      }))
+    : null;
+  const blueprint = templateBlueprint ?? (WORKFLOW_BLUEPRINTS[intent] ?? WORKFLOW_BLUEPRINTS['creation']);
   const budgetBand = normalizeBudgetBand(pricingPreference);
   const allowedPricingModels = getAllowedPricingModelsForBudget(pricingPreference, budgetBand);
 
@@ -1181,6 +1562,7 @@ export async function recommendStackFromGoal(
   const recentToolTokens = buildRecentToolTokens(options?.recentlyUsedTools);
   const baseOptions: WorkflowGenerationOptions = {
     budgetBand,
+    skillPreference: options?.skillPreference ?? null,
     strictPrimaryCategory: false,
     diversitySalt: 0,
     recentToolSlugs,
@@ -1189,8 +1571,12 @@ export async function recommendStackFromGoal(
     rotationIntent: intent,
   };
 
-  // Fill blueprint slots and keep workflow output constrained to 3-4 tools.
-  let filledSlots = fillBlueprint(blueprint, uniqueTools, goal, baseOptions).slice(0, 4);
+  const isTemplateFlow = !!matchedTemplate;
+
+  // Fill slots. Template flows are strict and preserve every template step in order.
+  let filledSlots = isTemplateFlow
+    ? fillTemplateBlueprintStrict(blueprint, uniqueTools, goal, baseOptions).slice(0, 4)
+    : fillBlueprint(blueprint, uniqueTools, goal, baseOptions).slice(0, 4);
   filledSlots = replaceOutOfBudgetSelections(filledSlots, blueprint, uniqueTools, goal, baseOptions);
 
   // Guard against collapsing into the same generic trio; retry with stricter fit.
@@ -1205,7 +1591,7 @@ export async function recommendStackFromGoal(
     return hasLanding && hasEmail && hasAnalytics;
   };
 
-  if (isGenericTrio(filledSlots) && !['creation', 'marketing', 'automation'].includes(intent)) {
+  if (!isTemplateFlow && isGenericTrio(filledSlots) && !['creation', 'marketing', 'automation'].includes(intent)) {
     const strictOptions: WorkflowGenerationOptions = {
       ...baseOptions,
       strictPrimaryCategory: true,
@@ -1217,7 +1603,7 @@ export async function recommendStackFromGoal(
     }
   }
 
-  if (filledSlots.length > 0 && filledSlots.length < 3) {
+  if (!isTemplateFlow && filledSlots.length > 0 && filledSlots.length < 3) {
     const broadOptions: WorkflowGenerationOptions = {
       ...baseOptions,
       strictPrimaryCategory: false,
@@ -1229,7 +1615,7 @@ export async function recommendStackFromGoal(
     }
   }
 
-  if (!hasControlledVariation(filledSlots) && filledSlots.length >= 3) {
+  if (!isTemplateFlow && !hasControlledVariation(filledSlots) && filledSlots.length >= 3) {
     const variationOptions: WorkflowGenerationOptions = {
       ...baseOptions,
       strictPrimaryCategory: true,

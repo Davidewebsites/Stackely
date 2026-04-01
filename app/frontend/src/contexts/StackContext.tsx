@@ -51,6 +51,17 @@ export interface CoverageRole {
   tools: Tool[];
 }
 
+type CoverageRoleDefinition = {
+  id: string;
+  label: string;
+  categories: string[];
+};
+
+export type WorkflowCoverageRole = {
+  role: string;
+  category?: string | null;
+};
+
 // ---------------------------------------------------------------------------
 // Cost calculation
 // ---------------------------------------------------------------------------
@@ -108,9 +119,51 @@ function inferStackLabel(tools: Tool[]): string {
 // Coverage & next action
 // ---------------------------------------------------------------------------
 
-function computeCoverageRoles(tools: Tool[]): CoverageRole[] {
-  return CORE_ROLES.map(({ id, label }) => {
-    const matching = tools.filter((t) => ROLE_MAP[t.category] === id);
+function toRoleId(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'workflow_role';
+}
+
+function buildGoalCoverageDefinitions(roles: WorkflowCoverageRole[]): CoverageRoleDefinition[] {
+  const byId = new Map<string, CoverageRoleDefinition>();
+
+  for (const item of roles) {
+    const label = String(item.role || '').trim();
+    if (!label) continue;
+
+    const id = toRoleId(label);
+    const category = String(item.category || '').trim();
+
+    if (!byId.has(id)) {
+      byId.set(id, { id, label, categories: category ? [category] : [] });
+      continue;
+    }
+
+    if (category) {
+      const existing = byId.get(id)!;
+      if (!existing.categories.includes(category)) {
+        existing.categories.push(category);
+      }
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
+function computeCoverageRoles(tools: Tool[], activeRoleDefs: CoverageRoleDefinition[] | null): CoverageRole[] {
+  const roleDefs = activeRoleDefs && activeRoleDefs.length > 0
+    ? activeRoleDefs
+    : CORE_ROLES.map(({ id, label }) => ({ id, label, categories: [] }));
+
+  return roleDefs.map(({ id, label, categories }) => {
+    const matching = tools.filter((t) => {
+      if (categories.length > 0) {
+        return categories.includes(t.category);
+      }
+      return ROLE_MAP[t.category] === id;
+    });
     const status: 'covered' | 'missing' | 'overlap' =
       matching.length === 0 ? 'missing' : matching.length > 1 ? 'overlap' : 'covered';
     return { id, label, status, tools: matching };
@@ -248,7 +301,7 @@ export function buildAddToStackGuidance(tool: Tool, currentStack: Tool[]): Stack
   const nextStack = currentStack.some((existingTool) => existingTool.id === tool.id)
     ? currentStack
     : [...currentStack, tool];
-  const missingRoles = computeCoverageRoles(nextStack).filter((role) => role.status === 'missing');
+  const missingRoles = computeCoverageRoles(nextStack, null).filter((role) => role.status === 'missing');
   const primaryLine = `${roleLabel}. ${getOperationalValue(tool, roleLabel)}`;
 
   if (overlappingTools.length > 0) {
@@ -325,13 +378,15 @@ export interface StackContextType {
   stackLabel: string;
   completedCount: number;
   stackProgressPercentage: number;
-  stackProgressLabel: 'Complete' | 'Partial' | 'Missing critical step';
+  stackProgressLabel: 'Complete' | 'Partial' | 'Your workflow is incomplete';
   coverageRoles: CoverageRole[];
   nextAction: string;
   missingCount: number;
   drawerOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
+  setWorkflowCoverageRoles: (roles: WorkflowCoverageRole[]) => void;
+  clearWorkflowCoverageRoles: () => void;
   getMissingRoles: () => string[];
   getOverlapForTool: (tool: Tool) => Tool[];
 }
@@ -354,6 +409,7 @@ export function StackProvider({ children }: { children: ReactNode }) {
   const [stackStatuses, setStackStatuses] = useState<Record<number, StackItemStatus>>(
     () => initialSelection.statuses,
   );
+  const [goalCoverageRoles, setGoalCoverageRoles] = useState<CoverageRoleDefinition[] | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -418,6 +474,15 @@ export function StackProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setWorkflowCoverageRoles = useCallback((roles: WorkflowCoverageRole[]) => {
+    const defs = buildGoalCoverageDefinitions(roles);
+    setGoalCoverageRoles(defs.length > 0 ? defs : null);
+  }, []);
+
+  const clearWorkflowCoverageRoles = useCallback(() => {
+    setGoalCoverageRoles(null);
+  }, []);
+
   const isInStack = useCallback(
     (tool: Tool) => stackTools.some((t) => t.id === tool.id),
     [stackTools],
@@ -429,7 +494,10 @@ export function StackProvider({ children }: { children: ReactNode }) {
     () => stackTools.filter((tool) => getToolStatus(tool.id) === 'completed').length,
     [stackTools, getToolStatus],
   );
-  const coverageRoles = useMemo(() => computeCoverageRoles(stackTools), [stackTools]);
+  const coverageRoles = useMemo(
+    () => computeCoverageRoles(stackTools, goalCoverageRoles),
+    [stackTools, goalCoverageRoles]
+  );
   const nextAction = useMemo(
     () => computeNextAction(stackTools, coverageRoles),
     [stackTools, coverageRoles],
@@ -442,12 +510,17 @@ export function StackProvider({ children }: { children: ReactNode }) {
     if (stackTools.length === 0) return 0;
     return Math.round((completedCount / stackTools.length) * 100);
   }, [completedCount, stackTools.length]);
-  const stackProgressLabel = useMemo<'Complete' | 'Partial' | 'Missing critical step'>(() => {
-    if (missingCount > 0) return 'Missing critical step';
+  const stackProgressLabel = useMemo<'Complete' | 'Partial' | 'Your workflow is incomplete'>(() => {
+    if (missingCount > 0) return 'Your workflow is incomplete';
     if (stackTools.length > 0 && completedCount === stackTools.length) return 'Complete';
     return 'Partial';
   }, [missingCount, completedCount, stackTools.length]);
-  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  const openDrawer = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('stack-drawer:open'));
+    }
+    setDrawerOpen(true);
+  }, []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   const getMissingRoles = useCallback(
@@ -482,6 +555,8 @@ export function StackProvider({ children }: { children: ReactNode }) {
         drawerOpen,
         openDrawer,
         closeDrawer,
+        setWorkflowCoverageRoles,
+        clearWorkflowCoverageRoles,
         getMissingRoles,
         getOverlapForTool,
       }}

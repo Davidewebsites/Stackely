@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useCompare } from '@/contexts/CompareContext';
 
 export default function GlobalCompareTrigger() {
-  const { compareTools, drawerOpen, toggleDrawer } = useCompare();
+  const { compareTools, drawerOpen, openDrawer, closeDrawer } = useCompare();
   const compareCount = Array.isArray(compareTools) ? compareTools.length : 0;
 
   if (compareCount === 0) return null;
@@ -12,7 +12,13 @@ export default function GlobalCompareTrigger() {
     <div className="fixed z-[9999]" style={{ right: '20px', bottom: '68px' }}>
       <Button
         type="button"
-        onClick={toggleDrawer}
+        onClick={() => {
+          if (drawerOpen) {
+            closeDrawer();
+          } else {
+            openDrawer();
+          }
+        }}
         aria-pressed={drawerOpen}
         className="h-9 w-[118px] pl-3 pr-3 rounded-full text-white text-[11px] font-semibold shadow-[0_8px_16px_rgba(47,128,237,0.2)] hover:translate-y-[-1px] transition-all justify-between"
         style={{ background: 'linear-gradient(135deg, #0EA5A4 0%, #2F80ED 65%, #4F46E5 100%)' }}

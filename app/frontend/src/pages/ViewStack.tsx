@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import ToolLogo from '@/components/ToolLogo';
@@ -154,7 +154,7 @@ function toReadableCategory(category?: string): string {
 function buildStackDescription(stackName: string, categoryLabel: string, toolCount: number): string {
   const workflow = categoryLabel.toLowerCase();
   const countLabel = Math.max(1, toolCount);
-  return `${stackName} is a ${countLabel}-tool ${workflow} stack built for clear role separation.`;
+  return `${stackName} is a ${countLabel}-step ${workflow} workflow built for clear role separation.`;
 }
 
 function buildBestForLine(categoryLabel: string, goalName: string | undefined, toolCount: number): string {
@@ -494,9 +494,13 @@ function toFallbackActionTools(stack: ResolvedStack): Tool[] {
 
 export default function ViewStack() {
   const { id } = useParams();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { clearCompare, openDrawer: openCompareDrawer, setCompareSessionContext, openStackComparison } = useCompare();
   const { setStack, openDrawer: openStackDrawer } = useStack();
+  const arrivedFromCompare =
+    Boolean((location.state as { fromCompare?: boolean } | null)?.fromCompare) ||
+    searchParams.get('fromCompare') === '1';
   const encodedState = searchParams.get('s') || searchParams.get('state');
   const decodedState = useMemo(() => (encodedState ? decodeStackShareState(encodedState) : null), [encodedState]);
 
@@ -506,6 +510,11 @@ export default function ViewStack() {
   const whyThisStackWorks = useMemo(() => (resolvedStack ? getWhyThisStackWorks(resolvedStack) : []), [resolvedStack]);
   const tradeOffs = useMemo(() => (resolvedStack ? getTradeOffs(resolvedStack) : []), [resolvedStack]);
   const relatedStacks = useMemo(() => buildRelatedStacks(id, resolvedStack), [id, resolvedStack]);
+  const coveredStepCount = resolvedStack?.tools.length || 0;
+  const missingStepCount = Math.max(0, 3 - coveredStepCount);
+  const workflowNextStep = relatedStacks.length > 0
+    ? 'Compare this workflow against alternatives before you commit it.'
+    : 'Add this workflow to your active stack and start implementing the steps.';
   const canonicalPath = useMemo(
     () => getCanonicalStackPath(id, resolvedStack, decodedState),
     [id, resolvedStack, decodedState],
@@ -588,8 +597,8 @@ export default function ViewStack() {
     clearCompare();
     setCompareSessionContext({
       source: 'stack_compare',
-      title: 'Compare stacks',
-      subtitle: `${baseline.name} vs ${alternatives.length} alternative stack${alternatives.length > 1 ? 's' : ''}`,
+      title: 'Step 3: Compare stack options',
+      subtitle: `${baseline.name} vs ${alternatives.length} alternative stack${alternatives.length > 1 ? 's' : ''} — then choose the stack to act on.`,
     });
     openStackComparison({ baseline, alternatives });
     openCompareDrawer();
@@ -700,7 +709,7 @@ export default function ViewStack() {
                 className="h-10 px-4 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(79,70,229,0.22)]"
                 style={{ background: 'linear-gradient(135deg,#2F80ED 0%,#4F46E5 62%,#8A2BE2 100%)' }}
               >
-                Add all tools to stack
+                Add this workflow to my stack
               </Button>
               <Button
                 type="button"
@@ -720,11 +729,92 @@ export default function ViewStack() {
                 Share
               </Button>
             </div>
+
+            <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/55 px-4 py-4 md:px-5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">Covered steps</p>
+                  <p className="mt-1 text-[16px] font-semibold text-slate-900">{coveredStepCount} decided</p>
+                  <p className="mt-1 text-[12px] text-slate-500">This workflow already defines the key steps to execute.</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">Missing steps</p>
+                  <p className="mt-1 text-[16px] font-semibold text-slate-900">{missingStepCount === 0 ? 'No core gaps' : `${missingStepCount} still missing`}</p>
+                  <p className="mt-1 text-[12px] text-slate-500">{missingStepCount === 0 ? 'This saved workflow covers setup, execution, and optimization.' : 'Add more steps before treating this workflow as complete.'}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">Next step</p>
+                  <p className="mt-1 text-[16px] font-semibold text-slate-900">{relatedStacks.length > 0 ? 'Compare or continue' : 'Start building'}</p>
+                  <p className="mt-1 text-[12px] text-slate-500">{workflowNextStep}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                <Button
+                  type="button"
+                  onClick={handleAddAllTools}
+                  className="h-9 px-4 text-[12.5px] font-semibold text-white"
+                  style={{ background: 'linear-gradient(135deg,#2F80ED 0%,#4F46E5 62%,#8A2BE2 100%)' }}
+                >
+                  Continue building
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCompareThisStack}
+                  className="h-9 px-4 text-[12.5px] font-semibold border-slate-300 text-slate-700 bg-white"
+                  disabled={relatedStacks.length === 0}
+                >
+                  Compare current step
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleShare}
+                  className="h-9 px-4 text-[12.5px] font-semibold border-slate-300 text-slate-700 bg-white"
+                >
+                  Finalize stack
+                </Button>
+              </div>
+            </section>
           </header>
+
+          {arrivedFromCompare && (
+            <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-4 md:px-5">
+              <p className="text-[14px] font-semibold text-emerald-900">You confirmed this workflow after comparison</p>
+              <p className="mt-1 text-[13px] text-emerald-800">Decision complete. Continue step by step, one tool per workflow step.</p>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                <Button
+                  type="button"
+                  onClick={handleAddAllTools}
+                  className="h-9 px-4 text-[12.5px] font-semibold text-white"
+                  style={{ background: 'linear-gradient(135deg,#2F80ED 0%,#4F46E5 62%,#8A2BE2 100%)' }}
+                >
+                  Start this workflow
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCompareThisStack}
+                  className="h-9 px-4 text-[12.5px] font-semibold border-slate-300 text-slate-700 bg-white"
+                  disabled={relatedStacks.length === 0}
+                >
+                  Revise decision
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleShare}
+                  className="h-9 px-3 text-[12px] font-semibold text-slate-600 hover:text-slate-800"
+                >
+                  Export / Share
+                </Button>
+              </div>
+            </section>
+          )}
 
           <main className="mt-6 grid grid-cols-1 gap-5">
             <section className="rounded-xl border border-slate-200/80 bg-slate-50/55 px-4 py-4 md:px-5">
-              <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-slate-500">Tool flow</h2>
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-slate-500">Workflow steps</h2>
               <ol className="mt-3 space-y-3">
                 {resolvedStack.tools.map((tool, index) => (
                   <li key={`${tool.name}-${index}`} className="rounded-lg bg-white px-4 py-3 shadow-[0_4px_12px_rgba(15,23,42,0.05)]">

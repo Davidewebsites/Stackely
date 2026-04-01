@@ -99,7 +99,7 @@ function Get-FullErrorBody {
     try {
       $response = $ErrorRecord.Exception.Response
       $stream = $response.GetResponseStream()
-      if ($stream -ne $null) {
+      if ($null -ne $stream) {
         $reader = New-Object System.IO.StreamReader($stream)
         $streamBody = $reader.ReadToEnd()
         if (-not [string]::IsNullOrWhiteSpace($streamBody)) {
@@ -146,12 +146,12 @@ for ($i = 0; $i -lt $clean.Count; $i += $BatchSize) {
     }
 
     foreach ($managedCol in $dbManagedColumns) {
-      if ($row[$managedCol] -ne $null) {
+      if ($null -ne $row[$managedCol]) {
         $null = $row.Remove($managedCol)
       }
     }
 
-    if ($row['slug'] -ne $null -and [string]$row['slug'] -ne '') {
+    if ($null -ne $row['slug'] -and [string]$row['slug'] -ne '') {
       $row['slug'] = ([string]$row['slug']).Trim().ToLower()
     }
     [pscustomobject]$row
@@ -162,7 +162,7 @@ for ($i = 0; $i -lt $clean.Count; $i += $BatchSize) {
 
   if (-not $printedPayloadKeys) {
     $firstPayloadRow = $payloadRows | Select-Object -First 1
-    if ($firstPayloadRow -ne $null) {
+    if ($null -ne $firstPayloadRow) {
       $payloadKeys = @($firstPayloadRow.PSObject.Properties.Name) -join ','
       Write-Host ("payload_first_row_keys={0}" -f $payloadKeys)
       $sampleRowJson = @($firstPayloadRow) | ConvertTo-Json -Depth 10 -Compress
@@ -171,8 +171,8 @@ for ($i = 0; $i -lt $clean.Count; $i += $BatchSize) {
     $printedPayloadKeys = $true
   }
 
-  $rowsMissingSlug = @($payloadRows | Where-Object { $_.slug -eq $null -or [string]::IsNullOrWhiteSpace([string]$_.slug) }).Count
-  $rowsWithId = @($payloadRows | Where-Object { $_.PSObject.Properties.Name -contains 'id' -and $_.id -ne $null }).Count
+  $rowsMissingSlug = @($payloadRows | Where-Object { $null -eq $_.slug -or [string]::IsNullOrWhiteSpace([string]$_.slug) }).Count
+  $rowsWithId = @($payloadRows | Where-Object { $_.PSObject.Properties.Name -contains 'id' -and $null -ne $_.id }).Count
   Write-Host ("payload_count={0} rows_missing_slug={1} rows_with_id={2}" -f $payloadCount, $rowsMissingSlug, $rowsWithId)
 
   if ($rowsMissingSlug -gt 0) {
@@ -203,7 +203,7 @@ for ($i = 0; $i -lt $clean.Count; $i += $BatchSize) {
 
     $errorBody = Get-FullErrorBody -ErrorRecord $_
 
-    if ($errorBody -ne $null -and $errorBody -ne '') {
+    if ($null -ne $errorBody -and $errorBody -ne '') {
       Write-Host ("error_body={0}" -f $errorBody)
     } elseif ($_.Exception -and $_.Exception.Message) {
       Write-Host ("error_message={0}" -f $_.Exception.Message)
@@ -211,7 +211,7 @@ for ($i = 0; $i -lt $clean.Count; $i += $BatchSize) {
 
     Write-Host ("error_body_raw={0}" -f $errorBody)
 
-    if ($statusCode -eq 409 -and ($errorBody -eq $null -or $errorBody -eq '')) {
+    if ($statusCode -eq 409 -and ($null -eq $errorBody -or $errorBody -eq '')) {
       Write-Host "error_body=HTTP 409 Conflict (no response body available)"
     }
     throw
@@ -223,7 +223,7 @@ $readHeaders = @{ apikey = $serviceKey; Authorization = "Bearer $serviceKey" }
 $rows = Invoke-RestMethod -Method Get -Uri "$supabaseUrl/rest/v1/tools?select=category,slug,name&active=eq.true&limit=5000" -Headers $readHeaders
 $total = @($rows).Count
 $dupSlug = (@($rows | Group-Object slug | Where-Object { $_.Count -gt 1 })).Count
-$dupName = (@($rows | Group-Object { if ($_.name -ne $null) { ([string]$_.name).ToLower() } else { '' } } | Where-Object { $_.Count -gt 1 })).Count
+$dupName = (@($rows | Group-Object { if ($null -ne $_.name) { ([string]$_.name).ToLower() } else { '' } } | Where-Object { $_.Count -gt 1 })).Count
 
 Write-Host "ACTIVE_TOTAL=$total"
 Write-Host "DUP_SLUG_GROUPS=$dupSlug"

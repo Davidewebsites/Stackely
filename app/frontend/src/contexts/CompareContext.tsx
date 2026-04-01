@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   type ReactNode,
 } from 'react';
@@ -31,7 +32,7 @@ export interface StackCompareSession {
 }
 
 interface CompareSessionContext {
-  source: 'daily_match' | 'generic' | 'stack_compare';
+  source: 'daily_match' | 'generic' | 'stack_compare' | 'search_flow' | 'stack_flow';
   title?: string;
   subtitle?: string;
 }
@@ -61,14 +62,14 @@ export function CompareProvider({ children }: { children: ReactNode }) {
   const [compareSessionContext, setCompareSessionContext] = useState<CompareSessionContext | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const openDrawer = useCallback(() => {
-    setDrawerOpen(true);
-  }, []);
-
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
     setCompareSessionContext(null);
     setStackCompareSession(null);
+  }, []);
+
+  const openDrawer = useCallback(() => {
+    setDrawerOpen(true);
   }, []);
 
   const toggleDrawer = useCallback(() => {
@@ -131,10 +132,8 @@ export function CompareProvider({ children }: { children: ReactNode }) {
 
   const clearCompare = useCallback(() => {
     setCompareTools([]);
-    setDrawerOpen(false);
-    setCompareSessionContext(null);
-    setStackCompareSession(null);
-  }, []);
+    closeDrawer();
+  }, [closeDrawer]);
 
   const openStackComparison = useCallback((session: StackCompareSession) => {
     setCompareTools([]);

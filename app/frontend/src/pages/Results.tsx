@@ -118,6 +118,27 @@ function inferCategoryFromRole(role: string): string {
   return 'automation';
 }
 
+function getCategoryStepLabel(category: string): string {
+  const matched = CATEGORIES.find((item) => item.id === category);
+  return matched?.role || matched?.label || 'Workflow step';
+}
+
+function deriveWorkflowStepLabel(item: AdaptedStackItem, index: number): string {
+  const normalizedRole = item.role.trim();
+  const normalizedLower = normalizedRole.toLowerCase();
+  const hasStrongRole =
+    normalizedRole.length > 0 &&
+    !['workflow step', 'workflow support', 'general', 'other', 'tool'].includes(normalizedLower);
+
+  if (hasStrongRole) {
+    return normalizedRole;
+  }
+
+  const inferredCategory = item.tool.category || inferCategoryFromRole(item.role);
+  const categoryLabel = getCategoryStepLabel(inferredCategory);
+  return `Step ${index + 1} - ${categoryLabel}`;
+}
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -783,12 +804,20 @@ export default function Results() {
   });
 
   // Compare via context & stack management
-  const { compareTools, toggleTool: toggleCompare, isToolSelected: isSelectedForCompare } = useCompare();
+  const {
+    compareTools,
+    toggleTool: toggleCompare,
+    isToolSelected: isSelectedForCompare,
+    openDrawer: openCompareDrawer,
+    setCompareSessionContext,
+  } = useCompare();
   const {
     stackTools: stackSelection,
     toggleStack,
     setStack,
     isInStack,
+    setWorkflowCoverageRoles,
+    clearWorkflowCoverageRoles,
     getToolStatus,
     completedCount,
     missingCount,
@@ -831,6 +860,32 @@ export default function Results() {
     }
   };
 
+  const handleFlowCompareToggle = (tool: Tool, flowSource: 'search' | 'stack') => {
+    const alreadySelected = isSelectedForCompare(tool.id);
+    toggleCompare(tool);
+
+    // Open compare once the user has enough options for a real decision.
+    if (alreadySelected) return;
+    const nextCount = compareTools.length + 1;
+    if (nextCount < 2) return;
+
+    if (flowSource === 'stack') {
+      setCompareSessionContext({
+        source: 'stack_flow',
+        title: 'Step 3: Compare tools in your stack',
+        subtitle: 'Compare options, replace weak steps, then finalize an actionable stack.',
+      });
+    } else {
+      setCompareSessionContext({
+        source: 'search_flow',
+        title: 'Step 3: Compare shortlisted tools',
+        subtitle: 'Compare candidates, keep the winners, then build your actionable stack.',
+      });
+    }
+
+    openCompareDrawer();
+  };
+
   useEffect(() => {
     setExpandedWorkflowStep(0);
   }, [query, stackData?.stack?.length]);
@@ -868,8 +923,12 @@ export default function Results() {
       const recentlyUsedTools = stackSelection
         .flatMap((tool) => [tool.name, tool.slug])
         .filter(Boolean);
+      const workflowSkillPreference = explicitSkillPreference || intent.inferredSkillPreference || null;
 
-      recommendStackFromGoal(budgetContextQuery, workflowPricingPreference, { recentlyUsedTools })
+      recommendStackFromGoal(budgetContextQuery, workflowPricingPreference, {
+        recentlyUsedTools,
+        skillPreference: workflowSkillPreference,
+      })
         .then((stack) => setStackData(stack))
         .catch((err) => {
           console.error('Stack recommendation failed:', err);
@@ -901,6 +960,7 @@ export default function Results() {
             const recentlyUsedTools = stackSelection
               .flatMap((tool) => [tool.name, tool.slug])
               .filter(Boolean);
+            const workflowSkillPreference = explicitSkillPreference || intentResolved.inferredSkillPreference || null;
             const workflowGoalQuery = explicitSkillPreference
               ? `${intentResolved.interpretedQuery || query} for ${explicitSkillPreference} users`
               : intentResolved.inferredSkillPreference
@@ -911,7 +971,10 @@ export default function Results() {
                 ? workflowGoalQuery
                 : `${workflowGoalQuery} with ${budgetParam} budget`;
 
-            recommendStackFromGoal(budgetWorkflowGoalQuery, workflowPricingPreference, { recentlyUsedTools })
+            recommendStackFromGoal(budgetWorkflowGoalQuery, workflowPricingPreference, {
+              recentlyUsedTools,
+              skillPreference: workflowSkillPreference,
+            })
               .then((workflow) => {
                 const byName = new Map<string, Tool>();
                 for (const tool of uniqueById([...combined, ...searchCatalogTools])) {
@@ -1300,6 +1363,26 @@ export default function Results() {
       .slice(0, 3);
   }, [workflowBudgetFallbackUsed, strictBudgetAiStackItems, aiStackItems]);
 
+  useEffect(() => {
+    if (queryMode === 'stack' && filteredAiStackItems.length > 0) {
+      setWorkflowCoverageRoles(
+        filteredAiStackItems.slice(0, 4).map((item) => ({
+          role: item.role,
+          category: item.tool.category,
+        }))
+      );
+      return;
+    }
+
+    clearWorkflowCoverageRoles();
+  }, [queryMode, filteredAiStackItems, setWorkflowCoverageRoles, clearWorkflowCoverageRoles]);
+
+  const visibleStackItems = useMemo(() => filteredAiStackItems.slice(0, 3), [filteredAiStackItems]);
+  const visibleStackStepLabels = useMemo(
+    () => visibleStackItems.map((item, index) => deriveWorkflowStepLabel(item, index)),
+    [visibleStackItems]
+  );
+
   const stackToolLookup = useMemo(() => {
     const map = new Map<string, Tool>();
     for (const tool of catalogTools) {
@@ -1507,8 +1590,12 @@ export default function Results() {
         const recentlyUsedTools = stackSelection
           .flatMap((tool) => [tool.name, tool.slug])
           .filter(Boolean);
+        const workflowSkillPreference = explicitSkillPreference || retryIntent.inferredSkillPreference || null;
 
-        recommendStackFromGoal(retrySkillContextQuery, pricingParam, { recentlyUsedTools })
+        recommendStackFromGoal(retrySkillContextQuery, pricingParam, {
+          recentlyUsedTools,
+          skillPreference: workflowSkillPreference,
+        })
           .then((stack) => setStackData(stack))
           .catch((err) => {
             console.error('Stack recommendation retry failed:', err);
@@ -1719,7 +1806,7 @@ export default function Results() {
                         tool={tool}
                         isSelectedForCompare={isSelectedForCompare(tool.id)}
                         isInStack={stackSelection.some((t) => t.id === tool.id)}
-                        onToggleCompare={toggleCompare}
+                        onToggleCompare={(tool) => handleFlowCompareToggle(tool, queryMode === 'stack' ? 'stack' : 'search')}
                         onToggleStack={toggleStack}
                         whyItMatches={generateWhyItMatchesUser(tool, {
                           query: queryIntent?.interpretedQuery || query,
@@ -1740,7 +1827,7 @@ export default function Results() {
                           tool={tool}
                           isSelectedForCompare={isSelectedForCompare(tool.id)}
                           isInStack={stackSelection.some((t) => t.id === tool.id)}
-                          onToggleCompare={toggleCompare}
+                          onToggleCompare={(tool) => handleFlowCompareToggle(tool, queryMode === 'stack' ? 'stack' : 'search')}
                           onToggleStack={toggleStack}
                           whyItMatches={generateWhyItMatchesUser(tool, {
                             query: queryIntent?.interpretedQuery || query,
@@ -1858,7 +1945,7 @@ export default function Results() {
                                 tool={tool}
                                 isSelectedForCompare={isSelectedForCompare(tool.id)}
                                 isInStack={stackSelection.some((t) => t.id === tool.id)}
-                                onToggleCompare={toggleCompare}
+                                onToggleCompare={(tool) => handleFlowCompareToggle(tool, 'search')}
                                 onToggleStack={toggleStack}
                               />
                             ))}
@@ -1897,7 +1984,7 @@ export default function Results() {
                         Stack for: {displayQueryLabel}
                       </h2>
                       <p className="body-copy mt-1">
-                        Workflow recommendation with {stackData.stack.length} structured step{stackData.stack.length !== 1 ? 's' : ''}
+                        Workflow recommendation with {stackData.stack.length} structured step{stackData.stack.length !== 1 ? 's' : ''}, one recommended tool per step
                       </p>
                     </div>
                   </div>
@@ -1946,8 +2033,8 @@ export default function Results() {
 
                 <div className="mb-10 panel-card p-4 sm:p-5">
                   <div className="flex items-center justify-between gap-3">
-                    {['Setup', 'Automate', 'Optimize'].map((label, index) => (
-                      <div key={label} className="flex items-center flex-1 min-w-0">
+                    {visibleStackStepLabels.map((label, index) => (
+                      <div key={`${label}-${index}`} className="flex items-center flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span
                             className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold text-white bg-slate-800"
@@ -1975,11 +2062,11 @@ export default function Results() {
                 )}
 
                 <div className="space-y-5">
-                  {filteredAiStackItems.slice(0, 3).map((item, index) => {
+                  {visibleStackItems.map((item, index) => {
                     const accent = getStackAccent(item.tool);
                     const pickReason = item.why && item.why.trim().length > 0 ? item.why.trim() : getWhyRecommended(item.tool);
                     const avoidTradeoff = getAvoidIf(item.tool);
-                    const stepTitle = index === 0 ? 'Setup' : index === 1 ? 'Automate / Execute' : 'Optimize / Measure';
+                    const stepTitle = visibleStackStepLabels[index] || deriveWorkflowStepLabel(item, index);
                     const timeEstimates = ['⏱ 15–30 min setup', '⏱ 10–20 min setup', '⏱ 5–15 min setup'];
                     const howToUse =
                       index === 0
@@ -2062,7 +2149,7 @@ export default function Results() {
                               size="sm"
                               variant="outline"
                               className="h-8 px-2.5 text-[11px] border-slate-300 bg-white"
-                              onClick={() => toggleCompare(item.tool)}
+                              onClick={() => handleFlowCompareToggle(item.tool, 'stack')}
                               disabled={compareTools.length >= 4 && !isSelectedForCompare(item.tool.id)}
                             >
                               Compare
@@ -2105,7 +2192,7 @@ export default function Results() {
                             <div className="pt-3 border-t border-slate-100">
                               <div className="flex items-center justify-between gap-2 mb-2">
                                 <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Alternatives</span>
-                                <span className="text-[10px] text-slate-400">Replace this step</span>
+                                <span className="text-[10px] text-slate-400">Switch this step decision</span>
                               </div>
                               <div className="space-y-2">
                                 {(stackData.alternatives?.[item.tool.name] || [])

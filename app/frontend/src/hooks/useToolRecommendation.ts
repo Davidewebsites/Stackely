@@ -14,6 +14,8 @@ import {
   type Tool,
 } from '@/lib/api';
 
+type SkillPreference = 'beginner' | 'intermediate' | 'advanced';
+
 const SYSTEM_PROMPT = `You are a marketing tool classifier. Given a user's business goal or need, classify it into:
 1. One or more CATEGORIES (exact values only):
    ads, design, copywriting, video, landing_pages, analytics, automation, email_marketing
@@ -163,7 +165,7 @@ export function useToolRecommendation() {
   const [error, setError] = useState<string | null>(null);
   const [activePricing, setActivePricing] = useState<PricingPreference>('any');
 
-  const classify = useCallback(async (query: string, pricingPreference: PricingPreference = 'any') => {
+  const classify = useCallback(async (query: string, pricingPreference: PricingPreference = 'any', skillPreference?: SkillPreference | null) => {
     if (!query.trim()) return;
 
     setIsLoading(true);
@@ -208,7 +210,7 @@ export function useToolRecommendation() {
         parsed.categories,
         parsed.use_cases,
         pricingPreference,
-        false
+        skillPreference === 'beginner'
       );
 
       if (focusedStack.length === 0) {

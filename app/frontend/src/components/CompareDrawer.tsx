@@ -1,9 +1,12 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import ToolLogo from './ToolLogo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { ScrollArea } from './ui/scroll-area';
 import { useCompare } from '@/contexts/CompareContext';
+import { useStack } from '@/contexts/StackContext';
 import { Tool, fetchToolsByCategories } from '@/lib/api';
 
 type StackCompareLike = {
@@ -143,6 +146,24 @@ function getPriceLabel(tool: Tool): string {
     return `${model} · ${tool.starting_price.trim()}`;
   }
   return model;
+}
+
+function getRoleLabel(tool: Tool): string {
+  if (!tool.category) return 'selected tool';
+  const category = String(tool.category || '').toLowerCase().trim();
+  const roleMap: Record<string, string> = {
+    landing_pages: 'Builder',
+    design: 'Builder',
+    email_marketing: 'Email',
+    analytics: 'Analytics',
+    automation: 'Automation',
+    ads: 'Ads',
+  };
+  if (roleMap[category]) return roleMap[category];
+  return category
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .trim() || 'selected tool';
 }
 
 function getBestForLabel(tool: Tool): string {
@@ -505,168 +526,36 @@ function getPrimaryUseCase(tool: Tool): string | null {
   return normalizeUseCase(val, tool.category, undefined);
 }
 
-type SuggestedTool = { tool: Tool; reason: string };
-
-function getSuggestedComparableTools(
-  selectedTools: Tool[],
-  candidatePool: Tool[],
-  dominantUseCase: string | null
-): SuggestedTool[] {
-  const selectedIds = new Set(selectedTools.map((t) => t.id));
-  const dominantCategory = dominantUseCase?.toLowerCase() ?? null;
-
-  const normalizeCategory = (value?: string | null) => (value || '').trim().toLowerCase();
-  const primaryGroupFor = (tool: Tool) => {
-    const primary = getPrimaryUseCase(tool);
-    if (primary) return primary;
-    return normalizeToBroadGroup(tool.category) || normalizeCategory(tool.category) || null;
-  };
-
-  const selectedGroups = new Set(
-    selectedTools
-      .map((tool) => primaryGroupFor(tool))
-      .filter((group): group is string => Boolean(group))
-  );
-
-  const selectedCategories = new Set(
-    selectedTools
-      .map((tool) => normalizeCategory(tool.category))
-      .filter(Boolean)
-  );
-
-  const getCompletenessScore = (tool: Tool): number => {
-    const checks = [
-      !!tool.pricing_model,
-      !!tool.skill_level,
-      !!tool.pros,
-      !!tool.cons,
-      !!tool.best_use_cases,
-      !!tool.recommended_for,
-      !!tool.target_audience,
-      typeof tool.difficulty_score === 'number',
-      !!tool.starting_price,
-    ];
-    const completed = checks.filter(Boolean).length;
-    return (completed / checks.length) * 4;
-  };
-
-  const getSimilarity = (a: Tool, b: Tool): number => {
-    let same = 0;
-    if (normalizeCategory(a.category) === normalizeCategory(b.category)) same += 1;
-    if (String(a.skill_level || '').toLowerCase() === String(b.skill_level || '').toLowerCase()) same += 1;
-    if (String(a.pricing_model || '').toLowerCase() === String(b.pricing_model || '').toLowerCase()) same += 1;
-    if (primaryGroupFor(a) === primaryGroupFor(b)) same += 1;
-    if (!!a.beginner_friendly === !!b.beginner_friendly) same += 1;
-    return same;
-  };
-
-  const scored = candidatePool
-    .filter((t) => !selectedIds.has(t.id))
-    .map((t) => {
-      let score = 0;
-      let reason = '';
-
-      const tCat = normalizeCategory(t.category);
-      const tPrimary = primaryGroupFor(t);
-      const tBroad = normalizeToBroadGroup(tCat);
-      const domBroad = normalizeToBroadGroup(dominantCategory);
-
-      const sameGroup = !!(tPrimary && selectedGroups.has(tPrimary));
-      const sameBroad = !!(tBroad && ((domBroad && tBroad === domBroad) || selectedGroups.has(tBroad)));
-      const sameCategory = !!(tCat && selectedCategories.has(tCat));
-
-      // Must be category-adjacent via broad/use-case grouping.
-      if (!sameGroup && !sameBroad && !sameCategory) {
-        return null;
-      }
-
-      if (sameGroup) {
-        score += 6;
-      } else if (sameBroad) {
-        score += 5;
-      } else if (sameCategory) {
-        score += 4;
-      }
-
-      const completeness = getCompletenessScore(t);
-      score += completeness;
-
-      const bestSimilarity = selectedTools.reduce((max, picked) => {
-        return Math.max(max, getSimilarity(t, picked));
-      }, 0);
-
-      // Avoid near-duplicates that do not improve trade-off clarity.
-      if (bestSimilarity >= 4) {
-        return null;
-      }
-
-      const differentiation = Math.max(0, 4 - bestSimilarity);
-      score += differentiation;
-
-      const hasTradeoffSignals = !!(t.pros && t.cons);
-      if (hasTradeoffSignals) score += 1.5;
-
-      score += Math.min((t.internal_score || 0) / 25, 3);
-      score += Math.min((t.popularity_score || 0) / 8, 1.5);
-
-      if (sameGroup && differentiation >= 2) {
-        reason = 'Closer use case, clearer comparison.';
-      } else if (completeness >= 3) {
-        reason = 'Better match for your current selection.';
-      } else if (sameBroad) {
-        reason = 'Helps you get a real decision.';
-      } else {
-        reason = 'Better match for your current selection.';
-      }
-
-      return { tool: t, score, reason };
-    })
-    .filter((s): s is { tool: Tool; score: number; reason: string } => !!s && s.score > 0)
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const bInternal = b.tool.internal_score || 0;
-      const aInternal = a.tool.internal_score || 0;
-      if (bInternal !== aInternal) return bInternal - aInternal;
-      return a.tool.id - b.tool.id;
-    })
-    .slice(0, 3);
-
-  return scored.map(({ tool, reason }) => ({ tool, reason }));
+function normalizeCategoryKey(value?: string | null): string {
+  return (value || '').trim().toLowerCase();
 }
 
-function findOutlierTool(tools: Tool[]): Tool | null {
-  if (tools.length === 0) return null;
-  if (tools.length === 1) return tools[0];
+function formatCategoryLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .trim();
+}
 
-  const useCaseCounts: Record<string, number> = {};
-  for (const tool of tools) {
-    const group = getPrimaryUseCase(tool) || 'other';
-    useCaseCounts[group] = (useCaseCounts[group] || 0) + 1;
-  }
-
-  let outlier: Tool | null = null;
-  let minGroupCount = Infinity;
-  let minDecisionScore = Infinity;
-
-  for (const tool of tools) {
-    const group = getPrimaryUseCase(tool) || 'other';
-    const groupCount = useCaseCounts[group] || 0;
-    const decisionScore = scoreToolForDecision(tool);
-
-    if (
-      groupCount < minGroupCount ||
-      (groupCount === minGroupCount && decisionScore < minDecisionScore)
-    ) {
-      outlier = tool;
-      minGroupCount = groupCount;
-      minDecisionScore = decisionScore;
-    }
-  }
-
-  return outlier;
+function workflowRoleIdForCategory(category?: string | null): string | null {
+  const normalized = normalizeCategoryKey(category);
+  if (!normalized) return null;
+  const roleMap: Record<string, string> = {
+    landing_pages: 'landing_pages',
+    design: 'landing_pages',
+    copywriting: 'content',
+    video: 'content',
+    email_marketing: 'email_marketing',
+    analytics: 'analytics',
+    automation: 'automation',
+    ads: 'ads',
+  };
+  return roleMap[normalized] || null;
 }
 
 export default function CompareDrawer() {
+  const navigate = useNavigate();
+  const { setStack, openDrawer: openStackDrawer, getOverlapForTool, coverageRoles } = useStack();
   const {
     compareTools,
     stackCompareSession,
@@ -723,42 +612,150 @@ export default function CompareDrawer() {
     };
   }, [compareTools]);
 
-  const [suggestionPool, setSuggestionPool] = useState<Tool[]>([]);
+  const [alignmentTargetCategory, setAlignmentTargetCategory] = useState<string | null>(null);
+  const [alignmentPool, setAlignmentPool] = useState<Tool[]>([]);
+  const [alignmentLoading, setAlignmentLoading] = useState(false);
+  const isWorkflowCompareContext = useMemo(() => {
+    const source = compareSessionContext?.source;
+    return source === 'stack_flow' || source === 'search_flow';
+  }, [compareSessionContext?.source]);
+  const coveredRoleIds = useMemo(
+    () => new Set(coverageRoles.filter((role) => role.status === 'covered' || role.status === 'overlap').map((role) => role.id)),
+    [coverageRoles]
+  );
+  const missingRoleLabels = useMemo(
+    () => coverageRoles.filter((role) => role.status === 'missing').map((role) => role.label),
+    [coverageRoles]
+  );
+
+  const comparisonCategories = useMemo(
+    () => Array.from(new Set(compareTools.map((tool) => normalizeCategoryKey(tool.category)).filter(Boolean))),
+    [compareTools]
+  );
+  const sortedComparisonCategories = useMemo(() => {
+    if (!isWorkflowCompareContext) return comparisonCategories;
+    return [...comparisonCategories].sort((a, b) => {
+      const roleA = workflowRoleIdForCategory(a);
+      const roleB = workflowRoleIdForCategory(b);
+      const scoreA = roleA ? (coveredRoleIds.has(roleA) ? 0 : 1) : 0;
+      const scoreB = roleB ? (coveredRoleIds.has(roleB) ? 0 : 1) : 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return a.localeCompare(b);
+    });
+  }, [comparisonCategories, coveredRoleIds, isWorkflowCompareContext]);
+  const alignmentTargetRoleId = useMemo(
+    () => workflowRoleIdForCategory(alignmentTargetCategory),
+    [alignmentTargetCategory]
+  );
 
   useEffect(() => {
-    if (!drawerOpen || comparisonIsCoherent || !dominantUseCase) {
-      setSuggestionPool([]);
+    if (comparisonIsCoherent) {
+      setAlignmentTargetCategory(null);
+      setAlignmentPool([]);
+      setAlignmentLoading(false);
+      return;
+    }
+
+    if (!alignmentTargetCategory || !comparisonCategories.includes(alignmentTargetCategory)) {
+      setAlignmentTargetCategory(null);
+      setAlignmentPool([]);
+      setAlignmentLoading(false);
+    }
+  }, [comparisonIsCoherent, alignmentTargetCategory, comparisonCategories]);
+
+  useEffect(() => {
+    if (!drawerOpen || comparisonIsCoherent || !alignmentTargetCategory) {
+      setAlignmentPool([]);
+      setAlignmentLoading(false);
       return;
     }
     let cancelled = false;
-    fetchToolsByCategories([dominantUseCase])
-      .then((tools) => { if (!cancelled) setSuggestionPool(tools); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [drawerOpen, comparisonIsCoherent, dominantUseCase]);
+    setAlignmentLoading(true);
+    fetchToolsByCategories([alignmentTargetCategory])
+      .then((tools) => {
+        if (!cancelled) {
+          setAlignmentPool(
+            tools.filter((tool) => normalizeCategoryKey(tool.category) === alignmentTargetCategory)
+          );
+          setAlignmentLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAlignmentPool([]);
+          setAlignmentLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerOpen, comparisonIsCoherent, alignmentTargetCategory]);
 
-  const suggestedTools = useMemo(
-    () => getSuggestedComparableTools(compareTools, suggestionPool, dominantUseCase),
-    [compareTools, suggestionPool, dominantUseCase]
-  );
+  const alignedTools = useMemo(() => {
+    if (!alignmentTargetCategory) return [];
+    return compareTools.filter((tool) => normalizeCategoryKey(tool.category) === alignmentTargetCategory);
+  }, [compareTools, alignmentTargetCategory]);
 
-  const outlierTool = useMemo(
-    () => findOutlierTool(compareTools),
-    [compareTools]
-  );
+  const outlierTools = useMemo(() => {
+    if (!alignmentTargetCategory) return [];
+    return compareTools.filter((tool) => normalizeCategoryKey(tool.category) !== alignmentTargetCategory);
+  }, [compareTools, alignmentTargetCategory]);
+
+  const replacementOptionsByOutlier = useMemo(() => {
+    if (!alignmentTargetCategory || outlierTools.length === 0) return {} as Record<number, Tool[]>;
+    const selectedIds = new Set(compareTools.map((tool) => tool.id));
+    const options: Record<number, Tool[]> = {};
+
+    for (const outlier of outlierTools) {
+      const outlierRoleId = workflowRoleIdForCategory(outlier.category);
+      const editingSameRole = !!(alignmentTargetRoleId && outlierRoleId && alignmentTargetRoleId === outlierRoleId);
+      const candidates = alignmentPool
+        .filter((tool) => tool.id !== outlier.id)
+        .filter((tool) => !selectedIds.has(tool.id) || tool.id === outlier.id)
+        .sort((a, b) => {
+          const scoreFor = (candidate: Tool) => {
+            let score = scoreToolForDecision(candidate);
+            if (isWorkflowCompareContext && alignmentTargetRoleId) {
+              if (coveredRoleIds.has(alignmentTargetRoleId) && !editingSameRole) score -= 2;
+              if (!coveredRoleIds.has(alignmentTargetRoleId)) score += 1.5;
+            }
+            return score;
+          };
+          return scoreFor(b) - scoreFor(a);
+        })
+        .slice(0, 4);
+      options[outlier.id] = candidates;
+    }
+
+    return options;
+  }, [alignmentPool, alignmentTargetCategory, alignmentTargetRoleId, compareTools, coveredRoleIds, isWorkflowCompareContext, outlierTools]);
 
   const finalDecisionSentence = useMemo(
     () => getFinalDecisionSentence(bestOverallTool, bestForBeginners, bestForAdvanced),
     [bestOverallTool, bestForBeginners, bestForAdvanced]
   );
 
-  const drawerTitle = compareSessionContext?.title || 'Compare Tools';
-  const drawerSubtitle = compareSessionContext?.subtitle || 'See which tool is best for your needs.';
+  const drawerTitle = compareSessionContext?.title || 'Step Decision';
+  const drawerSubtitle = compareSessionContext?.subtitle || 'AI recommends one best tool for this workflow step. Confirm your choice.';
   const isDailyMatchCompare = compareSessionContext?.source === 'daily_match';
+  const compareJourneyLine = useMemo(() => {
+    const source = compareSessionContext?.source;
+    if (source === 'stack_flow') return 'Goal -> Build stack step by step -> Compare one step -> Confirm';
+    if (source === 'search_flow') return 'Goal -> Tool shortlist -> Compare one step -> Confirm choice';
+    if (source === 'stack_compare') return 'Goal -> Stack generated -> Compare stacks -> Open winning stack';
+    if (source === 'daily_match') return 'Daily use case -> Compare options -> Confirm winner';
+    if (compareTools.length >= 2) return 'Shortlist -> Compare -> Confirm decision';
+    return null;
+  }, [compareSessionContext?.source, compareTools.length]);
   const isStackCompare = !!stackCompareSession;
   const recommendedStack = stackCompareSession?.baseline;
   const recommendedStackId = recommendedStack?.id;
-  const handleOpenComparedStack = (_stack: StackCompareLike) => {};
+  const handleOpenComparedStack = (stack: StackNavigationLike) => {
+    const path = getStackDetailPath(stack);
+    if (!path) return;
+    closeDrawer();
+    navigate(path, { state: { fromCompare: true } });
+  };
 
   const setCompareTools = (updater: (prev: Tool[]) => Tool[]) => {
     const next = updater(compareTools);
@@ -781,14 +778,128 @@ export default function CompareDrawer() {
 
   const handleReplaceTool = (oldToolId: number, newTool: Tool) => {
     if (oldToolId === newTool.id) return;
-    setCompareTools((prev) =>
-      prev.map((t) => (t.id === oldToolId ? newTool : t))
-    );
+    const nextTools = compareTools.map((t) => (t.id === oldToolId ? newTool : t));
+    setCompareTools(() => nextTools);
+    setStack(nextTools.slice(0, 5));
+    toast.success('Tool updated in your workflow');
   };
 
+  const handleChooseAlignmentCategory = (category: string) => {
+    setAlignmentTargetCategory(category);
+  };
+
+  const commitCtaLabel = useMemo(() => {
+    const source = compareSessionContext?.source;
+    const toolCompareMode = source !== 'stack_compare';
+    const insufficientTools = compareTools.length < 2;
+    
+    // Primary CTA label (when decision is allowed)
+    if (source === 'stack_flow') return 'Continue with this stack';
+    if (source === 'stack_compare') return 'Use recommended stack';
+    if (source === 'search_flow') return 'Add this tool to your stack';
+    return 'Add this tool to your stack';
+  }, [compareSessionContext?.source, compareTools.length]);
+
+  const commitCtaDisabledReason = useMemo(() => {
+    const source = compareSessionContext?.source;
+    const toolCompareMode = source !== 'stack_compare';
+    
+    if (toolCompareMode) {
+      if (compareTools.length < 2) return 'Add at least 2 tools to compare';
+      if (!comparisonIsCoherent) return 'Fix comparison first';
+    }
+    return null;
+  }, [compareSessionContext?.source, compareTools.length, comparisonIsCoherent]);
+
+  const canCommitDecision = useMemo(() => {
+    const source = compareSessionContext?.source;
+    if (source === 'stack_compare') {
+      return !!(recommendedStack && getStackDetailPath(recommendedStack));
+    }
+    // For tool-compare: require at least 2 tools AND coherent comparison
+    return compareTools.length >= 2 && comparisonIsCoherent;
+  }, [compareSessionContext?.source, compareTools.length, comparisonIsCoherent, recommendedStack]);
+
+  const shouldShowCommitAnyway = useMemo(() => {
+    const source = compareSessionContext?.source;
+    const toolCompareMode = source !== 'stack_compare';
+    const isIncoherent = !comparisonIsCoherent;
+    const hasSomeTools = compareTools.length >= 2;
+    return toolCompareMode && isIncoherent && hasSomeTools;
+  }, [compareSessionContext?.source, comparisonIsCoherent, compareTools.length]);
+
+  const getCommitTools = useCallback(() => {
+    // For tool-compare: only commit the best overall tool to avoid blindly committing all
+    // This ensures the user's decision is reflected in the stack
+    if (!bestOverallTool) return [];
+    return [bestOverallTool];
+  }, [bestOverallTool]);
+
+  const handleCommitDecision = () => {
+    const source = compareSessionContext?.source;
+
+    if (source === 'stack_compare') {
+      const targetPath = recommendedStack ? getStackDetailPath(recommendedStack) : null;
+      if (!targetPath) return;
+      closeDrawer();
+      navigate(targetPath, { state: { fromCompare: true } });
+      toast.success('Stack updated successfully');
+      return;
+    }
+
+    // For tool-compare: only commit the best overall tool
+    const toolsToCommit = getCommitTools();
+    if (toolsToCommit.length === 0) return;
+
+    const overlaps = getOverlapForTool(toolsToCommit[0]);
+    setStack(toolsToCommit.slice(0, 5));
+    openStackDrawer();
+    closeDrawer();
+    navigate('/results?mode=stack');
+
+    if (overlaps.length > 0) {
+      const overlapNames = overlaps.map((t) => t.name).join(', ');
+      toast.warning(
+        `${toolsToCommit[0]?.name} replaces ${overlapNames}. You already have a tool for this step. Replace it or keep your current one.`
+      );
+    } else {
+      toast.success(`${toolsToCommit[0]?.name} added to your stack`);
+    }
+  };
+
+  const handleCommitAnyway = useCallback(() => {
+    const source = compareSessionContext?.source;
+    const toolsToCommit = getCommitTools();
+    if (toolsToCommit.length === 0) return;
+
+    const overlaps = getOverlapForTool(toolsToCommit[0]);
+    setStack(toolsToCommit.slice(0, 5));
+    openStackDrawer();
+    closeDrawer();
+    navigate('/results?mode=stack');
+
+    if (overlaps.length > 0) {
+      const overlapNames = overlaps.map((t) => t.name).join(', ');
+      toast.warning(
+        `${toolsToCommit[0]?.name} replaces ${overlapNames}. You already have a tool for this step. Replace it or keep your current one.`
+      );
+    } else {
+      toast.success(`${toolsToCommit[0]?.name} added to your stack`);
+    }
+  }, [getCommitTools, setStack, openStackDrawer, closeDrawer, navigate, getOverlapForTool]);
+
+  const handleDrawerOpenChange = useCallback((open: boolean) => {
+    if (!open) closeDrawer();
+  }, [closeDrawer]);
+
   return (
-    <Sheet open={drawerOpen} onOpenChange={closeDrawer}>
-      <SheetContent side="right" className="!inset-0 !h-screen !w-screen sm:!max-w-none !border-l-0 p-0 flex flex-col bg-[linear-gradient(180deg,rgba(250,252,255,0.98)_0%,rgba(243,247,252,0.86)_55%,rgba(238,243,250,0.74)_100%)] rounded-none">
+    <Sheet open={drawerOpen} onOpenChange={handleDrawerOpenChange} modal={false}>
+      <SheetContent
+        side="right"
+        className="!inset-0 !h-screen !w-screen sm:!max-w-none !border-l-0 p-0 flex flex-col bg-[linear-gradient(180deg,rgba(250,252,255,0.98)_0%,rgba(243,247,252,0.86)_55%,rgba(238,243,250,0.74)_100%)] rounded-none"
+        onInteractOutside={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+      >
         <SheetHeader className="pl-8 pr-16 sm:pr-20 pt-3 pb-3 border-b border-slate-200/80 bg-white/88 backdrop-blur-[2px] flex-shrink-0 flex flex-row items-center justify-between gap-4 space-y-0 text-left">
           <div className="min-w-0">
             <SheetTitle className="text-[24px] font-semibold text-slate-900 tracking-tight text-left">
@@ -797,6 +908,9 @@ export default function CompareDrawer() {
             <p className="text-[14px] leading-5 text-slate-600 mt-0.5">
               {drawerSubtitle}
             </p>
+            {compareJourneyLine && (
+              <p className="text-[11px] text-slate-500 mt-1">{compareJourneyLine}</p>
+            )}
             {isDailyMatchCompare && (
               <p className="text-[11px] font-medium text-[#4F46E5] mt-1">Use Case Match follow-up</p>
             )}
@@ -921,7 +1035,7 @@ export default function CompareDrawer() {
               </div>
             </section>
           ) : colCount === 0 ? (
-            <p className="text-[14px] text-slate-400 text-center py-16">No tools selected for comparison.</p>
+            <p className="text-[14px] text-slate-400 text-center py-16">Select at least 2 tools to decide this workflow step.</p>
           ) : (
             <>
               {comparisonIsCoherent ? (
@@ -975,7 +1089,8 @@ export default function CompareDrawer() {
                   <div className="rounded-xl border border-amber-400/80 bg-amber-50/70 p-4 shadow-[0_10px_22px_rgba(180,83,9,0.08)] flex flex-col items-start">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-800 mb-1.5">Comparison warning</span>
                     <span className="text-[15px] font-semibold text-slate-900 mb-1">You cannot compare these tools directly.</span>
-                    <span className="text-[13px] text-slate-800 mb-1">Align your comparison to one use case first, then pick a winner.</span>
+                    <span className="text-[13px] text-slate-800 mb-1">These tools belong to different categories, so Stackely cannot recommend one winner for this step yet.</span>
+                    <span className="text-[13px] text-slate-700 mb-1">Choose one category below to keep, then replace only the tools that do not belong to that category.</span>
                     <span className="text-[13px] text-slate-700 mb-1">{coherenceReason}</span>
                     {dominantUseCase && (
                       <span className="mt-1 inline-flex items-center rounded-md border border-amber-300/80 bg-amber-100/70 px-2.5 py-1 text-[12px] text-amber-900">
@@ -986,41 +1101,100 @@ export default function CompareDrawer() {
                 </section>
               )}
 
-              {!comparisonIsCoherent && suggestedTools.length > 0 && (
-                <section className="mt-2.5 w-full rounded-xl border border-slate-300 bg-white p-4 shadow-[0_12px_26px_rgba(15,23,42,0.08)]">
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-900 mb-0.5 px-1">
-                    Recommended fix
+              {!comparisonIsCoherent && (
+                <section className="mt-2.5 w-full rounded-xl border border-blue-300/50 bg-blue-50/30 p-4 shadow-[0_12px_26px_rgba(59,130,246,0.08)]">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blue-900 mb-0.5 px-1">
+                    Fix this step decision
                   </p>
-                  <p className="text-[13px] font-medium text-slate-700 mb-3 px-1">
-                    Replace one tool below to make this a direct comparison.
+                  <p className="text-[13px] font-medium text-blue-800 mb-3 px-1">
+                    Choose the one category this workflow step should belong to
                   </p>
-                  <div className="grid gap-2">
-                    {suggestedTools.map(({ tool, reason }) => (
-                      <div key={tool.id} className="flex items-center gap-3 rounded-[0.5rem] border border-slate-200 bg-white p-3">
-                        <ToolLogo
-                          logoUrl={tool.logo_url}
-                          websiteUrl={tool.website_url}
-                          toolName={getToolName(tool)}
-                          size={28}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-semibold text-slate-900">{getToolName(tool)}</p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">{reason}</p>
-                          {outlierTool && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="mt-2 h-7 px-2.5 text-[11px] border-slate-200"
-                              onClick={() => handleReplaceTool(outlierTool.id, tool)}
-                            >
-                              Replace {getToolName(outlierTool)} with {getToolName(tool)}
-                            </Button>
+
+                  <div className="rounded-[0.75rem] border border-blue-200 bg-white p-3.5">
+                    <p className="text-[12px] font-semibold text-slate-700 mb-2">Tools in this step decision</p>
+                    <div className="flex flex-wrap gap-2">
+                      {compareTools.map((tool) => (
+                        <div key={tool.id} className="inline-flex items-center gap-1.5 rounded border border-slate-200 bg-slate-50 px-2 py-1">
+                          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={getToolName(tool)} size={16} />
+                          <span className="text-[11px] font-medium text-slate-800">{getToolName(tool)}</span>
+                          <span className="text-[10px] text-slate-500">({formatCategoryLabel(normalizeCategoryKey(tool.category) || 'other')})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-[0.75rem] border border-blue-200 bg-white p-3.5">
+                    <p className="text-[12px] font-semibold text-slate-700 mb-2">Categories in this comparison</p>
+                    <p className="text-[11px] text-slate-600 mb-3">
+                      Picking a category keeps the tools already in that category and shows replacements only for the outliers.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {sortedComparisonCategories.map((category) => (
+                        <Button
+                          key={category}
+                          type="button"
+                          variant={alignmentTargetCategory === category ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 px-3 text-[11px]"
+                          onClick={() => handleChooseAlignmentCategory(category)}
+                        >
+                          {formatCategoryLabel(category)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {alignmentTargetCategory && (
+                    <div className="mt-3 rounded-[0.75rem] border border-blue-200 bg-white p-3.5">
+                      <p className="text-[12px] font-semibold text-slate-700 mb-1">
+                        Aligning to: {formatCategoryLabel(alignmentTargetCategory)}
+                      </p>
+                      <p className="text-[11px] text-slate-600 mb-3">
+                        {alignedTools.length} tool{alignedTools.length !== 1 ? 's' : ''} already match, {outlierTools.length} outlier{outlierTools.length !== 1 ? 's' : ''} to replace.
+                      </p>
+                      {isWorkflowCompareContext && (
+                        <div className="mb-3 space-y-1.5 rounded border border-slate-200 bg-slate-50 px-2.5 py-2">
+                          <p className="text-[11px] text-slate-700">You are choosing the tool for this workflow step</p>
+                          {missingRoleLabels.length > 0 && (
+                            <p className="text-[11px] text-slate-600">Other workflow steps are still missing from your stack</p>
                           )}
                         </div>
+                      )}
+
+                      <div className="grid gap-2">
+                        {outlierTools.map((outlier) => (
+                          <div key={outlier.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-[12px] font-semibold text-slate-800">
+                              Replace {getToolName(outlier)}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mb-2">
+                              Current category: {formatCategoryLabel(normalizeCategoryKey(outlier.category) || 'other')} · only this outlier will be replaced
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {alignmentLoading && (
+                                <span className="text-[11px] text-slate-500">Finding replacement options in this category...</span>
+                              )}
+                              {(replacementOptionsByOutlier[outlier.id] || []).map((option) => (
+                                <Button
+                                  key={`${outlier.id}-${option.id}`}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2.5 text-[11px] border-slate-200"
+                                  onClick={() => handleReplaceTool(outlier.id, option)}
+                                >
+                                  Use {getToolName(option)}
+                                </Button>
+                              ))}
+                              {!alignmentLoading && (replacementOptionsByOutlier[outlier.id] || []).length === 0 && (
+                                <span className="text-[11px] text-slate-500">No replacement options are available in this category for this outlier. Choose another category to continue.</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </section>
               )}
 
@@ -1050,6 +1224,14 @@ export default function CompareDrawer() {
                               : 'border-slate-200 bg-white/70'
                           }`}
                         >
+                          {isWinner && (
+                            <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-[#4F46E5]/20">
+                              <span className="inline-flex items-center rounded-full bg-[#4F46E5]/15 px-2.5 py-1 text-[10px] font-semibold text-[#4338CA]">
+                                ✓ Will be added
+                              </span>
+                              <span className="text-[10px] font-medium text-slate-500">to your stack</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 mb-2">
                             <div className="rounded-[0.5rem] border border-slate-200/80 bg-white p-2 shadow-sm shadow-slate-200/30">
                               <ToolLogo
@@ -1114,6 +1296,58 @@ export default function CompareDrawer() {
           </div>
           </div>
         </ScrollArea>
+
+        <div className="flex-shrink-0 border-t border-slate-200/90 bg-white/92 backdrop-blur-[2px] px-6 py-3.5 sm:px-8">
+          <div className="mx-auto w-full max-w-[1720px]">
+            {/* Helper text for incomplete comparison */}
+            {!isStackCompare && !canCommitDecision && compareTools.length >= 2 && !comparisonIsCoherent && (
+              <p className="mb-2.5 text-[12px] text-amber-700 font-medium bg-amber-50/60 border border-amber-200/40 rounded px-3 py-2">
+                Tools are spread across multiple categories. {bestOverallTool && `Select ${getToolName(bestOverallTool)} to confirm this step, or add more similar tools.`}
+              </p>
+            )}
+            
+            {/* Helper text for valid comparison */}
+            {!isStackCompare && bestOverallTool && compareTools.length >= 2 && comparisonIsCoherent && (
+              <p className="mb-2.5 text-[12px] text-slate-600 font-medium">
+                This confirms <span className="font-semibold text-slate-900">{getToolName(bestOverallTool)}</span> as your <span className="font-semibold text-slate-900">{getRoleLabel(bestOverallTool)}</span> step tool. <span className="text-slate-500">(AI recommends one tool per step.)</span>
+              </p>
+            )}
+            
+            {!canCommitDecision && commitCtaDisabledReason ? (
+              <div className="space-y-2.5">
+                <Button
+                  type="button"
+                  size="lg"
+                  className="h-11 w-full text-[14px] font-semibold bg-slate-100 text-slate-500 hover:bg-slate-100 cursor-not-allowed"
+                  disabled
+                >
+                  {commitCtaDisabledReason}
+                </Button>
+                {shouldShowCommitAnyway && (
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="outline"
+                    className="h-11 w-full text-[14px] font-semibold border-amber-300 text-amber-700 hover:bg-amber-50"
+                    onClick={handleCommitAnyway}
+                  >
+                    Commit anyway
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button
+                type="button"
+                size="lg"
+                className="h-11 w-full text-[14px] font-semibold"
+                onClick={handleCommitDecision}
+                disabled={!canCommitDecision}
+              >
+                {commitCtaLabel}
+              </Button>
+            )}
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
   );

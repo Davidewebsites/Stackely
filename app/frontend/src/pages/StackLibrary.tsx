@@ -7,6 +7,7 @@ import AppTopBar from '@/components/AppTopBar';
 import { getSavedStacks, toggleSavedStackPinned, type SavedStack } from '@/lib/api';
 import { usePageSeo } from '@/lib/seo';
 import { normalizeStackDisplayName } from '@/lib/stackNames';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 function getBestRecencyTimestamp(stack: SavedStack): number {
   const candidate = stack as SavedStack & {
@@ -293,13 +294,31 @@ export default function StackLibrary() {
         {toolPreview.length > 0 ? (
           <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-white/70 px-2.5 py-1.5">
             {toolPreview.map((tool) => (
-              <ToolLogo
+              <button
                 key={`${stack.id}-${tool.id}`}
-                logoUrl={tool.logo_url}
-                websiteUrl={tool.website_url}
-                toolName={tool.name}
-                size={22}
-              />
+                type="button"
+                onClick={(event) => {
+                  if (!(tool.website_url || tool.affiliate_url || tool.url || tool.affiliateUrl)) {
+                    return;
+                  }
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openOutboundToolLink(tool, '/stack-library', '_blank', {
+                    surfaceSource: 'stack_library_tool_preview',
+                    slotId: String(tool.id),
+                    slotName: tool.name,
+                  });
+                }}
+                className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                aria-label={`Open ${tool.name}`}
+              >
+                <ToolLogo
+                  logoUrl={tool.logo_url}
+                  websiteUrl={tool.website_url}
+                  toolName={tool.name}
+                  size={22}
+                />
+              </button>
             ))}
           </div>
         ) : null}

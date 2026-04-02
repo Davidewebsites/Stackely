@@ -8,6 +8,7 @@ import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 import { usePageSeo } from '@/lib/seo';
 import { useStack } from '@/contexts/StackContext';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 const TOOL_STATUS_CONFIG = {
   not_started: {
@@ -106,6 +107,7 @@ export default function SharedStack() {
     if (savedStack.tools?.length) {
       return savedStack.tools.map((tool, index) => ({
         id: tool.id,
+        slug: tool.slug,
         stepNumber: index + 1,
         name: tool.name,
         category: tool.category,
@@ -276,6 +278,36 @@ export default function SharedStack() {
     }
     setLoadedIntoWorkspaceStack(true);
     openDrawer();
+  };
+
+  const handleStepToolIdentityClick = (item: (typeof stepItems)[number]) => {
+    if (item.websiteUrl) {
+      openOutboundToolLink(
+        {
+          id: item.id,
+          name: item.name,
+          slug: item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+          short_description: item.description,
+          category: item.category || 'workflow',
+          pricing_model: item.pricingModel || 'freemium',
+          skill_level: 'intermediate',
+          website_url: item.websiteUrl,
+          logo_url: item.logoUrl,
+        },
+        window.location.pathname,
+        '_blank',
+        {
+          surfaceSource: 'shared_stack_tool_identity',
+          slotId: String(item.id),
+          slotName: item.name,
+        }
+      );
+      return;
+    }
+
+    if (item.slug) {
+      navigate(`/tools/${item.slug}`);
+    }
   };
 
   if (loading) {
@@ -562,12 +594,19 @@ export default function SharedStack() {
                         {item.stepNumber}
                       </div>
                       <div className="mt-0.5">
-                        <ToolLogo
-                          logoUrl={item.logoUrl}
-                          websiteUrl={item.websiteUrl}
-                          toolName={item.name}
-                          size={44}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleStepToolIdentityClick(item)}
+                          className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                          aria-label={`Open ${item.name}`}
+                        >
+                          <ToolLogo
+                            logoUrl={item.logoUrl}
+                            websiteUrl={item.websiteUrl}
+                            toolName={item.name}
+                            size={44}
+                          />
+                        </button>
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -579,7 +618,14 @@ export default function SharedStack() {
                             {statusConfig.label}
                           </span>
                         </div>
-                        <h3 className="text-[20px] font-semibold text-slate-900 tracking-tight">{item.name}</h3>
+                        <button
+                          type="button"
+                          onClick={() => handleStepToolIdentityClick(item)}
+                          className="text-[20px] font-semibold text-slate-900 tracking-tight hover:text-[#4F46E5] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                          aria-label={`Open ${item.name}`}
+                        >
+                          {item.name}
+                        </button>
                         <div className="flex flex-wrap items-center gap-2 mt-2 text-[12px] text-slate-500">
                           <span className="capitalize">{item.category.replace(/_/g, ' ')}</span>
                           <span className="text-slate-300">·</span>

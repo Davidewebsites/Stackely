@@ -130,6 +130,28 @@ export default function ToolCard({
     .slice(0, 2);
   const avoidCandidates = toBulletList(avoidIfText, 'No major limitations documented yet.');
   const whenToAvoid = avoidCandidates.slice(0, 2);
+  const surfaceSource = outboundSurfaceSource || (location.pathname === '/results' ? 'results_tool_list' : undefined);
+
+  const handleIdentityClick = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+
+    if (tool.website_url || tool.affiliate_url) {
+      trackToolClick(tool.id);
+      openOutboundToolLink(tool, location.pathname, '_blank', {
+        surfaceSource,
+      });
+      return;
+    }
+
+    if (!disableNavigation) {
+      navigate(`/tools/${tool.slug}`, {
+        state: {
+          from: location.pathname + location.search,
+          parentFrom: location.state?.from || "/"
+        }
+      });
+    }
+  };
 
   return (
     <div
@@ -158,16 +180,26 @@ export default function ToolCard({
       {/* Header */}
       <div className={`flex items-start justify-between gap-3 ${compact ? 'mb-3' : 'mb-3.5'}`}>
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={compact ? 30 : 38} />
+          <button
+            type="button"
+            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+            onClick={handleIdentityClick}
+            aria-label={`Open ${tool.name}`}
+          >
+            <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={compact ? 30 : 38} />
+          </button>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h3
-                className={`text-[15px] font-semibold text-slate-900 truncate transition-colors ${
+              <button
+                type="button"
+                className={`max-w-full truncate text-left text-[15px] font-semibold text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm ${
                   isNavigable ? 'group-hover:text-slate-700' : ''
                 }`}
+                onClick={handleIdentityClick}
+                aria-label={`Open ${tool.name}`}
               >
                 {tool.name}
-              </h3>
+              </button>
               {isAI && (
                 <Sparkles className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
               )}
@@ -312,7 +344,7 @@ export default function ToolCard({
                 e.stopPropagation();
                 trackToolClick(tool.id);
                 openOutboundToolLink(tool, location.pathname, '_blank', {
-                  surfaceSource: outboundSurfaceSource || (location.pathname === '/results' ? 'results_tool_list' : undefined),
+                  surfaceSource,
                 });
               }}
             >

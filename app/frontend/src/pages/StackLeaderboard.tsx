@@ -5,11 +5,12 @@ import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 import AppTopBar from '@/components/AppTopBar';
 import { Button } from '@/components/ui/button';
-import { CATEGORIES } from '@/lib/api';
+import { CATEGORIES, type Tool } from '@/lib/api';
 import { usePageSeo } from '@/lib/seo';
 import { getDailyStackCatalog } from '@/data/dailyStackShowdown';
 import { getTopRankedStacksByCategory, getTopRankedStacksGlobal, type TimeWindow } from '@/lib/stackRanking';
 import { useCompare, type StackCompareCandidate } from '@/contexts/CompareContext';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 type CategoryFilter = 'all' | string;
 
@@ -30,6 +31,30 @@ interface LeaderboardEntry {
   rank: number | null;
   statusLabel?: 'Trending' | 'Suggested';
   toolPreview: Array<{ name: string; logoUrl?: string; websiteUrl?: string }>;
+}
+
+function toLeaderboardPreviewTool(
+  tool: { name: string; logoUrl?: string; websiteUrl?: string },
+  categoryId: string,
+  stackId: string,
+  index: number,
+): Tool {
+  const slug = tool.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || `leaderboard-tool-${index + 1}`;
+
+  return {
+    id: 820000 + index,
+    name: tool.name,
+    slug,
+    short_description: `Appears in ${stackId}`,
+    category: categoryId || 'workflow',
+    pricing_model: 'freemium',
+    skill_level: 'intermediate',
+    website_url: tool.websiteUrl,
+    logo_url: tool.logoUrl,
+  };
 }
 
 export default function StackLeaderboard() {
@@ -257,15 +282,32 @@ export default function StackLeaderboard() {
                 <p className="text-[15px] font-semibold text-slate-900 line-clamp-1">{entry.stackName}</p>
                 <p className="mt-1.5 text-[13px] text-slate-600 leading-relaxed line-clamp-2">{entry.summary}</p>
                 <div className="mt-3 flex items-center gap-2">
-                  {entry.toolPreview.map((tool) => (
-                    <ToolLogo
-                      key={`${entry.stackId}-${tool.name}`}
-                      logoUrl={tool.logoUrl}
-                      websiteUrl={tool.websiteUrl}
-                      toolName={tool.name}
-                      size={24}
-                    />
-                  ))}
+                  {entry.toolPreview.map((tool, index) => {
+                    const previewTool = toLeaderboardPreviewTool(tool, entry.categoryId, entry.stackId, index);
+                    return (
+                      <button
+                        key={`${entry.stackId}-${tool.name}`}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openOutboundToolLink(previewTool, '/stack-leaderboard', '_blank', {
+                            surfaceSource: 'stack_leaderboard_tool_preview',
+                            slotId: `${entry.stackId}_${index + 1}`,
+                            slotName: tool.name,
+                          });
+                        }}
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                        aria-label={`Open ${tool.name}`}
+                      >
+                        <ToolLogo
+                          logoUrl={tool.logoUrl}
+                          websiteUrl={tool.websiteUrl}
+                          toolName={tool.name}
+                          size={24}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="mt-4 flex items-center gap-2">
                   <Button

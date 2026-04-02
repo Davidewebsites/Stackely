@@ -142,6 +142,84 @@ function deriveWorkflowStepLabel(item: AdaptedStackItem, index: number): string 
   return `Step ${index + 1} - ${categoryLabel}`;
 }
 
+function getRoleLabelFromCategory(category: string): string {
+  switch (category) {
+    case 'landing_pages':
+      return 'Landing page builder';
+    case 'email_marketing':
+      return 'Email platform';
+    case 'automation':
+      return 'Automation engine';
+    case 'analytics':
+      return 'Analytics tracker';
+    case 'copywriting':
+      return 'Copy assistant';
+    case 'design':
+      return 'Design tool';
+    case 'ads':
+      return 'Traffic platform';
+    case 'video':
+      return 'Video editor';
+    default:
+      return 'Workflow tool';
+  }
+}
+
+function getPrimaryFunctionByCategory(category: string): string {
+  switch (category) {
+    case 'landing_pages':
+      return 'build high-converting pages';
+    case 'email_marketing':
+      return 'capture and nurture your audience';
+    case 'automation':
+      return 'connect tools and automate repetitive tasks';
+    case 'analytics':
+      return 'track performance and optimize results';
+    case 'copywriting':
+      return 'write persuasive messaging faster';
+    case 'design':
+      return 'create visuals for your funnel';
+    case 'ads':
+      return 'drive targeted traffic';
+    case 'video':
+      return 'create and publish video content';
+    default:
+      return 'move this workflow step forward';
+  }
+}
+
+function getActionCtaByCategory(category: string): string {
+  switch (category) {
+    case 'landing_pages':
+      return 'Start building your funnel';
+    case 'email_marketing':
+      return 'Launch your newsletter';
+    case 'automation':
+      return 'Automate this workflow';
+    case 'analytics':
+      return 'Track your results';
+    case 'ads':
+      return 'Capture more leads';
+    case 'copywriting':
+      return 'Create your messaging';
+    case 'design':
+      return 'Design your assets';
+    case 'video':
+      return 'Publish your video flow';
+    default:
+      return 'Use this tool now';
+  }
+}
+
+function buildStackIntro(items: AdaptedStackItem[]): string {
+  if (!items.length) return 'This setup helps you move from setup to conversion with clear step-by-step tools.';
+
+  const phrases = Array.from(new Set(items.map((item) => getPrimaryFunctionByCategory(item.tool.category)))).slice(0, 3);
+  if (phrases.length === 1) return `This setup helps you ${phrases[0]}.`;
+  if (phrases.length === 2) return `This setup helps you ${phrases[0]} and ${phrases[1]}.`;
+  return `This setup helps you ${phrases[0]}, ${phrases[1]}, and ${phrases[2]}.`;
+}
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -1532,6 +1610,20 @@ export default function Results() {
     () => visibleStackItems.map((item, index) => deriveWorkflowStepLabel(item, index)),
     [visibleStackItems]
   );
+  const stackIntroCopy = useMemo(() => buildStackIntro(visibleStackItems), [visibleStackItems]);
+  const primaryStackToolIndex = useMemo(() => {
+    if (visibleStackItems.length === 0) return 0;
+    let bestIndex = 0;
+    let bestScore = visibleStackItems[0].tool.internal_score || 0;
+    for (let i = 1; i < visibleStackItems.length; i++) {
+      const score = visibleStackItems[i].tool.internal_score || 0;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }, [visibleStackItems]);
 
   const stackToolLookup = useMemo(() => {
     const map = new Map<string, Tool>();
@@ -2132,6 +2224,7 @@ export default function Results() {
             {/* Stack Recommendation Section */}
             {queryMode === 'stack' && stackData && (
               <div className="mt-12">
+                <p className="mb-2 text-[11px] text-slate-500">Recommended setup for your goal</p>
                 <div className="mb-10 panel-card p-6 sm:p-7">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-8 h-8 rounded-lg border border-[#2F80ED]/20 bg-white flex items-center justify-center flex-shrink-0">
@@ -2220,12 +2313,20 @@ export default function Results() {
                   </div>
                 )}
 
+                <div className="mb-6 rounded-xl border border-slate-200 bg-white/80 px-4 py-3">
+                  <p className="text-[13px] text-slate-700 leading-relaxed">{stackIntroCopy}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Follow these steps to get results</p>
+                </div>
+
                 <div className="space-y-5">
                   {visibleStackItems.map((item, index) => {
                     const accent = getStackAccent(item.tool);
                     const pickReason = item.why && item.why.trim().length > 0 ? item.why.trim() : getWhyRecommended(item.tool);
                     const avoidTradeoff = getAvoidIf(item.tool);
                     const stepTitle = visibleStackStepLabels[index] || deriveWorkflowStepLabel(item, index);
+                    const roleLabel = getRoleLabelFromCategory(item.tool.category);
+                    const primaryFunction = getPrimaryFunctionByCategory(item.tool.category);
+                    const isPrimaryTool = index === primaryStackToolIndex;
                     const timeEstimates = ['⏱ 15–30 min setup', '⏱ 10–20 min setup', '⏱ 5–15 min setup'];
                     const howToUse =
                       index === 0
@@ -2233,12 +2334,23 @@ export default function Results() {
                         : index === 1
                         ? `Use ${item.tool.name} to execute the core of your process and automate key tasks.`
                         : `Monitor ${item.tool.name} regularly to measure results and improve performance over time.`;
+                    const openIdentityOutbound = () => {
+                      trackToolClick(item.tool.id);
+                      openOutboundToolLink(item.tool, location.pathname, '_blank', {
+                        surfaceSource: 'results_stack_identity',
+                        slotName: item.role,
+                        slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
+                        userGoalQuery: searchParams.get('q') || undefined,
+                      });
+                    };
                     return (
                       <div
                         key={`${item.tool.id}-${item.rank}`}
                         className={`rounded-2xl border bg-white overflow-hidden ${
                           recentlyReplacedToolId === item.tool.id
                             ? 'border-emerald-200 ring-2 ring-emerald-100'
+                            : isPrimaryTool
+                            ? 'border-indigo-200 bg-[linear-gradient(180deg,rgba(79,70,229,0.06)_0%,rgba(255,255,255,0.98)_36%,rgba(255,255,255,1)_100%)]'
                             : 'border-slate-200'
                         }`}
                       >
@@ -2252,6 +2364,7 @@ export default function Results() {
                               >
                                 {index + 1}
                               </span>
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Step {index + 1}</span>
                               <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-700">{stepTitle}</span>
                             </div>
                             <span className="text-[11px] text-slate-400">{timeEstimates[index]}</span>
@@ -2259,15 +2372,47 @@ export default function Results() {
 
                           {/* Tool identity */}
                           <div className="flex items-center gap-3 mb-3">
-                            <ToolLogo logoUrl={item.tool.logo_url} websiteUrl={item.tool.website_url} toolName={item.tool.name} size={38} />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openIdentityOutbound();
+                              }}
+                              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                              aria-label={`Open ${item.tool.name}`}
+                            >
+                              <ToolLogo logoUrl={item.tool.logo_url} websiteUrl={item.tool.website_url} toolName={item.tool.name} size={38} />
+                            </button>
                             <div className="min-w-0">
-                              <p className="text-[15px] font-semibold text-slate-900">{item.tool.name}</p>
+                              {isPrimaryTool && (
+                                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 mb-1">
+                                  Start here
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openIdentityOutbound();
+                                }}
+                                className="max-w-full truncate text-left text-[15px] font-semibold text-slate-900 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                                aria-label={`Open ${item.tool.name}`}
+                              >
+                                {item.tool.name}
+                              </button>
                               <p className="text-[12px] text-slate-500 truncate">{item.role}</p>
+                              <p className="text-[11px] text-slate-600">{roleLabel}</p>
+                              <p className="text-[11px] text-slate-500">Used to {primaryFunction}</p>
                             </div>
                           </div>
 
                           {/* Tags */}
                           <div className="flex flex-wrap gap-1.5 mb-4">
+                            {isPrimaryTool && (
+                              <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600 text-white border-0">
+                                Recommended
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
                               {item.tool.pricing_model}
                             </Badge>
@@ -2332,22 +2477,27 @@ export default function Results() {
                               </Button>
                             )}
                             {(item.tool.affiliate_url || item.tool.website_url) && (
-                              <Button
-                                size="sm"
-                                className="h-8 px-3 text-[11px] text-white bg-slate-900 hover:bg-slate-800"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  trackToolClick(item.tool.id);
-                                  openOutboundToolLink(item.tool, location.pathname, '_blank', {
-                                    surfaceSource: 'results_stack_primary',
-                                    slotName: item.role,
-                                    slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
-                                    userGoalQuery: searchParams.get('q') || undefined,
-                                  });
-                                }}
-                              >
-                                {getOutboundCtaLabel(item.tool, 'Try this tool')}
-                              </Button>
+                              <div className="flex flex-col">
+                                <Button
+                                  size="sm"
+                                  className={`${isPrimaryTool ? 'h-9 px-3.5 text-[12px] bg-indigo-600 hover:bg-indigo-700 shadow-[0_10px_22px_rgba(79,70,229,0.38)] text-white ring-1 ring-indigo-400/30' : 'h-8 px-3 text-[11px] bg-slate-600/75 hover:bg-slate-600/85 text-white/85 opacity-80 shadow-none'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    trackToolClick(item.tool.id);
+                                    openOutboundToolLink(item.tool, location.pathname, '_blank', {
+                                      surfaceSource: 'results_stack_primary',
+                                      slotName: item.role,
+                                      slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
+                                      userGoalQuery: searchParams.get('q') || undefined,
+                                    });
+                                  }}
+                                >
+                                  {getOutboundCtaLabel(item.tool, getActionCtaByCategory(item.tool.category))}
+                                </Button>
+                                {isPrimaryTool && (
+                                  <p className="mt-1 text-[10px] text-slate-500">↳ This is where most setups begin</p>
+                                )}
+                              </div>
                             )}
                           </div>
 
@@ -2373,7 +2523,23 @@ export default function Results() {
                                         className="flex items-center justify-between gap-3 rounded-md border border-slate-200/80 bg-slate-50/55 px-2.5 py-2"
                                       >
                                         <div className="min-w-0 flex items-center gap-2">
-                                          <span className="text-[12px] text-slate-700 font-medium truncate">{alt.name}</span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              trackToolClick(alt.id);
+                                              openOutboundToolLink(alt, location.pathname, '_blank', {
+                                                surfaceSource: 'results_stack_alternative',
+                                                slotName: item.role,
+                                                slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
+                                                userGoalQuery: searchParams.get('q') || undefined,
+                                              });
+                                            }}
+                                            className="truncate text-[12px] text-slate-700 font-medium hover:text-indigo-700 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                                            aria-label={`Open ${alt.name}`}
+                                          >
+                                            {alt.name}
+                                          </button>
                                           <Badge variant="outline" className="text-[9px] uppercase border-slate-300 text-slate-600">
                                             {alt.pricing_model}
                                           </Badge>
@@ -2405,6 +2571,10 @@ export default function Results() {
                     );
                   })}
                 </div>
+
+                <p className="mt-4 text-center text-[11px] text-slate-500">
+                  Start with the first step to get results faster
+                </p>
 
                 {workflowBudgetFallbackUsed && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">

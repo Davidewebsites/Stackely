@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { getAvoidIf, getWhyRecommended } from '@/lib/toolInsights';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 const STATUS_CONFIG: Record<
   CoverageRole['status'],
@@ -43,6 +44,20 @@ export default function StackDrawer() {
     nextAction,
     missingCount,
   } = useStack();
+  const handleToolIdentityClick = (tool: typeof stackTools[number]) => {
+    if (tool.website_url || tool.affiliate_url || tool.url || tool.affiliateUrl) {
+      openOutboundToolLink(tool, '/stack-drawer', '_blank', {
+        surfaceSource: 'stack_drawer_tool_identity',
+        slotId: String(tool.id),
+        slotName: tool.name,
+      });
+      return;
+    }
+
+    if (tool.slug) {
+      navigate(`/tools/${tool.slug}`);
+    }
+  };
 
   const handleShareStack = async () => {
     if (stackTools.length === 0) return;
@@ -1541,14 +1556,28 @@ export default function StackDrawer() {
                           : 'border-slate-100 bg-slate-50/60'
                       }`}
                     >
-                      <ToolLogo
-                        logoUrl={tool.logo_url}
-                        websiteUrl={tool.website_url}
-                        toolName={tool.name}
-                        size={32}
-                      />
+                      <button
+                        type="button"
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                        onClick={() => handleToolIdentityClick(tool)}
+                        aria-label={`Open ${tool.name}`}
+                      >
+                        <ToolLogo
+                          logoUrl={tool.logo_url}
+                          websiteUrl={tool.website_url}
+                          toolName={tool.name}
+                          size={32}
+                        />
+                      </button>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-900 truncate">{tool.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleToolIdentityClick(tool)}
+                          className="truncate text-[13px] font-semibold text-slate-900 hover:text-[#4F46E5] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                          aria-label={`Open ${tool.name}`}
+                        >
+                          {tool.name}
+                        </button>
                         <p className="text-[10px] text-[#2F80ED] font-medium mt-0.5 truncate">
                           {catInfo?.label || tool.category}
                         </p>

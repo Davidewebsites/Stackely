@@ -36,6 +36,7 @@ import {
 } from '@/lib/stackRanking';
 import { useCompare } from '@/contexts/CompareContext';
 import { buildResultsPathFromPreset, STACK_ENTRY_PRESET_LIST } from '@/lib/stackEntryPresets';
+import { getOutboundCtaLabel, openOutboundToolLink } from '@/lib/outboundLinks';
 
 const LANDING_USE_CASES = [
   {
@@ -540,14 +541,39 @@ function hasStableUseCaseCoverage(query: string, tools: Tool[]): boolean {
 }
 
 function TopPickCard({ tool }: { tool: Tool }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const catLabel = CATEGORIES.find((c) => c.id === tool.category)?.label;
   const reason = getTopPickReason(tool);
+  const normalizedName = (tool.name || '').trim().toLowerCase();
+
+  const outboundLabel = (() => {
+    if (normalizedName.includes('clickfunnels')) return 'Start building funnels';
+    if (normalizedName.includes('beehiiv')) return 'Start your newsletter';
+    if (normalizedName.includes('systeme')) return 'Launch your setup';
+    if (normalizedName === 'make' || normalizedName.includes('make.com')) return 'Automate workflows';
+    return getOutboundCtaLabel(tool, 'Visit website');
+  })();
+
+  const goToDetails = () => {
+    navigate(`/tools/${tool.slug}`, {
+      state: { from: location.pathname + location.search },
+    });
+  };
 
   return (
-    <Link
-      to={`/tools/${tool.slug}?surface_source=homepage_top_daily_picks`}
-      state={{ from: location.pathname + location.search }}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={goToDetails}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          goToDetails();
+        }
+      }}
       className="group rounded-2xl border border-slate-200 bg-white p-7 min-h-[220px] flex flex-col items-center justify-center text-center shadow-sm transition-all duration-300 hover:scale-[1.015] hover:border-[#4F46E5]/35 hover:shadow-[0_14px_30px_rgba(79,70,229,0.14)] hover:bg-[linear-gradient(160deg,rgba(47,128,237,0.05)_0%,rgba(138,43,226,0.06)_100%)]"
+      aria-label={`Open details for ${tool.name}`}
     >
       <ToolLogo
         logoUrl={tool.logo_url}
@@ -558,7 +584,32 @@ function TopPickCard({ tool }: { tool: Tool }) {
       <p className="mt-3 text-[13px] font-semibold text-slate-900 line-clamp-1 max-w-[22ch]">{tool.name}</p>
       {catLabel && <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[#2F80ED]/80 line-clamp-1">{catLabel}</p>}
       <p className="mt-3 text-[12px] text-slate-700 font-medium line-clamp-1 max-w-[25ch]">{reason}</p>
-    </Link>
+      <div className="mt-4 w-full flex items-center justify-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 px-3 text-[11px]"
+          onClick={(event) => {
+            event.stopPropagation();
+            goToDetails();
+          }}
+        >
+          View details
+        </Button>
+        <Button
+          size="sm"
+          className="h-8 px-3 text-[11px] bg-slate-900 hover:bg-slate-800 text-white"
+          onClick={(event) => {
+            event.stopPropagation();
+            openOutboundToolLink(tool, location.pathname, '_blank', {
+              surfaceSource: 'homepage_top_daily_picks',
+            });
+          }}
+        >
+          {outboundLabel}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1041,28 +1092,13 @@ export default function Index() {
               </div>
             </form>
 
-            <div className="w-full mt-6">
-              <p className="eyebrow-label mb-2 text-center" style={{ color: '#2F80ED' }}>
-                Quick examples
-              </p>
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {QUICK_EXAMPLES.map((goal) => (
-                  <button
-                    key={goal}
-                    onClick={() => handleGoalClick(goal, 'homepage_quick_examples')}
-                    className="text-[12px] px-3.5 py-1.5 rounded-full bg-slate-100/85 border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-[#4F46E5]/35 hover:text-[#4F46E5] transition-all"
-                  >
-                    {goal}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="w-full mt-5">
+            <div className="w-full mt-4">
+              <p className="text-[12px] text-center text-slate-600 mb-0.5">Start with what works</p>
+              <p className="text-[11px] text-center text-slate-500 mb-1.5">Pre-built setups used to launch faster</p>
               <p className="eyebrow-label mb-2 text-center" style={{ color: '#2F80ED' }}>
                 Start faster
               </p>
-              <div className="flex flex-wrap justify-center gap-1.5">
+              <div className="flex flex-wrap justify-center gap-2">
                 {orderedStartFasterPresets.map((preset) => {
                   const PRESET_INTENT: Record<string, string> = { funnel: 'funnel', newsletter: 'newsletter', automation: 'automation' };
                   const presetIntentType = PRESET_INTENT[preset.key];
@@ -1075,12 +1111,29 @@ export default function Index() {
                     <Link
                       key={preset.key}
                       to={presetPath}
-                      className="text-[12px] px-3.5 py-1.5 rounded-full bg-indigo-50/75 border border-indigo-100 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-200 transition-all"
+                      className="text-[13px] font-medium px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-300 transition-all"
                     >
                       {preset.title}
                     </Link>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="w-full mt-3 opacity-75">
+              <p className="eyebrow-label mb-1.5 text-center" style={{ color: '#64748b' }}>
+                Quick examples
+              </p>
+              <div className="flex flex-wrap justify-center gap-1">
+                {QUICK_EXAMPLES.map((goal) => (
+                  <button
+                    key={goal}
+                    onClick={() => handleGoalClick(goal, 'homepage_quick_examples')}
+                    className="text-[11px] px-3 py-1 rounded-full bg-slate-100/80 border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:border-[#4F46E5]/35 hover:text-[#4F46E5] transition-all"
+                  >
+                    {goal}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -1484,7 +1537,7 @@ export default function Index() {
           {shouldShowTopRankedSection && (
           <section className="border-t border-slate-200 bg-slate-50/35">
             <div className="page-shell page-section">
-              <div className="mb-7 max-w-[72ch]">
+              <div className="mb-5 max-w-[72ch]">
                 <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Ranking</div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1495,18 +1548,19 @@ export default function Index() {
                     to="/stack-leaderboard"
                     className="text-[12px] font-semibold text-[#2F80ED] hover:text-[#4F46E5] transition-colors"
                   >
-                    View leaderboard
+                    See full leaderboard
                   </Link>
                 </div>
               </div>
 
               {(() => {
-                const [featured, ...secondary] = topRankedHomepageStacks;
+                const previewStacks = topRankedHomepageStacks.slice(0, 3);
+                const [featured, ...secondary] = previewStacks;
                 return (
-                  <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3">
                         <Link
                           to={`/view-stack/${featured.stackId}`}
-                          className="rounded-2xl border border-[#4F46E5]/28 bg-[linear-gradient(165deg,rgba(47,128,237,0.10)_0%,rgba(79,70,229,0.08)_50%,rgba(255,255,255,0.96)_100%)] p-6 hover:shadow-[0_16px_34px_rgba(79,70,229,0.16)] hover:-translate-y-[1px] transition-all"
+                          className="rounded-2xl border border-[#4F46E5]/28 bg-[linear-gradient(165deg,rgba(47,128,237,0.10)_0%,rgba(79,70,229,0.08)_50%,rgba(255,255,255,0.96)_100%)] p-5 hover:shadow-[0_16px_34px_rgba(79,70,229,0.16)] hover:-translate-y-[1px] transition-all"
                         >
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">{featured.categoryLabel}</span>
@@ -1528,12 +1582,12 @@ export default function Index() {
                           <p className="mt-4 text-[12px] font-semibold text-[#4F46E5]">Open stack details</p>
                         </Link>
 
-                        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-3">
-                          {secondary.slice(0, 2).map((entry, idx) => (
+                        <div className="grid grid-cols-1 gap-2.5 rounded-2xl border border-slate-200/80 bg-white/80 p-2.5">
+                          {secondary.map((entry, idx) => (
                             <Link
                               key={entry.stackId}
                               to={`/view-stack/${entry.stackId}`}
-                              className="rounded-xl border border-slate-200 bg-white p-4 hover:shadow-[0_10px_20px_rgba(15,23,42,0.06)] hover:-translate-y-[1px] hover:border-[#4F46E5]/28 transition-all"
+                              className="rounded-xl border border-slate-200 bg-white p-3.5 hover:shadow-[0_10px_20px_rgba(15,23,42,0.06)] hover:-translate-y-[1px] hover:border-[#4F46E5]/28 transition-all"
                             >
                               <div className="mb-1.5 flex items-center justify-between gap-2">
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{entry.categoryLabel}</span>
@@ -1623,7 +1677,7 @@ export default function Index() {
                   <button
                     key={useCase.title}
                     onClick={() => handleWorkflowCardClick(useCase)}
-                    className={`group text-left rounded-xl border bg-white p-5 hover:border-[#4F46E5]/40 hover:shadow-[0_10px_22px_rgba(79,70,229,0.14)] transition-all ${isTrendingUseCase ? 'border-slate-300 bg-slate-50/50' : 'border-slate-200'}`}
+                    className={`group text-left rounded-xl border bg-white/95 p-4 hover:border-[#4F46E5]/30 hover:shadow-[0_8px_16px_rgba(79,70,229,0.1)] transition-all ${isTrendingUseCase ? 'border-slate-300 bg-slate-50/45' : 'border-slate-200'}`}
                   >
                     <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3" />
                     <div className="flex items-center justify-between mb-2.5">
@@ -1634,7 +1688,8 @@ export default function Index() {
                         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#2F80ED]/85">Use case</span>
                       )}
                     </div>
-                    <p className="text-[13px] text-slate-500 leading-relaxed mb-3 line-clamp-2">{useCase.description}</p>
+                    <p className="text-[13px] text-slate-500 leading-relaxed mb-2.5 line-clamp-2">{useCase.description}</p>
+                    <p className="text-[11px] text-slate-500/90 mb-3">See how this setup works step-by-step</p>
                     <span className="text-[11px] font-medium text-[#2F80ED] group-hover:text-[#4F46E5]">Run this use case</span>
                   </button>
                   );
@@ -1649,8 +1704,8 @@ export default function Index() {
               <div className="page-shell page-section">
                 <div className="mb-7 max-w-[72ch]">
                   <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Featured tools</div>
-                  <h2 className="section-heading mb-2">Top daily picks</h2>
-                  <p className="body-copy">Curated daily for fast scanning.</p>
+                  <h2 className="section-heading mb-2">Top tools used in stacks today</h2>
+                  <p className="body-copy">Based on real workflow combinations and usage patterns</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

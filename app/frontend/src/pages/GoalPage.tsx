@@ -11,6 +11,7 @@ import StackelyLogo from '@/components/StackelyLogo';
 import ToolLogo from '@/components/ToolLogo';
 import SiteFooter from '@/components/SiteFooter';
 import { usePageSeo } from '@/lib/seo';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 /** Convert a slug like "create-instagram-ads" to a readable goal "create instagram ads" */
 function slugToGoal(slug: string): string {
@@ -173,12 +174,48 @@ export default function GoalPage() {
                       className="group panel-card flex items-start gap-4 p-5 hover:border-[#8A2BE2]/35 hover:bg-violet-50/15 transition-all cursor-pointer"
                       onClick={() => navigate(`/tools/${tool.slug}`)}
                     >
-                      <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          if (tool.website_url || tool.affiliate_url || tool.url || tool.affiliateUrl) {
+                            event.stopPropagation();
+                            openOutboundToolLink(tool, window.location.pathname, '_blank', {
+                              surfaceSource: 'goal_page_ai_identity',
+                              slotId: String(tool.id),
+                              slotName: tool.name,
+                            });
+                            return;
+                          }
+                          event.stopPropagation();
+                          navigate(`/tools/${tool.slug}`);
+                        }}
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A2BE2]/55"
+                        aria-label={`Open ${tool.name}`}
+                      >
+                        <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={40} />
+                      </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <h3 className="text-[16px] font-semibold text-slate-900 group-hover:text-violet-700 transition-colors">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              if (tool.website_url || tool.affiliate_url || tool.url || tool.affiliateUrl) {
+                                event.stopPropagation();
+                                openOutboundToolLink(tool, window.location.pathname, '_blank', {
+                                  surfaceSource: 'goal_page_ai_identity',
+                                  slotId: String(tool.id),
+                                  slotName: tool.name,
+                                });
+                                return;
+                              }
+                              event.stopPropagation();
+                              navigate(`/tools/${tool.slug}`);
+                            }}
+                            className="text-left text-[16px] font-semibold text-slate-900 group-hover:text-violet-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A2BE2]/55 rounded-sm"
+                            aria-label={`Open ${tool.name}`}
+                          >
                             {tool.name}
-                          </h3>
+                          </button>
                           <Badge className="text-[10px] bg-violet-100 text-violet-700 border-violet-200 font-medium">
                             {tool.tool_type === 'hybrid' ? 'AI-enhanced' : 'AI'}
                           </Badge>

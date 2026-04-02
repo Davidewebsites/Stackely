@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import ToolLogo from '@/components/ToolLogo';
@@ -32,6 +32,7 @@ import {
 import { useCompare } from '@/contexts/CompareContext';
 import { useStack } from '@/contexts/StackContext';
 import type { StackCompareCandidate } from '@/contexts/CompareContext';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 type StackSource = 'daily' | 'saved';
 
@@ -494,6 +495,7 @@ function toFallbackActionTools(stack: ResolvedStack): Tool[] {
 
 export default function ViewStack() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { clearCompare, openDrawer: openCompareDrawer, setCompareSessionContext, openStackComparison } = useCompare();
@@ -557,6 +559,24 @@ export default function ViewStack() {
     if (mappedTools.length > 0) return mappedTools;
     return toFallbackActionTools(resolvedStack);
   }, [mappedTools, resolvedStack]);
+
+  const handleResolvedToolIdentityClick = (index: number) => {
+    const tool = actionableTools[index];
+    if (!tool) return;
+
+    if (tool.website_url || tool.affiliate_url || tool.url || tool.affiliateUrl) {
+      openOutboundToolLink(tool, '/view-stack', '_blank', {
+        surfaceSource: 'view_stack_tool_identity',
+        slotId: String(index + 1),
+        slotName: tool.name,
+      });
+      return;
+    }
+
+    if (tool.slug) {
+      navigate(`/tools/${tool.slug}`);
+    }
+  };
 
   const handleCompareThisStack = () => {
     if (!resolvedStack || relatedStacks.length === 0) {
@@ -822,14 +842,28 @@ export default function ViewStack() {
                       <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-300 text-[11px] font-semibold text-slate-700">
                         {index + 1}
                       </span>
-                      <ToolLogo
-                        logoUrl={tool.logoUrl}
-                        websiteUrl={tool.websiteUrl}
-                        toolName={tool.name}
-                        size={34}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => handleResolvedToolIdentityClick(index)}
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                        aria-label={`Open ${tool.name}`}
+                      >
+                        <ToolLogo
+                          logoUrl={tool.logoUrl}
+                          websiteUrl={tool.websiteUrl}
+                          toolName={tool.name}
+                          size={34}
+                        />
+                      </button>
                       <div className="min-w-0">
-                        <p className="text-[15px] font-semibold text-slate-900">{tool.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleResolvedToolIdentityClick(index)}
+                          className="text-[15px] font-semibold text-slate-900 hover:text-[#4F46E5] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                          aria-label={`Open ${tool.name}`}
+                        >
+                          {tool.name}
+                        </button>
                         <p className="text-[12px] text-slate-500">{tool.role}</p>
                         <p className="mt-1 text-[13px] text-slate-700">{tool.whyUsed}</p>
                       </div>
@@ -883,13 +917,46 @@ export default function ViewStack() {
                       <p className="text-[13px] font-semibold text-slate-900 line-clamp-1">{item.name}</p>
                       <div className="mt-2 flex items-center gap-1.5">
                         {item.tools.map((tool) => (
-                          <ToolLogo
+                          <button
                             key={`${item.id}-${tool.name}`}
-                            logoUrl={tool.logoUrl}
-                            websiteUrl={tool.websiteUrl}
-                            toolName={tool.name}
-                            size={22}
-                          />
+                            type="button"
+                            onClick={(event) => {
+                              if (!tool.websiteUrl) {
+                                return;
+                              }
+                              event.preventDefault();
+                              event.stopPropagation();
+                              openOutboundToolLink(
+                                {
+                                  id: 840000 + item.id.length + tool.name.length,
+                                  name: tool.name,
+                                  slug: tool.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `related-${item.id}`,
+                                  short_description: item.description,
+                                  category: resolvedStack?.categoryLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'workflow',
+                                  pricing_model: 'freemium',
+                                  skill_level: 'intermediate',
+                                  website_url: tool.websiteUrl,
+                                  logo_url: tool.logoUrl,
+                                },
+                                '/view-stack',
+                                '_blank',
+                                {
+                                  surfaceSource: 'view_stack_related_tool',
+                                  slotId: item.id,
+                                  slotName: tool.name,
+                                }
+                              );
+                            }}
+                            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                            aria-label={`Open ${tool.name}`}
+                          >
+                            <ToolLogo
+                              logoUrl={tool.logoUrl}
+                              websiteUrl={tool.websiteUrl}
+                              toolName={tool.name}
+                              size={22}
+                            />
+                          </button>
                         ))}
                       </div>
                       <p className="mt-2 text-[12px] text-slate-600 line-clamp-1">{item.description}</p>

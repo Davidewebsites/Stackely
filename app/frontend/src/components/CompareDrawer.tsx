@@ -8,6 +8,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { useCompare } from '@/contexts/CompareContext';
 import { useStack } from '@/contexts/StackContext';
 import { Tool, fetchToolsByCategories } from '@/lib/api';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
 
 type StackCompareLike = {
   id: string;
@@ -21,6 +22,29 @@ type StackNavigationLike = {
   id: string;
   path?: string;
 };
+
+function toComparePreviewTool(
+  tool: { name: string; logoUrl?: string; websiteUrl?: string },
+  category = 'workflow',
+  index = 0,
+): Tool {
+  const slug = tool.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || `compare-preview-${index + 1}`;
+
+  return {
+    id: 850000 + index,
+    name: tool.name,
+    slug,
+    short_description: 'Comparison preview tool',
+    category,
+    pricing_model: 'freemium',
+    skill_level: 'intermediate',
+    website_url: tool.websiteUrl,
+    logo_url: tool.logoUrl,
+  };
+}
 
 function firstCsvToken(val?: string | null): string | undefined {
   if (!val) return undefined;
@@ -568,6 +592,20 @@ export default function CompareDrawer() {
   } = useCompare();
 
   const colCount = compareTools.length;
+  const handleToolIdentityClick = (tool: Tool, surfaceSource: string) => {
+    if (tool.website_url || tool.affiliate_url || tool.url || tool.affiliateUrl) {
+      openOutboundToolLink(tool, '/compare-drawer', '_blank', {
+        surfaceSource,
+        slotId: String(tool.id),
+        slotName: getToolName(tool),
+      });
+      return;
+    }
+
+    if (tool.slug) {
+      navigate(`/tools/${tool.slug}`);
+    }
+  };
 
   const {
     dominantUseCase,
@@ -974,15 +1012,31 @@ export default function CompareDrawer() {
                     <p className="text-[12px] leading-snug text-slate-600 line-clamp-1"><span className="font-semibold">Not ideal if:</span> {toNotIdealIfLine(stackCompareSession.baseline)}</p>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
-                    {stackCompareSession.baseline.tools.slice(0, 4).map((tool) => (
-                      <ToolLogo
-                        key={`baseline-${stackCompareSession.baseline.id}-${tool.name}`}
-                        logoUrl={tool.logoUrl}
-                        websiteUrl={tool.websiteUrl}
-                        toolName={tool.name}
-                        size={24}
-                      />
-                    ))}
+                    {stackCompareSession.baseline.tools.slice(0, 4).map((tool, index) => {
+                      const outboundTool = toComparePreviewTool(tool, stackCompareSession.baseline.categoryLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'workflow', index);
+                      return (
+                        <button
+                          key={`baseline-${stackCompareSession.baseline.id}-${tool.name}`}
+                          type="button"
+                          onClick={() => {
+                            openOutboundToolLink(outboundTool, '/compare-drawer', '_blank', {
+                              surfaceSource: 'compare_drawer_baseline_tool',
+                              slotId: `${stackCompareSession.baseline.id}_${index + 1}`,
+                              slotName: tool.name,
+                            });
+                          }}
+                          className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                          aria-label={`Open ${tool.name}`}
+                        >
+                          <ToolLogo
+                            logoUrl={tool.logoUrl}
+                            websiteUrl={tool.websiteUrl}
+                            toolName={tool.name}
+                            size={24}
+                          />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1019,15 +1073,31 @@ export default function CompareDrawer() {
                         <p className="text-[12px] leading-snug text-slate-600 line-clamp-1"><span className="font-semibold">Not ideal if:</span> {toNotIdealIfLine(stack)}</p>
                       </div>
                       <div className="mt-3 flex items-center gap-1.5">
-                        {stack.tools.slice(0, 4).map((tool) => (
-                          <ToolLogo
-                            key={`${stack.id}-${tool.name}`}
-                            logoUrl={tool.logoUrl}
-                            websiteUrl={tool.websiteUrl}
-                            toolName={tool.name}
-                            size={22}
-                          />
-                        ))}
+                        {stack.tools.slice(0, 4).map((tool, index) => {
+                          const outboundTool = toComparePreviewTool(tool, stack.categoryLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'workflow', index);
+                          return (
+                            <button
+                              key={`${stack.id}-${tool.name}`}
+                              type="button"
+                              onClick={() => {
+                                openOutboundToolLink(outboundTool, '/compare-drawer', '_blank', {
+                                  surfaceSource: 'compare_drawer_alternative_stack_tool',
+                                  slotId: `${stack.id}_${index + 1}`,
+                                  slotName: tool.name,
+                                });
+                              }}
+                              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                              aria-label={`Open ${tool.name}`}
+                            >
+                              <ToolLogo
+                                logoUrl={tool.logoUrl}
+                                websiteUrl={tool.websiteUrl}
+                                toolName={tool.name}
+                                size={22}
+                              />
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -1051,8 +1121,22 @@ export default function CompareDrawer() {
                       {bestOverallTool ? (
                         <>
                           <div className="flex items-center gap-2 mb-2">
-                            <ToolLogo logoUrl={bestOverallTool.logo_url} websiteUrl={bestOverallTool.website_url} toolName={getToolName(bestOverallTool)} size={32} />
-                            <span className="text-lg font-semibold text-slate-900">{getToolName(bestOverallTool)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToolIdentityClick(bestOverallTool, 'compare_drawer_best_overall')}
+                              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                              aria-label={`Open ${getToolName(bestOverallTool)}`}
+                            >
+                              <ToolLogo logoUrl={bestOverallTool.logo_url} websiteUrl={bestOverallTool.website_url} toolName={getToolName(bestOverallTool)} size={32} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToolIdentityClick(bestOverallTool, 'compare_drawer_best_overall')}
+                              className="text-left text-lg font-semibold text-slate-900 hover:text-[#4F46E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                              aria-label={`Open ${getToolName(bestOverallTool)}`}
+                            >
+                              {getToolName(bestOverallTool)}
+                            </button>
                           </div>
                           <span className="text-[13px] text-slate-700">{getRecommendationReason(bestOverallTool, 'overall')}</span>
                         </>
@@ -1063,8 +1147,22 @@ export default function CompareDrawer() {
                       {bestForBeginners ? (
                         <>
                           <div className="flex items-center gap-2 mb-2">
-                            <ToolLogo logoUrl={bestForBeginners.logo_url} websiteUrl={bestForBeginners.website_url} toolName={getToolName(bestForBeginners)} size={28} />
-                            <span className="text-base font-semibold text-slate-900">{getToolName(bestForBeginners)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToolIdentityClick(bestForBeginners, 'compare_drawer_best_beginner')}
+                              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                              aria-label={`Open ${getToolName(bestForBeginners)}`}
+                            >
+                              <ToolLogo logoUrl={bestForBeginners.logo_url} websiteUrl={bestForBeginners.website_url} toolName={getToolName(bestForBeginners)} size={28} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToolIdentityClick(bestForBeginners, 'compare_drawer_best_beginner')}
+                              className="text-left text-base font-semibold text-slate-900 hover:text-[#4F46E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                              aria-label={`Open ${getToolName(bestForBeginners)}`}
+                            >
+                              {getToolName(bestForBeginners)}
+                            </button>
                           </div>
                           <span className="text-[13px] text-slate-700">{getRecommendationReason(bestForBeginners, 'beginners')}</span>
                         </>
@@ -1075,8 +1173,22 @@ export default function CompareDrawer() {
                       {bestForAdvanced ? (
                         <>
                           <div className="flex items-center gap-2 mb-2">
-                            <ToolLogo logoUrl={bestForAdvanced.logo_url} websiteUrl={bestForAdvanced.website_url} toolName={getToolName(bestForAdvanced)} size={28} />
-                            <span className="text-base font-semibold text-slate-900">{getToolName(bestForAdvanced)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToolIdentityClick(bestForAdvanced, 'compare_drawer_best_advanced')}
+                              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                              aria-label={`Open ${getToolName(bestForAdvanced)}`}
+                            >
+                              <ToolLogo logoUrl={bestForAdvanced.logo_url} websiteUrl={bestForAdvanced.website_url} toolName={getToolName(bestForAdvanced)} size={28} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToolIdentityClick(bestForAdvanced, 'compare_drawer_best_advanced')}
+                              className="text-left text-base font-semibold text-slate-900 hover:text-[#4F46E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                              aria-label={`Open ${getToolName(bestForAdvanced)}`}
+                            >
+                              {getToolName(bestForAdvanced)}
+                            </button>
                           </div>
                           <span className="text-[13px] text-slate-700">{getRecommendationReason(bestForAdvanced, 'advanced')}</span>
                         </>
@@ -1115,8 +1227,22 @@ export default function CompareDrawer() {
                     <div className="flex flex-wrap gap-2">
                       {compareTools.map((tool) => (
                         <div key={tool.id} className="inline-flex items-center gap-1.5 rounded border border-slate-200 bg-slate-50 px-2 py-1">
-                          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={getToolName(tool)} size={16} />
-                          <span className="text-[11px] font-medium text-slate-800">{getToolName(tool)}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToolIdentityClick(tool, 'compare_drawer_coherence_tools')}
+                            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                            aria-label={`Open ${getToolName(tool)}`}
+                          >
+                            <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={getToolName(tool)} size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToolIdentityClick(tool, 'compare_drawer_coherence_tools')}
+                            className="text-[11px] font-medium text-slate-800 hover:text-[#4F46E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm text-left"
+                            aria-label={`Open ${getToolName(tool)}`}
+                          >
+                            {getToolName(tool)}
+                          </button>
                           <span className="text-[10px] text-slate-500">({formatCategoryLabel(normalizeCategoryKey(tool.category) || 'other')})</span>
                         </div>
                       ))}
@@ -1234,15 +1360,29 @@ export default function CompareDrawer() {
                           )}
                           <div className="flex items-center gap-2 mb-2">
                             <div className="rounded-[0.5rem] border border-slate-200/80 bg-white p-2 shadow-sm shadow-slate-200/30">
-                              <ToolLogo
-                                logoUrl={tool.logo_url}
-                                websiteUrl={tool.website_url}
-                                toolName={getToolName(tool)}
-                                size={28}
-                              />
+                              <button
+                                type="button"
+                                onClick={() => handleToolIdentityClick(tool, 'compare_drawer_decision_card')}
+                                className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                                aria-label={`Open ${getToolName(tool)}`}
+                              >
+                                <ToolLogo
+                                  logoUrl={tool.logo_url}
+                                  websiteUrl={tool.website_url}
+                                  toolName={getToolName(tool)}
+                                  size={28}
+                                />
+                              </button>
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[13px] font-bold text-slate-900">{getToolName(tool)}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleToolIdentityClick(tool, 'compare_drawer_decision_card')}
+                                className="text-[13px] font-bold text-slate-900 hover:text-[#4F46E5] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                                aria-label={`Open ${getToolName(tool)}`}
+                              >
+                                {getToolName(tool)}
+                              </button>
                               <p className="text-[11px] text-slate-500">{getPriceLabel(tool)}</p>
                             </div>
                             {isWinner && (

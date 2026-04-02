@@ -5,12 +5,36 @@ import {
   getDailyStackMatchup,
   type StackSide,
 } from '@/data/dailyStackShowdown';
+import { openOutboundToolLink } from '@/lib/outboundLinks';
+import type { Tool } from '@/lib/api';
 
 function parseReferenceDate(value: string | null): Date {
   if (!value) return new Date();
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return new Date();
   return parsed;
+}
+
+function toDailyWinningTool(
+  tool: { name: string; logoUrl?: string; websiteUrl?: string },
+  index: number,
+): Tool {
+  const slug = tool.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || `daily-winning-${index + 1}`;
+
+  return {
+    id: 830000 + index,
+    name: tool.name,
+    slug,
+    short_description: 'Daily winning stack tool',
+    category: 'workflow',
+    pricing_model: 'freemium',
+    skill_level: 'intermediate',
+    website_url: tool.websiteUrl,
+    logo_url: tool.logoUrl,
+  };
 }
 
 export default function DailyWinningStack() {
@@ -32,17 +56,46 @@ export default function DailyWinningStack() {
           <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/55 p-4">
             <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Tools</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {stack.tools.slice(0, 3).map((tool) => (
+              {stack.tools.slice(0, 3).map((tool, index) => {
+                const outboundTool = toDailyWinningTool(tool, index);
+                return (
                 <div key={tool.name} className="rounded-lg border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                  <ToolLogo
-                    logoUrl={tool.logoUrl}
-                    websiteUrl={tool.websiteUrl}
-                    toolName={tool.name}
-                    size={24}
-                  />
-                  <span className="text-[12px] text-slate-700 font-medium line-clamp-1">{tool.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openOutboundToolLink(outboundTool, '/daily-winning-stack', '_blank', {
+                        surfaceSource: 'daily_winning_stack_tool_identity',
+                        slotId: String(index + 1),
+                        slotName: tool.name,
+                      });
+                    }}
+                    className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60"
+                    aria-label={`Open ${tool.name}`}
+                  >
+                    <ToolLogo
+                      logoUrl={tool.logoUrl}
+                      websiteUrl={tool.websiteUrl}
+                      toolName={tool.name}
+                      size={24}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openOutboundToolLink(outboundTool, '/daily-winning-stack', '_blank', {
+                        surfaceSource: 'daily_winning_stack_tool_identity',
+                        slotId: String(index + 1),
+                        slotName: tool.name,
+                      });
+                    }}
+                    className="text-[12px] text-slate-700 font-medium line-clamp-1 text-left hover:text-[#4F46E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
+                    aria-label={`Open ${tool.name}`}
+                  >
+                    {tool.name}
+                  </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Badges</p>

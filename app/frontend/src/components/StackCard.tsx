@@ -47,6 +47,16 @@ export default function StackCard({ tool, position }: StackCardProps) {
   const avoidIfText = getAvoidIf(tool);
   const contextTags = getDisplayTags(tool, 3);
   const outboundCtaLabel = getOutboundCtaLabel(tool, 'Visit');
+  const handleIdentityClick = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    if (tool.website_url || tool.affiliate_url) {
+      openOutboundToolLink(tool, location.pathname, '_blank', {
+        surfaceSource: 'stack_card_identity',
+      });
+      return;
+    }
+    navigate(`/tools/${tool.slug}`);
+  };
 
   return (
     <div
@@ -92,10 +102,17 @@ export default function StackCard({ tool, position }: StackCardProps) {
 
         {/* Tool name with logo */}
         <div className="flex items-center gap-3 mb-1">
-          <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={32} />
-          <h3 className="text-[17px] font-semibold text-slate-900 transition-colors">
-            {tool.name}
-          </h3>
+          <button
+            type="button"
+            className="flex items-center gap-3 min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2F80ED]/55"
+            onClick={handleIdentityClick}
+            aria-label={`Open ${tool.name}`}
+          >
+            <ToolLogo logoUrl={tool.logo_url} websiteUrl={tool.website_url} toolName={tool.name} size={32} />
+            <h3 className="text-[17px] font-semibold text-slate-900 transition-colors truncate">
+              {tool.name}
+            </h3>
+          </button>
         </div>
         <p className="card-description mb-3.5">{tool.short_description}</p>
 

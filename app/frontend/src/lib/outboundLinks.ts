@@ -1,5 +1,18 @@
 import { type Tool } from '@/lib/api';
 
+const AFFILIATE_OVERRIDES: Record<string, string> = {
+  'clickfunnels': 'https://www.clickfunnels.com/signup-flow?aff=81e39989c311e71577d33f055de31472a9ffad4d630bbdb4262f65863dc15a21',
+  'systeme.io': 'https://systeme.io/?sa=sa0267746843790ed4c296e51035a551044a7c8813',
+  'beehiiv': 'https://www.beehiiv.com?via=Stackely-Affiliate',
+  'make': 'https://www.make.com/en/register?pc=stackely',
+};
+
+function getAffiliateOverrideUrl(tool: Tool | null | undefined): string | null {
+  if (!tool) return null;
+  const normalizedName = (tool.name || '').trim().toLowerCase();
+  return AFFILIATE_OVERRIDES[normalizedName] || null;
+}
+
 /**
  * Resolves the outbound URL for a tool.
  * Returns affiliateUrl if available and non-empty, falls back to url.
@@ -9,8 +22,11 @@ export function getOutboundToolUrl(tool: Tool | null | undefined): string | null
   
   const affUrl = (tool.affiliateUrl || tool.affiliate_url || '').trim();
   if (affUrl) return affUrl;
+
+  const overrideAffiliateUrl = getAffiliateOverrideUrl(tool);
+  if (overrideAffiliateUrl) return overrideAffiliateUrl;
   
-  const webUrl = (tool.url || tool.website_url || '').trim();
+  const webUrl = (tool.website_url || tool.url || '').trim();
   if (webUrl) return webUrl;
   
   return null;
@@ -23,6 +39,7 @@ export function getOutboundLinkType(tool: Tool | null | undefined): 'affiliate' 
   if (!tool) return 'none';
   
   if ((tool.affiliateUrl || tool.affiliate_url || '').trim()) return 'affiliate';
+  if (getAffiliateOverrideUrl(tool)) return 'affiliate';
   if ((tool.url || tool.website_url || '').trim()) return 'direct';
   
   return 'none';
@@ -46,6 +63,8 @@ export function trackOutboundToolClick(data: OutboundLinkTracking): void {
     timestamp: new Date().toISOString(),
     ...data,
   };
+
+  console.log('affiliate_click', data);
 
   // Log to console in development
   if (process.env.NODE_ENV === 'development') {

@@ -1,4 +1,5 @@
 import { type Tool } from '@/lib/api';
+import { supabase } from './supabase';
 
 const AFFILIATE_OVERRIDES: Record<string, string> = {
   'clickfunnels': 'https://www.clickfunnels.com/signup-flow?aff=81e39989c311e71577d33f055de31472a9ffad4d630bbdb4262f65863dc15a21',
@@ -100,6 +101,26 @@ export function trackOutboundToolClick(data: OutboundLinkTracking): void {
   if (process.env.NODE_ENV === 'development') {
     console.log('[Outbound Link]', event);
   }
+
+  // Persist to Supabase (fire-and-forget — never blocks navigation)
+  supabase
+    .from('affiliate_clicks')
+    .insert({
+      tool_name: data.tool_name,
+      tool_slug: data.tool_slug,
+      has_affiliate: data.has_affiliate,
+      surface_source: data.surface_source ?? null,
+      entry_source: data.entry_source ?? null,
+      destination_url: data.destination_url,
+    })
+    .then(({ error }) => {
+      if (error) {
+        console.warn('[affiliate_clicks] Insert failed:', error.message);
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn('[affiliate_clicks] Insert error:', err);
+    });
 
   // TODO: Wire to your analytics service
   // Example: gtag('event', 'outbound_tool_click', data);

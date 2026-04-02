@@ -10,7 +10,7 @@ import {
   CreditCard,
   Globe,
 } from 'lucide-react';
-import { CATEGORIES, PRICING_OPTIONS, fetchAllTools, fetchFeaturedTools, type Tool, type PricingPreference } from '@/lib/api';
+import { CATEGORIES, PRICING_OPTIONS, fetchAllTools, fetchFeaturedTools, detectIntentFromGoal, type Tool, type PricingPreference } from '@/lib/api';
 import ToolLogo from '@/components/ToolLogo';
 import AppTopBar from '@/components/AppTopBar';
 import SiteFooter from '@/components/SiteFooter';
@@ -805,7 +805,9 @@ export default function Index() {
       const skillParam = skillLevelPreference !== 'auto' ? `&skill=${encodeURIComponent(skillLevelPreference)}` : '';
       const pricingPreferenceFromBudget = budgetToPricingPreference(entryBudgetFilter);
       const budgetParam = entryBudgetFilter !== 'any' ? `&budget=${entryBudgetFilter}` : '';
-      navigate(`/results?q=${encodeURIComponent(goal)}&pricing=${pricingPreferenceFromBudget}${budgetParam}${skillParam}&surface_source=${encodeURIComponent(surfaceSource)}`);
+      const derivedIntentType = detectIntentFromGoal(goal);
+      const intentParam = derivedIntentType ? `&intent_type=${encodeURIComponent(derivedIntentType)}&intent_origin=quick_example` : '';
+      navigate(`/results?q=${encodeURIComponent(goal)}&pricing=${pricingPreferenceFromBudget}${budgetParam}${skillParam}&surface_source=${encodeURIComponent(surfaceSource)}${intentParam}`);
       return;
     }
     setQuery(goal);
@@ -816,7 +818,9 @@ export default function Index() {
     const skillParam = skillLevelPreference !== 'auto' ? `&skill=${encodeURIComponent(skillLevelPreference)}` : '';
     const anchorParam = useCase.workflowAnchor ? `&workflow_anchor=${encodeURIComponent(useCase.workflowAnchor)}` : '';
     const sourceParam = useCase.workflowAnchor ? '&workflow_source=affiliate_card' : '';
-    navigate(`/results?q=${encodeURIComponent(useCase.query)}&pricing=any${skillParam}${sourceParam}${anchorParam}&surface_source=homepage_workflow_cards`);
+    const intentType = useCase.workflowAnchor === 'clickfunnels' ? 'funnel' : useCase.workflowAnchor === 'beehiiv' ? 'newsletter' : detectIntentFromGoal(useCase.query);
+    const intentParam = `&intent_type=${encodeURIComponent(intentType)}&intent_origin=workflow_card`;
+    navigate(`/results?q=${encodeURIComponent(useCase.query)}&pricing=any${skillParam}${sourceParam}${anchorParam}${intentParam}&surface_source=homepage_workflow_cards`);
   };
 
   const handleGenerate = () => {
@@ -1059,15 +1063,24 @@ export default function Index() {
                 Start faster
               </p>
               <div className="flex flex-wrap justify-center gap-1.5">
-                {orderedStartFasterPresets.map((preset) => (
-                  <Link
-                    key={preset.key}
-                    to={appendQueryParam(buildResultsPathFromPreset(preset), 'surface_source', 'homepage_start_faster')}
-                    className="text-[12px] px-3.5 py-1.5 rounded-full bg-indigo-50/75 border border-indigo-100 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-200 transition-all"
-                  >
-                    {preset.title}
-                  </Link>
-                ))}
+                {orderedStartFasterPresets.map((preset) => {
+                  const PRESET_INTENT: Record<string, string> = { funnel: 'funnel', newsletter: 'newsletter', automation: 'automation' };
+                  const presetIntentType = PRESET_INTENT[preset.key];
+                  let presetPath = appendQueryParam(buildResultsPathFromPreset(preset), 'surface_source', 'homepage_start_faster');
+                  if (presetIntentType) {
+                    presetPath = appendQueryParam(presetPath, 'intent_type', presetIntentType);
+                    presetPath = appendQueryParam(presetPath, 'intent_origin', 'start_faster');
+                  }
+                  return (
+                    <Link
+                      key={preset.key}
+                      to={presetPath}
+                      className="text-[12px] px-3.5 py-1.5 rounded-full bg-indigo-50/75 border border-indigo-100 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-200 transition-all"
+                    >
+                      {preset.title}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </div>

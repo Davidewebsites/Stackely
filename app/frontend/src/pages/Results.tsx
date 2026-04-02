@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import {
   PRICING_OPTIONS,
   fetchToolsByCategories,
   recommendStackFromGoal,
+  detectIntentFromGoal,
   createShareableStackUrl,
   saveStack,
   searchTools,
@@ -188,6 +189,73 @@ function ensureAffiliateBrandedWorkflowAnchor(
     ...stack,
     stack: nextStack,
   };
+}
+
+/**
+ * Ensures the generated stack contains at least one tool from the required
+ * category group implied by intentType. If missing, replaces the weakest slot
+ * with the highest-ranked catalog tool in that category group.
+ * Never modifies the stack if intent is already satisfied or not recognised.
+ */
+function ensureIntentCoherence(
+  stack: StackResponseWithAlternatives,
+  intentType: string,
+  allTools: Tool[],
+): StackResponseWithAlternatives {
+  if (!stack?.stack?.length || !allTools.length) return stack;
+
+  const INTENT_REQUIRED_CATEGORIES: Record<string, string[]> = {
+    funnel: ['landing_pages', 'funnels', 'website_builders'],
+    newsletter: ['email_marketing'],
+  };
+
+  const required = INTENT_REQUIRED_CATEGORIES[intentType];
+  if (!required) return stack;
+
+  const normName = (n: string) => n.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const resolveTool = (toolName: string): Tool | undefined =>
+    allTools.find(
+      (t) => normName(t.name) === normName(toolName) || normName(t.slug || '') === normName(toolName),
+    );
+
+  // Guard: already satisfied
+  const satisfied = stack.stack.some((item) => {
+    const tool = resolveTool(item.tool);
+    return tool && required.some((cat) => tool.category === cat || tool.subcategory === cat);
+  });
+  if (satisfied) return stack;
+
+  // Best replacement: highest internal_score in required category group
+  const candidates = allTools
+    .filter((t) => required.some((cat) => t.category === cat || t.subcategory === cat))
+    .sort((a, b) => (b.internal_score || 0) - (a.internal_score || 0));
+  const bestTool = candidates[0];
+  if (!bestTool) return stack;
+
+  // Weakest slot: lowest internal_score across all current stack items
+  let weakestIndex = 0;
+  let weakestScore = Infinity;
+  for (let i = 0; i < stack.stack.length; i++) {
+    const tool = resolveTool(stack.stack[i].tool);
+    const score = tool ? (tool.internal_score || 0) : 0;
+    if (score < weakestScore) {
+      weakestScore = score;
+      weakestIndex = i;
+    }
+  }
+
+  const nextStack = [...stack.stack];
+  const current = nextStack[weakestIndex];
+  nextStack[weakestIndex] = {
+    ...current,
+    tool: bestTool.name,
+    why: `${bestTool.name} is the highest-ranked tool for this step and ensures intent coherence for your goal.`,
+    logo_url: bestTool.logo_url,
+    logo: bestTool.logo_url,
+    website_url: bestTool.website_url,
+  };
+
+  return { ...stack, stack: nextStack };
 }
 
 type QueryIntentType = 'exact_tool' | 'goal_search' | 'constrained_search' | 'alternative_search' | 'generic_search';
@@ -782,6 +850,12 @@ export default function Results() {
       ? explicitSkillPreferenceParam
       : null;
 
+  // Intent memory: read from URL or derive from query
+  const intentTypeParam = searchParams.get('intent_type');
+  const intentOriginParam = searchParams.get('intent_origin');
+  const intentType = intentTypeParam || (query ? detectIntentFromGoal(query) : 'creation') || 'creation';
+  const intentOrigin = intentOriginParam || 'search';
+
   const { classify, reset, isLoading, classification, stack, alternatives, aiAccelerators, error, activePricing } =
     useToolRecommendation();
 
@@ -797,6 +871,9 @@ export default function Results() {
   const [stackData, setStackData] = useState<StackResponseWithAlternatives | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
   const [catalogTools, setCatalogTools] = useState<Tool[]>([]);
+    // Ref so async .then() callbacks always see the latest catalog tools
+    const catalogToolsRef = useRef<Tool[]>([]);
+    useEffect(() => { catalogToolsRef.current = catalogTools; }, [catalogTools]);
   const [searchCatalogTools, setSearchCatalogTools] = useState<Tool[]>([]);
   const [searchWorkflowFallbackTools, setSearchWorkflowFallbackTools] = useState<Tool[]>([]);
   const [searchWorkflowSucceeded, setSearchWorkflowSucceeded] = useState(false);
@@ -983,7 +1060,11 @@ export default function Results() {
         skillPreference: workflowSkillPreference,
       })
         .then((stack) => {
-          setStackData(ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor));
+            setStackData(ensureIntentCoherence(
+              ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor),
+              intentType,
+              catalogToolsRef.current,
+            ));
         })
         .catch((err) => {
           console.error('Stack recommendation failed:', err);
@@ -1233,6 +1314,8 @@ export default function Results() {
     workflowPricingPreference,
     workflowSource,
     workflowAffiliateAnchor,
+    intentType,
+    intentOrigin,
   ]);
 
   useEffect(() => {
@@ -1664,7 +1747,11 @@ export default function Results() {
           skillPreference: workflowSkillPreference,
         })
           .then((stack) => {
-            setStackData(ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor));
+            setStackData(ensureIntentCoherence(
+              ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor),
+              intentType,
+              catalogToolsRef.current,
+            ));
           })
           .catch((err) => {
             console.error('Stack recommendation retry failed:', err);
@@ -1851,7 +1938,7 @@ export default function Results() {
                         {workflowCta.description}
                       </p>
                       <Button
-                        onClick={() => navigate(`/results?q=${encodeURIComponent(workflowCta.workflowQuery)}&pricing=${pricingParam}${budgetParam !== 'any' ? `&budget=${budgetParam}` : ''}${explicitSkillPreference ? `&skill=${encodeURIComponent(explicitSkillPreference)}` : ''}&mode=stack${workflowSource === 'affiliate_card' ? '&workflow_source=affiliate_card' : ''}${workflowAffiliateAnchor ? `&workflow_anchor=${encodeURIComponent(workflowAffiliateAnchor)}` : ''}`)}
+                        onClick={() => navigate(`/results?q=${encodeURIComponent(workflowCta.workflowQuery)}&pricing=${pricingParam}${budgetParam !== 'any' ? `&budget=${budgetParam}` : ''}${explicitSkillPreference ? `&skill=${encodeURIComponent(explicitSkillPreference)}` : ''}&mode=stack${workflowSource === 'affiliate_card' ? '&workflow_source=affiliate_card' : ''}${workflowAffiliateAnchor ? `&workflow_anchor=${encodeURIComponent(workflowAffiliateAnchor)}` : ''}&intent_type=${encodeURIComponent(intentType)}&intent_origin=${encodeURIComponent(intentOrigin)}`)}
                         className="h-10 text-[13px] text-white shadow-none"
                         style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
                       >

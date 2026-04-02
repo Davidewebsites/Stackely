@@ -840,6 +840,11 @@ export default function Results() {
     };
   }, [queryIntent, displayQueryLabel, query]);
 
+  const resultsToolOutboundSurfaceSource = useMemo(() => {
+    if (queryIntent?.type === 'alternative_search') return 'results_stack_alternative';
+    return 'results_tool_list';
+  }, [queryIntent?.type]);
+
   usePageSeo({
     title: query
       ? `${queryMode === 'stack' ? 'Stack results' : 'Search results'} for ${displayQueryLabel} - Stackely`
@@ -1868,6 +1873,7 @@ export default function Results() {
                       <ToolCard
                         key={tool.id}
                         tool={tool}
+                        outboundSurfaceSource={resultsToolOutboundSurfaceSource}
                         isSelectedForCompare={isSelectedForCompare(tool.id)}
                         isInStack={stackSelection.some((t) => t.id === tool.id)}
                         onToggleCompare={(tool) => handleFlowCompareToggle(tool, queryMode === 'stack' ? 'stack' : 'search')}
@@ -1889,6 +1895,7 @@ export default function Results() {
                         <ToolCard
                           key={tool.id}
                           tool={tool}
+                          outboundSurfaceSource={resultsToolOutboundSurfaceSource}
                           isSelectedForCompare={isSelectedForCompare(tool.id)}
                           isInStack={stackSelection.some((t) => t.id === tool.id)}
                           onToggleCompare={(tool) => handleFlowCompareToggle(tool, queryMode === 'stack' ? 'stack' : 'search')}
@@ -2007,6 +2014,7 @@ export default function Results() {
                               <ToolCard
                                 key={tool.id}
                                 tool={tool}
+                                outboundSurfaceSource="results_tool_list"
                                 isSelectedForCompare={isSelectedForCompare(tool.id)}
                                 isInStack={stackSelection.some((t) => t.id === tool.id)}
                                 onToggleCompare={(tool) => handleFlowCompareToggle(tool, 'search')}
@@ -2244,6 +2252,7 @@ export default function Results() {
                                   e.stopPropagation();
                                   trackToolClick(item.tool.id);
                                   openOutboundToolLink(item.tool, location.pathname, '_blank', {
+                                    surfaceSource: 'results_stack_primary',
                                     slotName: item.role,
                                     slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
                                     userGoalQuery: searchParams.get('q') || undefined,

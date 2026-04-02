@@ -60,6 +60,7 @@ export function getOutboundLinkType(tool: Tool | null | undefined): 'affiliate' 
 }
 
 export interface OutboundLinkTracking {
+  event: 'affiliate_click';
   tool_id?: number;
   tool_name: string;
   tool_slug: string;
@@ -68,6 +69,7 @@ export interface OutboundLinkTracking {
   has_affiliate: boolean;
   destination_url: string;
   source_page: string;
+  surface_source?: string;
   slot_id?: string;
   slot_name?: string;
   user_goal_query?: string;
@@ -75,6 +77,8 @@ export interface OutboundLinkTracking {
 }
 
 export interface OutboundTrackingContext {
+  surfaceSource?: string;
+  entrySource?: string;
   slotId?: string;
   slotName?: string;
   userGoalQuery?: string;
@@ -86,12 +90,11 @@ export interface OutboundTrackingContext {
  */
 export function trackOutboundToolClick(data: OutboundLinkTracking): void {
   const event = {
-    event_name: 'outbound_tool_click',
-    timestamp: new Date().toISOString(),
     ...data,
+    timestamp: new Date().toISOString(),
   };
 
-  console.log('affiliate_click', data);
+  console.log(event);
 
   // Log to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -122,7 +125,8 @@ export function openOutboundToolLink(
   const linkType = getOutboundLinkType(tool);
   const params = new URLSearchParams(window.location.search);
   const userGoalQuery = context.userGoalQuery || params.get('q') || params.get('query') || undefined;
-  const entrySource = params.get('entry') || undefined;
+  const entrySource = context.entrySource || params.get('entry_source') || params.get('entry') || undefined;
+  const surfaceSource = context.surfaceSource || params.get('surface_source') || undefined;
   const fallbackSlotName = String((tool as Tool & { role?: string }).role || '').trim() || undefined;
   const slotName = context.slotName || fallbackSlotName;
   const slotId = context.slotId || (slotName ? slotName.toLowerCase().replace(/\s+/g, '_') : undefined);
@@ -130,6 +134,7 @@ export function openOutboundToolLink(
 
   // Track before opening (more reliable than tracking in new tab)
   trackOutboundToolClick({
+    event: 'affiliate_click',
     tool_id: tool.id,
     tool_name: tool.name,
     tool_slug: tool.slug,
@@ -138,6 +143,7 @@ export function openOutboundToolLink(
     has_affiliate: hasAffiliate,
     destination_url: url,
     source_page: sourcePage,
+    surface_source: surfaceSource,
     slot_id: slotId,
     slot_name: slotName,
     user_goal_query: userGoalQuery,

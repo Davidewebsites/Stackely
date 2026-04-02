@@ -279,6 +279,11 @@ function normalizeToolSlug(value?: string): string {
   return (value || '').toLowerCase().trim();
 }
 
+function appendQueryParam(path: string, key: string, value: string): string {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
 function stackContainsToolByName(
   stack: { tools: Array<{ name: string }> },
   toolName: string,
@@ -540,7 +545,7 @@ function TopPickCard({ tool }: { tool: Tool }) {
 
   return (
     <Link
-      to={`/tools/${tool.slug}`}
+      to={`/tools/${tool.slug}?surface_source=homepage_top_daily_picks`}
       state={{ from: location.pathname + location.search }}
       className="group rounded-2xl border border-slate-200 bg-white p-7 min-h-[220px] flex flex-col items-center justify-center text-center shadow-sm transition-all duration-300 hover:scale-[1.015] hover:border-[#4F46E5]/35 hover:shadow-[0_14px_30px_rgba(79,70,229,0.14)] hover:bg-[linear-gradient(160deg,rgba(47,128,237,0.05)_0%,rgba(138,43,226,0.06)_100%)]"
     >
@@ -795,7 +800,14 @@ export default function Index() {
     await resolveQueryFlow(query);
   };
 
-  const handleGoalClick = async (goal: string) => {
+  const handleGoalClick = async (goal: string, surfaceSource?: string) => {
+    if (surfaceSource) {
+      const skillParam = skillLevelPreference !== 'auto' ? `&skill=${encodeURIComponent(skillLevelPreference)}` : '';
+      const pricingPreferenceFromBudget = budgetToPricingPreference(entryBudgetFilter);
+      const budgetParam = entryBudgetFilter !== 'any' ? `&budget=${entryBudgetFilter}` : '';
+      navigate(`/results?q=${encodeURIComponent(goal)}&pricing=${pricingPreferenceFromBudget}${budgetParam}${skillParam}&surface_source=${encodeURIComponent(surfaceSource)}`);
+      return;
+    }
     setQuery(goal);
     await resolveQueryFlow(goal);
   };
@@ -804,7 +816,7 @@ export default function Index() {
     const skillParam = skillLevelPreference !== 'auto' ? `&skill=${encodeURIComponent(skillLevelPreference)}` : '';
     const anchorParam = useCase.workflowAnchor ? `&workflow_anchor=${encodeURIComponent(useCase.workflowAnchor)}` : '';
     const sourceParam = useCase.workflowAnchor ? '&workflow_source=affiliate_card' : '';
-    navigate(`/results?q=${encodeURIComponent(useCase.query)}&pricing=any${skillParam}${sourceParam}${anchorParam}`);
+    navigate(`/results?q=${encodeURIComponent(useCase.query)}&pricing=any${skillParam}${sourceParam}${anchorParam}&surface_source=homepage_workflow_cards`);
   };
 
   const handleGenerate = () => {
@@ -1033,7 +1045,7 @@ export default function Index() {
                 {QUICK_EXAMPLES.map((goal) => (
                   <button
                     key={goal}
-                    onClick={() => handleGoalClick(goal)}
+                    onClick={() => handleGoalClick(goal, 'homepage_quick_examples')}
                     className="text-[12px] px-3.5 py-1.5 rounded-full bg-slate-100/85 border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-[#4F46E5]/35 hover:text-[#4F46E5] transition-all"
                   >
                     {goal}
@@ -1050,7 +1062,7 @@ export default function Index() {
                 {orderedStartFasterPresets.map((preset) => (
                   <Link
                     key={preset.key}
-                    to={buildResultsPathFromPreset(preset)}
+                    to={appendQueryParam(buildResultsPathFromPreset(preset), 'surface_source', 'homepage_start_faster')}
                     className="text-[12px] px-3.5 py-1.5 rounded-full bg-indigo-50/75 border border-indigo-100 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-200 transition-all"
                   >
                     {preset.title}

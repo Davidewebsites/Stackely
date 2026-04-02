@@ -71,6 +71,7 @@ interface ToolCardProps {
   onToggleStack?: (tool: Tool) => void;
   disableNavigation?: boolean;
   whyItMatches?: string[];
+  outboundSurfaceSource?: string;
 }
 
 const pricingStyles: Record<string, string> = {
@@ -95,6 +96,7 @@ export default function ToolCard({
   onToggleStack,
   disableNavigation = false,
   whyItMatches,
+  outboundSurfaceSource,
 }: ToolCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -309,7 +311,9 @@ export default function ToolCard({
               onClick={(e) => {
                 e.stopPropagation();
                 trackToolClick(tool.id);
-                openOutboundToolLink(tool, location.pathname);
+                openOutboundToolLink(tool, location.pathname, '_blank', {
+                  surfaceSource: outboundSurfaceSource || (location.pathname === '/results' ? 'results_tool_list' : undefined),
+                });
               }}
             >
               <ExternalLink className="w-3 h-3" />

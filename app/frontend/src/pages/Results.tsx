@@ -71,6 +71,8 @@ interface AdaptedStackItem {
   isSynthesized: boolean;
 }
 
+type WorkflowCardAffiliateAnchor = 'clickfunnels' | 'beehiiv';
+
 const STACK_ACCENTS = [
   { strong: '#2563eb', soft: '#dbeafe', border: '#93c5fd' },
   { strong: '#0891b2', soft: '#cffafe', border: '#67e8f9' },
@@ -146,6 +148,46 @@ function escapeRegex(value: string): string {
 function hasBoundedPhrase(text: string, phrase: string): boolean {
   const pattern = `\\b${escapeRegex(phrase).replace(/\\\s+/g, '\\s+')}\\b`;
   return new RegExp(pattern, 'i').test(text);
+}
+
+function ensureAffiliateBrandedWorkflowAnchor(
+  stack: StackResponseWithAlternatives,
+  source: string | null,
+  anchor: WorkflowCardAffiliateAnchor | null,
+): StackResponseWithAlternatives {
+  if (source !== 'affiliate_card' || !anchor || !stack?.stack?.length) return stack;
+
+  const anchorName = anchor === 'clickfunnels' ? 'ClickFunnels' : 'Beehiiv';
+  const anchorWebsite = anchor === 'clickfunnels' ? 'https://www.clickfunnels.com' : 'https://www.beehiiv.com';
+  const anchorLogo = anchor === 'clickfunnels'
+    ? 'https://logo.clearbit.com/clickfunnels.com'
+    : 'https://logo.clearbit.com/beehiiv.com';
+
+  const alreadyPresent = stack.stack.some((item) => normalizeToolName(item.tool).includes(anchor));
+  if (alreadyPresent) return stack;
+
+  const targetIndex = stack.stack.findIndex((item) => {
+    const role = (item.role || '').toLowerCase();
+    if (anchor === 'clickfunnels') return /funnel|landing|conversion|page/.test(role);
+    return /newsletter|email|audience|subscriber/.test(role);
+  });
+
+  const replaceIndex = targetIndex >= 0 ? targetIndex : 0;
+  const nextStack = [...stack.stack];
+  const current = nextStack[replaceIndex];
+  nextStack[replaceIndex] = {
+    ...current,
+    tool: anchorName,
+    why: `${anchorName} is pinned for this affiliate workflow launch path.`,
+    logo_url: anchorLogo,
+    logo: anchorLogo,
+    website_url: anchorWebsite,
+  };
+
+  return {
+    ...stack,
+    stack: nextStack,
+  };
 }
 
 type QueryIntentType = 'exact_tool' | 'goal_search' | 'constrained_search' | 'alternative_search' | 'generic_search';
@@ -726,6 +768,12 @@ export default function Results() {
   const budgetParam = normalizeBudgetFilter(searchParams.get('budget'));
   const pricingParam = (searchParams.get('pricing') || 'any') as PricingPreference;
   const requestedMode = searchParams.get('mode');
+  const workflowSource = searchParams.get('workflow_source');
+  const workflowAnchorParam = searchParams.get('workflow_anchor');
+  const workflowAffiliateAnchor: WorkflowCardAffiliateAnchor | null =
+    workflowAnchorParam === 'clickfunnels' || workflowAnchorParam === 'beehiiv'
+      ? workflowAnchorParam
+      : null;
   const explicitSkillPreferenceParam = searchParams.get('skill');
   const explicitSkillPreference: SkillPreference | null =
     explicitSkillPreferenceParam === 'beginner' ||
@@ -929,7 +977,9 @@ export default function Results() {
         recentlyUsedTools,
         skillPreference: workflowSkillPreference,
       })
-        .then((stack) => setStackData(stack))
+        .then((stack) => {
+          setStackData(ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor));
+        })
         .catch((err) => {
           console.error('Stack recommendation failed:', err);
           setSearchError('Failed to generate stack recommendation');
@@ -1166,7 +1216,19 @@ export default function Results() {
         })
         .finally(() => setSearchLoading(false));
     }
-  }, [query, queryMode, pricingParam, categoryParam, searchCatalogTools, navigate, explicitSkillPreference, budgetParam, workflowPricingPreference]);
+  }, [
+    query,
+    queryMode,
+    pricingParam,
+    categoryParam,
+    searchCatalogTools,
+    navigate,
+    explicitSkillPreference,
+    budgetParam,
+    workflowPricingPreference,
+    workflowSource,
+    workflowAffiliateAnchor,
+  ]);
 
   useEffect(() => {
     if (!query || queryMode !== 'search') {
@@ -1596,7 +1658,9 @@ export default function Results() {
           recentlyUsedTools,
           skillPreference: workflowSkillPreference,
         })
-          .then((stack) => setStackData(stack))
+          .then((stack) => {
+            setStackData(ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor));
+          })
           .catch((err) => {
             console.error('Stack recommendation retry failed:', err);
             setSearchError('Failed to generate stack recommendation');
@@ -1782,7 +1846,7 @@ export default function Results() {
                         {workflowCta.description}
                       </p>
                       <Button
-                        onClick={() => navigate(`/results?q=${encodeURIComponent(workflowCta.workflowQuery)}&pricing=${pricingParam}${budgetParam !== 'any' ? `&budget=${budgetParam}` : ''}${explicitSkillPreference ? `&skill=${encodeURIComponent(explicitSkillPreference)}` : ''}&mode=stack`)}
+                        onClick={() => navigate(`/results?q=${encodeURIComponent(workflowCta.workflowQuery)}&pricing=${pricingParam}${budgetParam !== 'any' ? `&budget=${budgetParam}` : ''}${explicitSkillPreference ? `&skill=${encodeURIComponent(explicitSkillPreference)}` : ''}&mode=stack${workflowSource === 'affiliate_card' ? '&workflow_source=affiliate_card' : ''}${workflowAffiliateAnchor ? `&workflow_anchor=${encodeURIComponent(workflowAffiliateAnchor)}` : ''}`)}
                         className="h-10 text-[13px] text-white shadow-none"
                         style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
                       >

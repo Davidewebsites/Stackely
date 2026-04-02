@@ -609,12 +609,14 @@ export default function Index() {
       description: 'Start from a conversion-first funnel workflow anchored around ClickFunnels.',
       query: 'build a sales funnel with clickfunnels',
       categoryId: 'landing_pages',
+      workflowAnchor: 'clickfunnels' as const,
     },
     {
       title: 'Start a newsletter',
       description: 'Use a newsletter-first workflow with Beehiiv for audience growth.',
       query: 'start a newsletter with beehiiv',
       categoryId: 'email_marketing',
+      workflowAnchor: 'beehiiv' as const,
     },
   ];
 
@@ -796,6 +798,13 @@ export default function Index() {
   const handleGoalClick = async (goal: string) => {
     setQuery(goal);
     await resolveQueryFlow(goal);
+  };
+
+  const handleWorkflowCardClick = (useCase: { query: string; workflowAnchor?: 'clickfunnels' | 'beehiiv' }) => {
+    const skillParam = skillLevelPreference !== 'auto' ? `&skill=${encodeURIComponent(skillLevelPreference)}` : '';
+    const anchorParam = useCase.workflowAnchor ? `&workflow_anchor=${encodeURIComponent(useCase.workflowAnchor)}` : '';
+    const sourceParam = useCase.workflowAnchor ? '&workflow_source=affiliate_card' : '';
+    navigate(`/results?q=${encodeURIComponent(useCase.query)}&pricing=any${skillParam}${sourceParam}${anchorParam}`);
   };
 
   const handleGenerate = () => {
@@ -1588,7 +1597,7 @@ export default function Index() {
                   return (
                   <button
                     key={useCase.title}
-                    onClick={() => handleGoalClick(useCase.query)}
+                    onClick={() => handleWorkflowCardClick(useCase)}
                     className={`group text-left rounded-xl border bg-white p-5 hover:border-[#4F46E5]/40 hover:shadow-[0_10px_22px_rgba(79,70,229,0.14)] transition-all ${isTrendingUseCase ? 'border-slate-300 bg-slate-50/50' : 'border-slate-200'}`}
                   >
                     <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3" />

@@ -37,17 +37,6 @@ import {
 import { useCompare } from '@/contexts/CompareContext';
 import { buildResultsPathFromPreset, STACK_ENTRY_PRESET_LIST } from '@/lib/stackEntryPresets';
 
-const POPULAR_GOALS = [
-  'Create Instagram ads',
-  'Build a personal brand',
-  'Launch an ecommerce store',
-  'Build a SaaS landing page',
-  'Grow a newsletter',
-  'Create social media content',
-  'Automate marketing workflows',
-  'Launch a digital product',
-];
-
 const LANDING_USE_CASES = [
   {
     title: 'Build a website',
@@ -67,6 +56,15 @@ const LANDING_USE_CASES = [
     query: 'start email campaigns',
     categoryId: 'email_marketing',
   },
+];
+
+const QUICK_EXAMPLES = [
+  'Get more leads online',
+  'Build a landing page that converts',
+  'Start a creator newsletter',
+  'Grow your email audience',
+  'Launch a funnel for your offer',
+  'Compare tools for lead generation',
 ];
 
 const PRICING_ICONS: Record<string, React.ReactNode> = {
@@ -503,10 +501,6 @@ export default function Index() {
       });
   }, []);
 
-  const visiblePopularGoals = useMemo(() => {
-    return POPULAR_GOALS.filter((goal) => hasStableUseCaseCoverage(goal, catalogTools));
-  }, [catalogTools]);
-
   const visibleLandingUseCases = useMemo(() => {
     return LANDING_USE_CASES.filter((useCase) => hasStableUseCaseCoverage(useCase.query, catalogTools));
   }, [catalogTools]);
@@ -930,7 +924,7 @@ export default function Index() {
                 Quick examples
               </p>
               <div className="flex flex-wrap justify-center gap-1.5">
-                {visiblePopularGoals.slice(0, 6).map((goal) => (
+                {QUICK_EXAMPLES.map((goal) => (
                   <button
                     key={goal}
                     onClick={() => handleGoalClick(goal)}

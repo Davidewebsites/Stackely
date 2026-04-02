@@ -22,24 +22,24 @@ export const STACK_ENTRY_PRESETS: Record<StackEntryKey, StackEntryPreset> = {
   newsletter: {
     key: 'newsletter',
     path: '/stacks/newsletter',
-    title: 'Build your newsletter stack',
+    title: 'Start your newsletter',
     description: 'Get a focused stack for writing, publishing, and growing a newsletter faster.',
-    ctaLabel: 'See newsletter stack',
+    ctaLabel: 'Start your newsletter',
     queryVariants: {
       natural: 'launch newsletter and grow subscribers',
-      guided: 'start creator newsletter and grow subscribers faster',
+      guided: 'start a creator newsletter and grow subscribers',
     },
     entryParam: 'newsletter-stack',
   },
   funnel: {
     key: 'funnel',
     path: '/stacks/funnel',
-    title: 'Build your funnel stack',
+    title: 'Build your funnel',
     description: 'Get the core tools for landing pages, lead capture, and conversion flow setup.',
-    ctaLabel: 'See funnel stack',
+    ctaLabel: 'Build your funnel',
     queryVariants: {
       natural: 'build sales funnel landing pages and lead generation',
-      guided: 'build sales funnel landing pages and lead generation with clickfunnels',
+      guided: 'build a sales funnel with landing pages and lead capture',
     },
     entryParam: 'funnel-stack',
   },
@@ -51,7 +51,7 @@ export const STACK_ENTRY_PRESETS: Record<StackEntryKey, StackEntryPreset> = {
     ctaLabel: 'See automation stack',
     queryVariants: {
       natural: 'connect apps and automate workflows',
-      guided: 'connect apps and automate workflows with make',
+      guided: 'connect apps and automate your workflow',
     },
     entryParam: 'automation-stack',
   },
@@ -63,15 +63,15 @@ export const STACK_ENTRY_PRESETS: Record<StackEntryKey, StackEntryPreset> = {
     ctaLabel: 'See solopreneur stack',
     queryVariants: {
       natural: 'simple all-in-one solopreneur online business setup',
-      guided: 'simple all-in-one solopreneur online business setup with systeme.io',
+      guided: 'simple all-in-one setup for a solopreneur online business',
     },
     entryParam: 'solopreneur-stack',
   },
 };
 
 export const STACK_ENTRY_PRESET_LIST: StackEntryPreset[] = [
-  STACK_ENTRY_PRESETS.newsletter,
   STACK_ENTRY_PRESETS.funnel,
+  STACK_ENTRY_PRESETS.newsletter,
   STACK_ENTRY_PRESETS.automation,
   STACK_ENTRY_PRESETS.solopreneur,
 ];

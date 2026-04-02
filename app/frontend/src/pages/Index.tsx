@@ -277,6 +277,10 @@ function normalizeToolName(value: string): string {
   return (value || '').toLowerCase().trim();
 }
 
+function normalizeToolSlug(value?: string): string {
+  return (value || '').toLowerCase().trim();
+}
+
 function stackContainsToolByName(
   stack: { tools: Array<{ name: string }> },
   toolName: string,
@@ -323,14 +327,22 @@ function buildTopPicksSourcePool(featuredTools: Tool[], catalogTools: Tool[]): T
   const pool = [...featuredTools];
   const requiredToolNames: Array<'ClickFunnels' | 'Beehiiv'> = ['ClickFunnels', 'Beehiiv'];
 
-  const hasByName = (tools: Tool[], required: string): boolean =>
-    tools.some((tool) => normalizeToolName(tool.name).includes(normalizeToolName(required)));
+  const hasBySlugOrName = (tools: Tool[], requiredSlug: string, requiredName: string): boolean =>
+    tools.some((tool) => {
+      const toolSlug = normalizeToolSlug(tool.slug);
+      const toolName = normalizeToolName(tool.name);
+      return toolSlug === requiredSlug || toolName === requiredName;
+    });
 
   for (const requiredName of requiredToolNames) {
-    if (hasByName(pool, requiredName)) continue;
+    const requiredSlug = normalizeToolSlug(requiredName);
+    const requiredNormalizedName = normalizeToolName(requiredName);
+
+    if (hasBySlugOrName(pool, requiredSlug, requiredNormalizedName)) continue;
 
     const fromCatalog = catalogTools.find((tool) =>
-      normalizeToolName(tool.name).includes(normalizeToolName(requiredName))
+      normalizeToolSlug(tool.slug) === requiredSlug ||
+      normalizeToolName(tool.name) === requiredNormalizedName
     );
 
     if (fromCatalog) {
@@ -508,12 +520,6 @@ export default function Index() {
       categoryId: 'landing_pages',
     },
     {
-      title: 'Automate marketing',
-      description: 'Combine automation tools and triggers to remove repetitive work.',
-      query: 'automate marketing workflows',
-      categoryId: 'automation',
-    },
-    {
       title: 'Start a newsletter',
       description: 'Use a newsletter-first workflow with Beehiiv for audience growth.',
       query: 'start a newsletter with beehiiv',
@@ -592,27 +598,68 @@ export default function Index() {
         };
       })
       .filter((entry): entry is NonNullable<typeof entry> => !!entry);
+    const visibleCount = 3;
+    const indexed = ranked.map((entry, index) => ({ entry, index }));
+    const visibleIndexed = indexed.slice(0, visibleCount);
 
-    const newsletter = ranked.find((entry) => stackContainsToolByName(entry, 'beehiiv'));
-    const funnel = ranked.find((entry) => stackContainsToolByName(entry, 'clickfunnels'));
+    const hasVisibleFunnel = visibleIndexed.some(({ entry }) => stackContainsToolByName(entry, 'clickfunnels'));
+    const hasVisibleNewsletter = visibleIndexed.some(({ entry }) => stackContainsToolByName(entry, 'beehiiv'));
 
-    const selected: typeof ranked = [];
-    if (funnel) selected.push(funnel);
-    if (newsletter && newsletter.stackId !== funnel?.stackId) selected.push(newsletter);
+    const funnelCandidate = hasVisibleFunnel
+      ? null
+      : indexed.find(({ entry }) => stackContainsToolByName(entry, 'clickfunnels'));
+    const newsletterCandidate = hasVisibleNewsletter
+      ? null
+      : indexed.find(({ entry }) => stackContainsToolByName(entry, 'beehiiv'));
 
-    for (const entry of ranked) {
-      if (selected.length >= 3) break;
-      if (selected.some((picked) => picked.stackId === entry.stackId)) continue;
-      selected.push(entry);
-    }
+    const nextVisible = [...visibleIndexed];
 
-    return selected.slice(0, 3);
+    const replaceFromTail = (candidate: { entry: (typeof ranked)[number]; index: number } | null) => {
+      if (!candidate) return;
+      if (nextVisible.some((item) => item.entry.stackId === candidate.entry.stackId)) return;
+
+      const replaceIndex = [...nextVisible]
+        .reverse()
+        .findIndex((item) =>
+          !stackContainsToolByName(item.entry, 'clickfunnels') &&
+          !stackContainsToolByName(item.entry, 'beehiiv')
+        );
+
+      if (replaceIndex === -1) return;
+
+      const targetIndex = nextVisible.length - 1 - replaceIndex;
+      nextVisible[targetIndex] = candidate;
+    };
+
+    replaceFromTail(funnelCandidate);
+    replaceFromTail(newsletterCandidate);
+
+    // Keep original ranking order for the visible homepage subset.
+    return nextVisible
+      .sort((a, b) => a.index - b.index)
+      .map((item) => item.entry)
+      .slice(0, visibleCount);
   }, [dailyVoteSnapshot.totalVotes]);
 
   const topPicksSourcePool = useMemo(
     () => buildTopPicksSourcePool(featuredTools, catalogTools),
     [featuredTools, catalogTools],
   );
+
+  const orderedStartFasterPresets = useMemo(() => {
+    const priority: Record<string, number> = {
+      funnel: 0,
+      newsletter: 1,
+      automation: 2,
+      solopreneur: 3,
+    };
+
+    return [...STACK_ENTRY_PRESET_LIST].sort((a, b) => {
+      const aPriority = priority[a.key] ?? 99;
+      const bPriority = priority[b.key] ?? 99;
+      return aPriority - bPriority;
+    });
+  }, []);
 
   const shouldShowTopRankedSection = topRankedHomepageStacks.length >= 2;
 
@@ -900,7 +947,7 @@ export default function Index() {
                 Start faster
               </p>
               <div className="flex flex-wrap justify-center gap-1.5">
-                {STACK_ENTRY_PRESET_LIST.map((preset) => (
+                {orderedStartFasterPresets.map((preset) => (
                   <Link
                     key={preset.key}
                     to={buildResultsPathFromPreset(preset)}

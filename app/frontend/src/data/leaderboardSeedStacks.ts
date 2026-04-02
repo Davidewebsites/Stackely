@@ -176,6 +176,21 @@ export const LEADERBOARD_SEED_STACKS: LeaderboardSeedStack[] = [
     ],
   },
   {
+    rankingStackId: 'landing-pages-funnel-conversion-stack',
+    stackName: 'Funnel conversion stack',
+    categoryId: 'landing_pages',
+    categoryLabel: 'Landing Pages',
+    summary: 'Centers the workflow on lead capture funnels and conversion path clarity.',
+    bestForLine: 'Best for teams that prioritize funnel conversion over broad site design flexibility.',
+    tradeOffLine: 'Trade-off: less open-ended design control than builder-first stacks.',
+    voteCount: 248,
+    tools: [
+      tool('ClickFunnels', 'clickfunnels.com', 'https://www.clickfunnels.com'),
+      tool('Typeform', 'typeform.com', 'https://www.typeform.com'),
+      tool('Calendly', 'calendly.com'),
+    ],
+  },
+  {
     rankingStackId: 'landing-pages-fast-launch-stack',
     stackName: 'Fast launch stack',
     categoryId: 'landing_pages',

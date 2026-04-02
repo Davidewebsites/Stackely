@@ -43,7 +43,7 @@ import { useCompare } from '@/contexts/CompareContext';
 import StackCard from '@/components/StackCard';
 import ToolCard from '@/components/ToolCard';
 import { trackToolClick } from '@/components/ToolCard';
-import { openOutboundToolLink } from '@/lib/outboundLinks';
+import { getOutboundCtaLabel, openOutboundToolLink } from '@/lib/outboundLinks';
 import ToolLogo from '@/components/ToolLogo';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
@@ -2179,10 +2179,14 @@ export default function Results() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   trackToolClick(item.tool.id);
-                                  openOutboundToolLink(item.tool, location.pathname);
+                                  openOutboundToolLink(item.tool, location.pathname, '_blank', {
+                                    slotName: item.role,
+                                    slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
+                                    userGoalQuery: searchParams.get('q') || undefined,
+                                  });
                                 }}
                               >
-                                Try this tool
+                                {getOutboundCtaLabel(item.tool, 'Try this tool')}
                               </Button>
                             )}
                           </div>

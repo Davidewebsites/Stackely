@@ -35,6 +35,7 @@ import {
   type StackRankingSnapshot,
 } from '@/lib/stackRanking';
 import { useCompare } from '@/contexts/CompareContext';
+import { buildResultsPathFromPreset, STACK_ENTRY_PRESET_LIST } from '@/lib/stackEntryPresets';
 
 const POPULAR_GOALS = [
   'Create Instagram ads',
@@ -272,6 +273,77 @@ function getTopPickReason(tool: Tool): string {
   return 'Strong overall fit';
 }
 
+function normalizeToolName(value: string): string {
+  return (value || '').toLowerCase().trim();
+}
+
+function stackContainsToolByName(
+  stack: { tools: Array<{ name: string }> },
+  toolName: string,
+): boolean {
+  const target = normalizeToolName(toolName);
+  return stack.tools.some((tool) => normalizeToolName(tool.name).includes(target));
+}
+
+function createTopPickFallbackTool(toolName: 'ClickFunnels' | 'Beehiiv'): Tool {
+  if (toolName === 'ClickFunnels') {
+    return {
+      id: -99001,
+      name: 'ClickFunnels',
+      slug: 'clickfunnels',
+      short_description: 'Build conversion-first sales funnels and landing experiences.',
+      category: 'landing_pages',
+      pricing_model: 'paid',
+      skill_level: 'intermediate',
+      website_url: 'https://www.clickfunnels.com',
+      logo_url: 'https://logo.clearbit.com/clickfunnels.com',
+      internal_score: 84,
+      popularity_score: 8,
+      active: true,
+    };
+  }
+
+  return {
+    id: -99002,
+    name: 'Beehiiv',
+    slug: 'beehiiv',
+    short_description: 'Run and grow a creator-focused newsletter with built-in growth tools.',
+    category: 'email_marketing',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://www.beehiiv.com',
+    logo_url: 'https://logo.clearbit.com/beehiiv.com',
+    internal_score: 85,
+    popularity_score: 8,
+    active: true,
+  };
+}
+
+function buildTopPicksSourcePool(featuredTools: Tool[], catalogTools: Tool[]): Tool[] {
+  const pool = [...featuredTools];
+  const requiredToolNames: Array<'ClickFunnels' | 'Beehiiv'> = ['ClickFunnels', 'Beehiiv'];
+
+  const hasByName = (tools: Tool[], required: string): boolean =>
+    tools.some((tool) => normalizeToolName(tool.name).includes(normalizeToolName(required)));
+
+  for (const requiredName of requiredToolNames) {
+    if (hasByName(pool, requiredName)) continue;
+
+    const fromCatalog = catalogTools.find((tool) =>
+      normalizeToolName(tool.name).includes(normalizeToolName(requiredName))
+    );
+
+    if (fromCatalog) {
+      pool.push(fromCatalog);
+      continue;
+    }
+
+    pool.push(createTopPickFallbackTool(requiredName));
+  }
+
+  return pool;
+}
+
 function getDailyTopPicks(tools: Tool[], count = 6): Tool[] {
   if (tools.length <= count) return tools;
 
@@ -307,6 +379,19 @@ function getDailyTopPicks(tools: Tool[], count = 6): Tool[] {
       if (picks.some((t) => t.id === row.tool.id)) continue;
       picks.push(row.tool);
     }
+  }
+
+  // Keep affiliate picks visible in this editorial section when available.
+  const requiredNames = ['clickfunnels', 'beehiiv'];
+  for (const requiredName of requiredNames) {
+    const requiredTool = tools.find((tool) => normalizeToolName(tool.name).includes(requiredName));
+    if (!requiredTool) continue;
+    if (picks.some((tool) => tool.id === requiredTool.id)) continue;
+    if (picks.length < count) {
+      picks.push(requiredTool);
+      continue;
+    }
+    picks[picks.length - 1] = requiredTool;
   }
 
   return picks;
@@ -417,9 +502,9 @@ export default function Index() {
   // STATIC: Editorially chosen workflows for homepage section
   const displayedLandingUseCases = [
     {
-      title: 'Build a website',
-      description: 'Find landing page, design, and automation tools to launch faster.',
-      query: 'i want to create a website',
+      title: 'Build a sales funnel',
+      description: 'Start from a conversion-first funnel workflow anchored around ClickFunnels.',
+      query: 'build a sales funnel with clickfunnels',
       categoryId: 'landing_pages',
     },
     {
@@ -429,9 +514,9 @@ export default function Index() {
       categoryId: 'automation',
     },
     {
-      title: 'Start email campaigns',
-      description: 'Choose email platforms for broadcasts, onboarding, and growth loops.',
-      query: 'start email campaigns',
+      title: 'Start a newsletter',
+      description: 'Use a newsletter-first workflow with Beehiiv for audience growth.',
+      query: 'start a newsletter with beehiiv',
       categoryId: 'email_marketing',
     },
   ];
@@ -460,7 +545,29 @@ export default function Index() {
   const topStacksByCategory = useMemo(() => {
     const map: Record<string, StackRankingSnapshot[]> = {};
     for (const category of CATEGORIES) {
-      const ranked = getTopRankedStacksByCategory(category.id, 2).filter((entry) => entry.rawScore > 0);
+      let ranked = getTopRankedStacksByCategory(category.id, 3).filter((entry) => entry.rawScore > 0);
+
+      if (category.id === 'landing_pages' || category.id === 'email_marketing') {
+        const requiredTool = category.id === 'landing_pages' ? 'clickfunnels' : 'beehiiv';
+        const requiredCatalog = getDailyStackCatalog().find(
+          (item) => item.categoryId === category.id && stackContainsToolByName(item, requiredTool),
+        );
+
+        if (requiredCatalog) {
+          const requiredSnapshot = getStackRanking({
+            stackId: requiredCatalog.rankingStackId,
+            stackName: requiredCatalog.stackName,
+            categoryId: requiredCatalog.categoryId,
+          });
+
+          if (requiredSnapshot.rawScore > 0 && !ranked.some((entry) => entry.stackId === requiredSnapshot.stackId)) {
+            ranked = [requiredSnapshot, ...ranked]
+              .sort((a, b) => b.rawScore - a.rawScore)
+              .slice(0, 3);
+          }
+        }
+      }
+
       if (ranked.length > 0) {
         map[category.id] = ranked;
       }
@@ -484,11 +591,28 @@ export default function Index() {
           tools: catalog.tools.slice(0, 3),
         };
       })
-      .filter((entry): entry is NonNullable<typeof entry> => !!entry)
-      .slice(0, 3);
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry);
 
-    return ranked;
+    const newsletter = ranked.find((entry) => stackContainsToolByName(entry, 'beehiiv'));
+    const funnel = ranked.find((entry) => stackContainsToolByName(entry, 'clickfunnels'));
+
+    const selected: typeof ranked = [];
+    if (funnel) selected.push(funnel);
+    if (newsletter && newsletter.stackId !== funnel?.stackId) selected.push(newsletter);
+
+    for (const entry of ranked) {
+      if (selected.length >= 3) break;
+      if (selected.some((picked) => picked.stackId === entry.stackId)) continue;
+      selected.push(entry);
+    }
+
+    return selected.slice(0, 3);
   }, [dailyVoteSnapshot.totalVotes]);
+
+  const topPicksSourcePool = useMemo(
+    () => buildTopPicksSourcePool(featuredTools, catalogTools),
+    [featuredTools, catalogTools],
+  );
 
   const shouldShowTopRankedSection = topRankedHomepageStacks.length >= 2;
 
@@ -767,6 +891,23 @@ export default function Index() {
                   >
                     {goal}
                   </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="w-full mt-5">
+              <p className="eyebrow-label mb-2 text-center" style={{ color: '#2F80ED' }}>
+                Start faster
+              </p>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {STACK_ENTRY_PRESET_LIST.map((preset) => (
+                  <Link
+                    key={preset.key}
+                    to={buildResultsPathFromPreset(preset)}
+                    className="text-[12px] px-3.5 py-1.5 rounded-full bg-indigo-50/75 border border-indigo-100 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-200 transition-all"
+                  >
+                    {preset.title}
+                  </Link>
                 ))}
               </div>
             </div>
@@ -1331,7 +1472,7 @@ export default function Index() {
           </section>
 
           {/* Featured Tools */}
-          {featuredTools.length > 0 && (
+          {topPicksSourcePool.length > 0 && (
             <section className="border-t border-slate-200 bg-white/60">
               <div className="page-shell page-section">
                 <div className="mb-7 max-w-[72ch]">
@@ -1341,7 +1482,7 @@ export default function Index() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {getDailyTopPicks(featuredTools, 8).map((tool) => (
+                  {getDailyTopPicks(topPicksSourcePool, 8).map((tool) => (
                     <TopPickCard key={tool.id} tool={tool} />
                   ))}
                 </div>

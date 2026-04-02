@@ -13,6 +13,20 @@ function getAffiliateOverrideUrl(tool: Tool | null | undefined): string | null {
   return AFFILIATE_OVERRIDES[normalizedName] || null;
 }
 
+export function getOutboundCtaLabel(tool: Tool | null | undefined, neutralLabel: string): string {
+  if (!tool) return neutralLabel;
+  const linkType = getOutboundLinkType(tool);
+  if (linkType !== 'affiliate') return neutralLabel;
+
+  const normalizedName = (tool.name || '').trim().toLowerCase();
+  if (normalizedName.includes('clickfunnels')) return 'Start free';
+  if (normalizedName.includes('beehiiv')) return 'Try free';
+  if (normalizedName === 'make' || normalizedName.includes('make.com')) return 'Launch faster';
+  if (normalizedName.includes('systeme')) return 'Best for beginners';
+
+  return 'Start free';
+}
+
 /**
  * Resolves the outbound URL for a tool.
  * Returns affiliateUrl if available and non-empty, falls back to url.
@@ -46,11 +60,24 @@ export function getOutboundLinkType(tool: Tool | null | undefined): 'affiliate' 
 }
 
 export interface OutboundLinkTracking {
+  tool_id?: number;
   tool_name: string;
   tool_slug: string;
   category: string;
   destination_type: 'affiliate' | 'direct';
+  has_affiliate: boolean;
+  destination_url: string;
   source_page: string;
+  slot_id?: string;
+  slot_name?: string;
+  user_goal_query?: string;
+  entry_source?: string;
+}
+
+export interface OutboundTrackingContext {
+  slotId?: string;
+  slotName?: string;
+  userGoalQuery?: string;
 }
 
 /**
@@ -84,7 +111,8 @@ export function trackOutboundToolClick(data: OutboundLinkTracking): void {
 export function openOutboundToolLink(
   tool: Tool | null | undefined,
   sourcePage: string,
-  target: string = '_blank'
+  target: string = '_blank',
+  context: OutboundTrackingContext = {}
 ): void {
   if (!tool) return;
 
@@ -92,14 +120,28 @@ export function openOutboundToolLink(
   if (!url) return;
 
   const linkType = getOutboundLinkType(tool);
+  const params = new URLSearchParams(window.location.search);
+  const userGoalQuery = context.userGoalQuery || params.get('q') || params.get('query') || undefined;
+  const entrySource = params.get('entry') || undefined;
+  const fallbackSlotName = String((tool as Tool & { role?: string }).role || '').trim() || undefined;
+  const slotName = context.slotName || fallbackSlotName;
+  const slotId = context.slotId || (slotName ? slotName.toLowerCase().replace(/\s+/g, '_') : undefined);
+  const hasAffiliate = Boolean((tool.hasAffiliate === true || tool.has_affiliate === true || linkType === 'affiliate'));
 
   // Track before opening (more reliable than tracking in new tab)
   trackOutboundToolClick({
+    tool_id: tool.id,
     tool_name: tool.name,
     tool_slug: tool.slug,
     category: tool.category || 'uncategorized',
     destination_type: linkType === 'affiliate' ? 'affiliate' : 'direct',
+    has_affiliate: hasAffiliate,
+    destination_url: url,
     source_page: sourcePage,
+    slot_id: slotId,
+    slot_name: slotName,
+    user_goal_query: userGoalQuery,
+    entry_source: entrySource,
   });
 
   // Open the link

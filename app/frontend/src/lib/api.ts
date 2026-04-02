@@ -75,6 +75,10 @@ export interface Tool {
   website_url?: string;
   logo_url?: string;
   affiliate_url?: string;
+  hasAffiliate?: boolean;
+  has_affiliate?: boolean;
+  affiliate_provider?: string;
+  affiliateProvider?: string;
   internal_score?: number;
   is_featured?: boolean;
   pros?: string;
@@ -103,11 +107,21 @@ type ToolRecord = Tool & {
   affiliateUrl?: string;
   website_url?: string;
   affiliate_url?: string;
+  hasAffiliate?: boolean;
+  has_affiliate?: boolean;
+  affiliate_provider?: string;
+  affiliateProvider?: string;
 };
 
 function normalizeToolRecord<T extends ToolRecord>(tool: T): T {
   const canonicalUrl = (tool.url || tool.website_url || '').trim();
   const canonicalAffiliateUrl = (tool.affiliateUrl || tool.affiliate_url || '').trim();
+  const hasAffiliate = Boolean(
+    tool.hasAffiliate === true ||
+    tool.has_affiliate === true ||
+    canonicalAffiliateUrl
+  );
+  const affiliateProvider = (tool.affiliateProvider || tool.affiliate_provider || '').trim();
 
   return {
     ...tool,
@@ -115,6 +129,10 @@ function normalizeToolRecord<T extends ToolRecord>(tool: T): T {
     website_url: canonicalUrl || undefined,
     affiliateUrl: canonicalAffiliateUrl || undefined,
     affiliate_url: canonicalAffiliateUrl || undefined,
+    hasAffiliate,
+    has_affiliate: hasAffiliate,
+    affiliateProvider: affiliateProvider || undefined,
+    affiliate_provider: affiliateProvider || undefined,
   };
 }
 

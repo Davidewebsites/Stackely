@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, ArrowUpRight, Target, Lightbulb, Sparkles } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CATEGORIES, type StackTool } from '@/lib/api';
-import { openOutboundToolLink } from '@/lib/outboundLinks';
+import { getOutboundCtaLabel, openOutboundToolLink } from '@/lib/outboundLinks';
 import ToolLogo from '@/components/ToolLogo';
 import { getBestFor, getWhyRecommended, getAvoidIf, getDisplayTags } from '@/lib/toolInsights';
 
@@ -46,6 +46,7 @@ export default function StackCard({ tool, position }: StackCardProps) {
   const whySelectedText = (typeof tool.why_selected === 'string' ? tool.why_selected.trim() : '') || getWhyRecommended(tool);
   const avoidIfText = getAvoidIf(tool);
   const contextTags = getDisplayTags(tool, 3);
+  const outboundCtaLabel = getOutboundCtaLabel(tool, 'Visit');
 
   return (
     <div
@@ -151,7 +152,7 @@ export default function StackCard({ tool, position }: StackCardProps) {
               }}
             >
               <ExternalLink className="w-3 h-3 mr-1" />
-              Visit
+              {outboundCtaLabel}
             </Button>
           )}
           <Button

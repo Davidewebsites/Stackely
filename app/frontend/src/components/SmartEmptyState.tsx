@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Sparkles, Zap, Rocket } from 'lucide-react';
 import { type Tool } from '@/lib/api';
+import { Link } from 'react-router-dom';
+import { buildResultsPathFromPreset, STACK_ENTRY_PRESET_LIST } from '@/lib/stackEntryPresets';
 
 interface SmartEmptyStateProps {
   onSelectStack: (tools: Tool[]) => void;
@@ -233,6 +235,18 @@ export default function SmartEmptyState({ onSelectStack, compact = false, reason
           <p className="text-[15px] text-slate-500">
             Pick a proven template based on trade-off, audience, and role coverage
           </p>
+
+          <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+            {STACK_ENTRY_PRESET_LIST.map((preset) => (
+              <Link
+                key={preset.key}
+                to={buildResultsPathFromPreset(preset)}
+                className="text-[11px] px-3 py-1.5 rounded-full bg-indigo-50/75 border border-indigo-100 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-200 transition-all"
+              >
+                {preset.title}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* Stack Options Grid */}

@@ -4,6 +4,12 @@ import { type PricingPreference, type Tool } from '../lib/api';
 function normalizeSearchTool(tool: Tool): Tool {
   const canonicalUrl = (tool.url || tool.website_url || '').trim();
   const canonicalAffiliateUrl = (tool.affiliateUrl || tool.affiliate_url || '').trim();
+  const hasAffiliate = Boolean(
+    tool.hasAffiliate === true ||
+    tool.has_affiliate === true ||
+    canonicalAffiliateUrl
+  );
+  const affiliateProvider = (tool.affiliateProvider || tool.affiliate_provider || '').trim();
 
   return {
     ...tool,
@@ -11,6 +17,10 @@ function normalizeSearchTool(tool: Tool): Tool {
     website_url: canonicalUrl || undefined,
     affiliateUrl: canonicalAffiliateUrl || undefined,
     affiliate_url: canonicalAffiliateUrl || undefined,
+    hasAffiliate,
+    has_affiliate: hasAffiliate,
+    affiliateProvider: affiliateProvider || undefined,
+    affiliate_provider: affiliateProvider || undefined,
   };
 }
 

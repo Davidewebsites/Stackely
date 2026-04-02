@@ -259,6 +259,71 @@ function tokenize(value: string): string[] {
     .filter((t) => t.length >= 3);
 }
 
+type AffiliateToolKey = 'beehiiv' | 'clickfunnels' | 'systemeio' | 'make';
+
+const AFFILIATE_INTENT_RULES: Array<{ keywords: string[]; targets: AffiliateToolKey[] }> = [
+  {
+    keywords: ['newsletter', 'grow subscribers', 'audience', 'creator newsletter'],
+    targets: ['beehiiv'],
+  },
+  {
+    keywords: ['sales funnel', 'landing page', 'lead generation', 'get leads', 'conversion funnel'],
+    targets: ['clickfunnels', 'systemeio'],
+  },
+  {
+    keywords: ['automation', 'workflow', 'connect apps'],
+    targets: ['make'],
+  },
+  {
+    keywords: ['all-in-one', 'solopreneur', 'simple online business setup'],
+    targets: ['systemeio'],
+  },
+];
+
+function normalizeAffiliateToolName(name: string): AffiliateToolKey | null {
+  if (!name) return null;
+  if (name.includes('beehiiv')) return 'beehiiv';
+  if (name.includes('clickfunnels')) return 'clickfunnels';
+  if (name.includes('systeme')) return 'systemeio';
+  if (name === 'make' || name.includes('make.com')) return 'make';
+  return null;
+}
+
+function isAffiliateSlotCompatible(toolKey: AffiliateToolKey, slot: WorkflowSlot): boolean {
+  if (toolKey === 'beehiiv') return slot.categories.includes('email_marketing');
+  if (toolKey === 'clickfunnels') return slot.categories.includes('landing_pages');
+  if (toolKey === 'systemeio') return slot.categories.includes('landing_pages') || slot.categories.includes('email_marketing');
+  return slot.categories.includes('automation');
+}
+
+function detectAffiliateIntentTargets(goal: string): Set<AffiliateToolKey> {
+  const normalized = normalizeQueryTypos(goal);
+  const targets = new Set<AffiliateToolKey>();
+
+  AFFILIATE_INTENT_RULES.forEach((rule) => {
+    const hasMatch = rule.keywords.some((keyword) => normalized.includes(keyword));
+    if (!hasMatch) return;
+    rule.targets.forEach((target) => targets.add(target));
+  });
+
+  return targets;
+}
+
+function detectFunnelSemanticIntent(goal: string): boolean {
+  const normalized = normalizeQueryTypos(goal);
+  return /\bsales funnel\b|\blanding page\b|\blead generation\b|\bget leads\b|\bconversion funnel\b/.test(normalized);
+}
+
+function detectNewsletterSemanticIntent(goal: string): boolean {
+  const normalized = normalizeQueryTypos(goal);
+  return /\bnewsletter\b|\bgrow subscribers\b|\baudience\b|\bcreator newsletter\b/.test(normalized);
+}
+
+function detectBroadGenericBusinessIntent(goal: string): boolean {
+  const normalized = normalizeQueryTypos(goal);
+  return /\bonline business\b|\bbusiness\b|\bmarketing\b|\bemail marketing\b/.test(normalized);
+}
+
 function getPricingTier(model: string): number {
   return model === 'free' ? 0 : model === 'freemium' ? 1 : 2;
 }
@@ -712,6 +777,10 @@ function scoreToolForSlot(
   tool: Tool,
   slot: WorkflowSlot,
   goalTokens: string[],
+  affiliateIntentTargets: Set<AffiliateToolKey>,
+  funnelSemanticIntent: boolean,
+  newsletterSemanticIntent: boolean,
+  broadGenericBusinessIntent: boolean,
   selectedTools: Tool[],
   selectedCategoriesCount: Map<string, number>,
   coveredStages: Set<WorkflowStage>,
@@ -722,6 +791,8 @@ function scoreToolForSlot(
   let score = tool.internal_score || 0;
   const archetype = getToolArchetypeProfile(tool);
   const skillLevel = String(tool.skill_level || '').toLowerCase();
+  const toolName = (tool.name || '').trim().toLowerCase();
+  const affiliateToolKey = normalizeAffiliateToolName(toolName);
 
   const cat = tool.category;
 
@@ -760,6 +831,42 @@ function scoreToolForSlot(
   // Long-tail visibility: if relevance is strong, boost less obvious options.
   if ((tool.popularity_score || 0) <= 5 && matchedTokens >= 2) {
     score += 7;
+  }
+
+  if (
+    affiliateToolKey === 'clickfunnels' &&
+    (affiliateIntentTargets.has('clickfunnels') || funnelSemanticIntent) &&
+    slot.categories.includes('landing_pages')
+  ) {
+    // Hard priority: funnel flows should strongly prefer ClickFunnels in landing-page slots.
+    score += 80;
+  } else if (
+    affiliateToolKey === 'clickfunnels' &&
+    !affiliateIntentTargets.has('clickfunnels') &&
+    !funnelSemanticIntent &&
+    !broadGenericBusinessIntent &&
+    slot.categories.includes('landing_pages')
+  ) {
+    // Baseline fallback: keep ClickFunnels visible in landing-page slots when intent is weak.
+    score += 20;
+  }
+
+  if (
+    affiliateToolKey === 'beehiiv' &&
+    (affiliateIntentTargets.has('beehiiv') || newsletterSemanticIntent) &&
+    slot.categories.includes('email_marketing')
+  ) {
+    // Soft priority: newsletter flows should surface Beehiiv consistently without overpowering all signals.
+    score += 40;
+  } else if (
+    affiliateToolKey === 'beehiiv' &&
+    !affiliateIntentTargets.has('beehiiv') &&
+    !newsletterSemanticIntent &&
+    !broadGenericBusinessIntent &&
+    slot.categories.includes('email_marketing')
+  ) {
+    // Baseline fallback: keep Beehiiv visible in email-marketing slots for ambiguous goals.
+    score += 15;
   }
 
   // Beginner-friendly
@@ -869,6 +976,10 @@ function fillBlueprint(
   options: WorkflowGenerationOptions
 ): ScoredTool[] {
   const goalTokens = tokenize(goal);
+  const affiliateIntentTargets = detectAffiliateIntentTargets(goal);
+  const funnelSemanticIntent = detectFunnelSemanticIntent(goal);
+  const newsletterSemanticIntent = detectNewsletterSemanticIntent(goal);
+  const broadGenericBusinessIntent = detectBroadGenericBusinessIntent(goal);
   const selectedIds = new Set<number>();
   const selectedCategoriesCount = new Map<string, number>();
   const coveredStages = new Set<WorkflowStage>();
@@ -924,6 +1035,10 @@ function fillBlueprint(
           tool,
           slot,
           goalTokens,
+          affiliateIntentTargets,
+          funnelSemanticIntent,
+          newsletterSemanticIntent,
+          broadGenericBusinessIntent,
           result.map((entry) => entry.tool),
           selectedCategoriesCount,
           coveredStages,
@@ -974,6 +1089,10 @@ function fillTemplateBlueprintStrict(
   options: WorkflowGenerationOptions
 ): ScoredTool[] {
   const goalTokens = tokenize(goal);
+  const affiliateIntentTargets = detectAffiliateIntentTargets(goal);
+  const funnelSemanticIntent = detectFunnelSemanticIntent(goal);
+  const newsletterSemanticIntent = detectNewsletterSemanticIntent(goal);
+  const broadGenericBusinessIntent = detectBroadGenericBusinessIntent(goal);
   const selectedIds = new Set<number>();
   const selectedCategoriesCount = new Map<string, number>();
   const coveredStages = new Set<WorkflowStage>();
@@ -1039,6 +1158,10 @@ function fillTemplateBlueprintStrict(
           tool,
           slot,
           goalTokens,
+          affiliateIntentTargets,
+          funnelSemanticIntent,
+          newsletterSemanticIntent,
+          broadGenericBusinessIntent,
           result.map((entry) => entry.tool),
           selectedCategoriesCount,
           coveredStages,
@@ -1070,6 +1193,10 @@ function buildAlternativesBySelectedTool(
   options: WorkflowGenerationOptions
 ): Record<string, Tool[]> {
   const goalTokens = tokenize(goal);
+  const affiliateIntentTargets = detectAffiliateIntentTargets(goal);
+  const funnelSemanticIntent = detectFunnelSemanticIntent(goal);
+  const newsletterSemanticIntent = detectNewsletterSemanticIntent(goal);
+  const broadGenericBusinessIntent = detectBroadGenericBusinessIntent(goal);
   const selectedIds = new Set(selected.map((s) => s.tool.id));
   const alternatives: Record<string, Tool[]> = {};
 
@@ -1099,6 +1226,10 @@ function buildAlternativesBySelectedTool(
           tool,
           slot,
           goalTokens,
+          affiliateIntentTargets,
+          funnelSemanticIntent,
+          newsletterSemanticIntent,
+          broadGenericBusinessIntent,
           selected.filter((entry) => entry.tool.id !== tool.id).map((entry) => entry.tool),
           selectedCategoriesCount,
           coveredStages,
@@ -1108,7 +1239,7 @@ function buildAlternativesBySelectedTool(
         ),
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
+      .slice(0, 1)
       .map((entry) => entry.tool);
 
     alternatives[selectedItem.tool.name] = rankedAlternatives;
@@ -1129,6 +1260,10 @@ function replaceOutOfBudgetSelections(
   const result: ScoredTool[] = [...selected];
   const selectedIds = new Set(result.map((entry) => entry.tool.id));
   const goalTokens = tokenize(goal);
+  const affiliateIntentTargets = detectAffiliateIntentTargets(goal);
+  const funnelSemanticIntent = detectFunnelSemanticIntent(goal);
+  const newsletterSemanticIntent = detectNewsletterSemanticIntent(goal);
+  const broadGenericBusinessIntent = detectBroadGenericBusinessIntent(goal);
 
   for (let i = 0; i < result.length; i += 1) {
     const entry = result[i];
@@ -1165,6 +1300,10 @@ function replaceOutOfBudgetSelections(
           tool,
           slot,
           goalTokens,
+          affiliateIntentTargets,
+          funnelSemanticIntent,
+          newsletterSemanticIntent,
+          broadGenericBusinessIntent,
           result.filter((_, idx) => idx !== i).map((entry) => entry.tool),
           selectedCategoriesCount,
           coveredStages,
@@ -1218,6 +1357,10 @@ export function recomputeAlternativesForStack(
   const budgetBand = normalizeBudgetBand(pricingPreference);
   const allowedPricingModels = new Set(getAllowedPricingModelsForBudget(pricingPreference, budgetBand));
   const goalTokens = tokenize(goal);
+  const affiliateIntentTargets = detectAffiliateIntentTargets(goal);
+  const funnelSemanticIntent = detectFunnelSemanticIntent(goal);
+  const newsletterSemanticIntent = detectNewsletterSemanticIntent(goal);
+  const broadGenericBusinessIntent = detectBroadGenericBusinessIntent(goal);
   const options: WorkflowGenerationOptions = {
     budgetBand,
     strictPrimaryCategory: false,
@@ -1263,6 +1406,10 @@ export function recomputeAlternativesForStack(
           tool,
           slot,
           goalTokens,
+          affiliateIntentTargets,
+          funnelSemanticIntent,
+          newsletterSemanticIntent,
+          broadGenericBusinessIntent,
           selectedTools.filter((selected) => selected.id !== tool.id),
           selectedCategoriesCount,
           coveredStages,
@@ -1272,7 +1419,7 @@ export function recomputeAlternativesForStack(
         ),
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
+      .slice(0, 1)
       .map((entry) => entry.tool);
   });
 

@@ -25,6 +25,7 @@ import NotFound from './pages/NotFound';
 import ViewStack from './pages/ViewStack';
 import StackLeaderboard from './pages/StackLeaderboard';
 import StackLibrary from './pages/StackLibrary';
+import StackEntryLanding from './pages/StackEntryLanding';
 import { LegacyDailyStackRedirect, LegacySharedStackRedirect } from './pages/StackRouteRedirects';
 import CookieConsent from './components/CookieConsent';
 
@@ -65,6 +66,7 @@ const App = () => {
                 <Route path="/view-stack/:id" element={<ViewStack />} />
                 <Route path="/stack-leaderboard" element={<StackLeaderboard />} />
                 <Route path="/stack-library" element={<StackLibrary />} />
+                <Route path="/stacks/:entryType" element={<StackEntryLanding />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />

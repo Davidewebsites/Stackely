@@ -287,7 +287,7 @@ function stackContainsToolByName(
   return stack.tools.some((tool) => normalizeToolName(tool.name).includes(target));
 }
 
-function createTopPickFallbackTool(toolName: 'ClickFunnels' | 'Beehiiv'): Tool {
+function createTopPickFallbackTool(toolName: 'ClickFunnels' | 'Beehiiv' | 'Systeme'): Tool {
   if (toolName === 'ClickFunnels') {
     return {
       id: -99001,
@@ -301,6 +301,23 @@ function createTopPickFallbackTool(toolName: 'ClickFunnels' | 'Beehiiv'): Tool {
       logo_url: 'https://logo.clearbit.com/clickfunnels.com',
       internal_score: 84,
       popularity_score: 8,
+      active: true,
+    };
+  }
+
+  if (toolName === 'Systeme') {
+    return {
+      id: -99003,
+      name: 'Systeme.io',
+      slug: 'systeme',
+      short_description: 'Build funnels, email sequences, and digital offers in one platform.',
+      category: 'landing_pages',
+      pricing_model: 'freemium',
+      skill_level: 'beginner',
+      website_url: 'https://systeme.io',
+      logo_url: 'https://logo.clearbit.com/systeme.io',
+      internal_score: 82,
+      popularity_score: 7,
       active: true,
     };
   }
@@ -323,7 +340,8 @@ function createTopPickFallbackTool(toolName: 'ClickFunnels' | 'Beehiiv'): Tool {
 
 function buildTopPicksSourcePool(featuredTools: Tool[], catalogTools: Tool[]): Tool[] {
   const pool = [...featuredTools];
-  const requiredToolNames: Array<'ClickFunnels' | 'Beehiiv'> = ['ClickFunnels', 'Beehiiv'];
+  const tier1RequiredToolNames: Array<'ClickFunnels' | 'Beehiiv'> = ['ClickFunnels', 'Beehiiv'];
+  const tier2OptionalToolName = 'Systeme' as const;
 
   const hasBySlugOrName = (tools: Tool[], requiredSlug: string, requiredName: string): boolean =>
     tools.some((tool) => {
@@ -332,7 +350,38 @@ function buildTopPicksSourcePool(featuredTools: Tool[], catalogTools: Tool[]): T
       return toolSlug === requiredSlug || toolName === requiredName;
     });
 
-  for (const requiredName of requiredToolNames) {
+  const hasByAliases = (tools: Tool[], aliases: string[]): boolean =>
+    tools.some((tool) => {
+      const toolSlug = normalizeToolSlug(tool.slug);
+      const toolName = normalizeToolName(tool.name);
+      return aliases.some((alias) => {
+        const normalizedAlias = normalizeToolName(alias);
+        return (
+          toolSlug === normalizedAlias ||
+          toolName === normalizedAlias ||
+          toolSlug.includes(normalizedAlias) ||
+          toolName.includes(normalizedAlias)
+        );
+      });
+    });
+
+  const findFromCatalogByAliases = (aliases: string[]): Tool | undefined =>
+    catalogTools.find((tool) => {
+      const toolSlug = normalizeToolSlug(tool.slug);
+      const toolName = normalizeToolName(tool.name);
+      return aliases.some((alias) => {
+        const normalizedAlias = normalizeToolName(alias);
+        return (
+          toolSlug === normalizedAlias ||
+          toolName === normalizedAlias ||
+          toolSlug.includes(normalizedAlias) ||
+          toolName.includes(normalizedAlias)
+        );
+      });
+    });
+
+  // Tier 1: must be guaranteed (featured -> catalog -> static fallback)
+  for (const requiredName of tier1RequiredToolNames) {
     const requiredSlug = normalizeToolSlug(requiredName);
     const requiredNormalizedName = normalizeToolName(requiredName);
 
@@ -351,31 +400,91 @@ function buildTopPicksSourcePool(featuredTools: Tool[], catalogTools: Tool[]): T
     pool.push(createTopPickFallbackTool(requiredName));
   }
 
+  // Tier 2: optional/contextual (Systeme)
+  // Include only if already present in featured/catalog OR when no other funnel option exists.
+  const systemeAliases = ['systeme', 'systeme.io'];
+  const hasSystemeInPool = hasByAliases(pool, systemeAliases);
+  if (!hasSystemeInPool) {
+    const fromCatalogSysteme = findFromCatalogByAliases(systemeAliases);
+    if (fromCatalogSysteme) {
+      pool.push(fromCatalogSysteme);
+    } else {
+      const hasFunnelAlternative = pool.some((tool) => normalizeToolSlug(tool.category) === 'landing_pages');
+      if (!hasFunnelAlternative) {
+        pool.push(createTopPickFallbackTool(tier2OptionalToolName));
+      }
+    }
+  }
+
+  // Tier 3 (Make): intentionally not force-injected.
+
   return pool;
 }
 
 function getDailyTopPicks(tools: Tool[], count = 6): Tool[] {
-  if (tools.length <= count) return tools;
-
   const now = new Date();
   const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const rand = seededRandomFactory(hashDateSeed(dateKey));
+
+  const isAliasMatch = (tool: Tool, aliases: string[]): boolean => {
+    const slug = normalizeToolSlug(tool.slug);
+    const name = normalizeToolName(tool.name);
+    return aliases.some((alias) => {
+      const normalizedAlias = normalizeToolName(alias);
+      return (
+        slug === normalizedAlias ||
+        name === normalizedAlias ||
+        slug.includes(normalizedAlias) ||
+        name.includes(normalizedAlias)
+      );
+    });
+  };
 
   const scored = [...tools].map((tool) => {
     const quality = (tool.internal_score || 0) * 1.0;
     const popularity = (tool.popularity_score || 0) * 7;
     const seededJitter = rand() * 12;
-    const score = quality + popularity + seededJitter;
+    const isClickFunnels = isAliasMatch(tool, ['clickfunnels']);
+    const isBeehiiv = isAliasMatch(tool, ['beehiiv']);
+    const isSysteme = isAliasMatch(tool, ['systeme', 'systeme.io']);
+
+    // Daily weighted rotation: deterministic day seed + strong recurring bias for Tier 1.
+    const tierWeight = isClickFunnels ? 28 : isBeehiiv ? 24 : isSysteme ? 10 : 0;
+    const dailyWeightJitter = tierWeight > 0 ? rand() * 10 : 0;
+
+    const score = quality + popularity + seededJitter + tierWeight + dailyWeightJitter;
     return { tool, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
 
+  // Reserve two fixed daily anchors, then rotate only remaining slots.
+  const clickFunnelsTool = tools.find((tool) => isAliasMatch(tool, ['clickfunnels'])) || createTopPickFallbackTool('ClickFunnels');
+  const beehiivTool = tools.find((tool) => isAliasMatch(tool, ['beehiiv'])) || createTopPickFallbackTool('Beehiiv');
+
+  const anchorPicks: Tool[] = [];
+  const anchorSeen = new Set<number>();
+  for (const anchor of [clickFunnelsTool, beehiivTool]) {
+    if (anchorSeen.has(anchor.id)) continue;
+    anchorSeen.add(anchor.id);
+    anchorPicks.push(anchor);
+    if (anchorPicks.length >= count) break;
+  }
+
+  const remainingSlots = Math.max(0, count - anchorPicks.length);
+  if (remainingSlots === 0) return anchorPicks;
+
   // Diversity-first pass: cap to 2 tools per category, then fill remaining slots.
   const picks: Tool[] = [];
   const perCategory = new Map<string, number>();
+  for (const anchor of anchorPicks) {
+    const cat = anchor.category || '_';
+    perCategory.set(cat, (perCategory.get(cat) || 0) + 1);
+  }
+
   for (const row of scored) {
-    if (picks.length >= count) break;
+    if (picks.length >= remainingSlots) break;
+    if (anchorSeen.has(row.tool.id)) continue;
     const cat = row.tool.category || '_';
     const used = perCategory.get(cat) || 0;
     if (used >= 2) continue;
@@ -383,28 +492,16 @@ function getDailyTopPicks(tools: Tool[], count = 6): Tool[] {
     perCategory.set(cat, used + 1);
   }
 
-  if (picks.length < count) {
+  if (picks.length < remainingSlots) {
     for (const row of scored) {
-      if (picks.length >= count) break;
+      if (picks.length >= remainingSlots) break;
+      if (anchorSeen.has(row.tool.id)) continue;
       if (picks.some((t) => t.id === row.tool.id)) continue;
       picks.push(row.tool);
     }
   }
 
-  // Keep affiliate picks visible in this editorial section when available.
-  const requiredNames = ['clickfunnels', 'beehiiv'];
-  for (const requiredName of requiredNames) {
-    const requiredTool = tools.find((tool) => normalizeToolName(tool.name).includes(requiredName));
-    if (!requiredTool) continue;
-    if (picks.some((tool) => tool.id === requiredTool.id)) continue;
-    if (picks.length < count) {
-      picks.push(requiredTool);
-      continue;
-    }
-    picks[picks.length - 1] = requiredTool;
-  }
-
-  return picks;
+  return [...anchorPicks, ...picks];
 }
 
 function inferUseCaseCategories(query: string): string[] {
@@ -1518,7 +1615,7 @@ export default function Index() {
               <div className="page-shell page-section">
                 <div className="mb-7 max-w-[72ch]">
                   <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Featured tools</div>
-                  <h2 className="section-heading mb-2">Top picks this week</h2>
+                  <h2 className="section-heading mb-2">Top daily picks</h2>
                   <p className="body-copy">Curated daily for fast scanning.</p>
                 </div>
 

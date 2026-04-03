@@ -63,6 +63,14 @@ import {
   pricingModelRank,
   type BudgetFilter,
 } from '@/lib/budget';
+import {
+  buildStackSlotOutboundContext,
+  buildWorkflowGoalQuery,
+  resolveResultsQueryMode,
+  resolveResultsToolOutboundSurfaceSource,
+  resolveUrlIntent,
+  type SkillPreference,
+} from './results/orchestration';
 
 interface AdaptedStackItem {
   tool: Tool;
@@ -126,6 +134,39 @@ function getCategoryStepLabel(category: string): string {
   return matched?.role || matched?.label || 'Workflow step';
 }
 
+function humanizeWorkflowStepLabel(role: string, category: string, index: number): string {
+  const normalizedRole = role.trim().toLowerCase();
+
+  if (/traffic engine|acquisition|ads/.test(normalizedRole)) return 'Bring in visitors';
+  if (/conversion layer|page builder|store builder|landing/.test(normalizedRole)) return 'Set up your page';
+  if (/email platform|email lifecycle|newsletter|distribution/.test(normalizedRole)) return 'Reach your audience';
+  if (/copy engine|copywriter|writing engine|script/.test(normalizedRole)) return 'Write your message';
+  if (/automation hub|orchestrator|automation trigger/.test(normalizedRole)) return 'Connect your tools';
+  if (/analytics|measurement|tracking|reporting/.test(normalizedRole)) return 'Track what works';
+  if (/video|design|visual/.test(normalizedRole)) return 'Create your content';
+
+  switch (category) {
+    case 'landing_pages':
+      return 'Set up your page';
+    case 'email_marketing':
+      return 'Reach your audience';
+    case 'automation':
+      return 'Connect your tools';
+    case 'analytics':
+      return 'Track what works';
+    case 'copywriting':
+      return 'Write your message';
+    case 'design':
+      return 'Create your visuals';
+    case 'ads':
+      return 'Bring in visitors';
+    case 'video':
+      return 'Create your content';
+    default:
+      return index === 0 ? 'Start here' : index >= 2 ? 'Optional next step' : 'Next step';
+  }
+}
+
 function deriveWorkflowStepLabel(item: AdaptedStackItem, index: number): string {
   const normalizedRole = item.role.trim();
   const normalizedLower = normalizedRole.toLowerCase();
@@ -134,12 +175,12 @@ function deriveWorkflowStepLabel(item: AdaptedStackItem, index: number): string 
     !['workflow step', 'workflow support', 'general', 'other', 'tool'].includes(normalizedLower);
 
   if (hasStrongRole) {
-    return normalizedRole;
+    return humanizeWorkflowStepLabel(normalizedRole, item.tool.category || inferCategoryFromRole(item.role), index);
   }
 
   const inferredCategory = item.tool.category || inferCategoryFromRole(item.role);
   const categoryLabel = getCategoryStepLabel(inferredCategory);
-  return `Step ${index + 1} - ${categoryLabel}`;
+  return humanizeWorkflowStepLabel(categoryLabel, inferredCategory, index);
 }
 
 function getRoleLabelFromCategory(category: string): string {
@@ -269,6 +310,65 @@ function ensureAffiliateBrandedWorkflowAnchor(
   };
 }
 
+function createAffiliateVisibilityFallbackTool(anchor: WorkflowCardAffiliateAnchor): Tool {
+  if (anchor === 'clickfunnels') {
+    return {
+      id: -97001,
+      name: 'ClickFunnels',
+      slug: 'clickfunnels',
+      short_description: 'Build conversion-first funnels and landing pages with a premium all-in-one workflow.',
+      category: 'landing_pages',
+      pricing_model: 'paid',
+      skill_level: 'intermediate',
+      website_url: 'https://www.clickfunnels.com',
+      logo_url: 'https://logo.clearbit.com/clickfunnels.com',
+      internal_score: 84,
+      popularity_score: 8,
+      active: true,
+    };
+  }
+
+  return {
+    id: -97002,
+    name: 'Beehiiv',
+    slug: 'beehiiv',
+    short_description: 'Run and grow a newsletter with built-in audience growth and creator workflows.',
+    category: 'email_marketing',
+    pricing_model: 'freemium',
+    skill_level: 'beginner',
+    website_url: 'https://www.beehiiv.com',
+    logo_url: 'https://logo.clearbit.com/beehiiv.com',
+    internal_score: 85,
+    popularity_score: 8,
+    active: true,
+  };
+}
+
+function resolveAffiliateVisibilityAnchor(
+  query: string,
+  intentType: string,
+  workflowAffiliateAnchor: WorkflowCardAffiliateAnchor | null,
+): WorkflowCardAffiliateAnchor | null {
+  if (workflowAffiliateAnchor) return workflowAffiliateAnchor;
+
+  const normalized = query.toLowerCase();
+  if (
+    intentType === 'funnel' ||
+    /\b(funnel|funnel builder|sales funnel|lead generation|landing page|conversion funnel|squeeze page)\b/.test(normalized)
+  ) {
+    return 'clickfunnels';
+  }
+
+  if (
+    intentType === 'newsletter' ||
+    /\b(newsletter|email list|grow subscribers|creator newsletter|newsletter platform|email audience)\b/.test(normalized)
+  ) {
+    return 'beehiiv';
+  }
+
+  return null;
+}
+
 /**
  * Ensures the generated stack contains at least one tool from the required
  * category group implied by intentType. If missing, replaces the weakest slot
@@ -337,8 +437,6 @@ function ensureIntentCoherence(
 }
 
 type QueryIntentType = 'exact_tool' | 'goal_search' | 'constrained_search' | 'alternative_search' | 'generic_search';
-type SkillPreference = 'beginner' | 'intermediate' | 'advanced';
-
 // Queries containing these terms signal broader intent — never redirect to a single tool detail page.
 const SEARCH_REDIRECT_BLOCKER =
   /\b(beginner|intermediate|advanced|easy|free|cheap|affordable|automation|analytics|website|landing|alternative|alternatives|competitor|competitors|similar|tool|tools|app|apps|software|platform|platforms)\b/i;
@@ -899,12 +997,6 @@ function scoreToolForGoalSkill(tool: Tool, domain: GoalDomain, skill: SkillPrefe
   return score;
 }
 
-// Only an explicit mode flag may activate stack mode. Free-text queries stay in search mode.
-function classifyQueryMode(query: string, requestedMode: string | null): 'stack' | 'search' {
-  if (!query) return 'search';
-  return requestedMode === 'stack' ? 'stack' : 'search';
-}
-
 export default function Results() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -929,10 +1021,10 @@ export default function Results() {
       : null;
 
   // Intent memory: read from URL or derive from query
-  const intentTypeParam = searchParams.get('intent_type');
-  const intentOriginParam = searchParams.get('intent_origin');
-  const intentType = intentTypeParam || (query ? detectIntentFromGoal(query) : 'creation') || 'creation';
-  const intentOrigin = intentOriginParam || 'search';
+  const { intentType, intentOrigin } = useMemo(
+    () => resolveUrlIntent(searchParams, query, detectIntentFromGoal),
+    [searchParams, query],
+  );
 
   const { classify, reset, isLoading, classification, stack, alternatives, aiAccelerators, error, activePricing } =
     useToolRecommendation();
@@ -953,13 +1045,15 @@ export default function Results() {
     const catalogToolsRef = useRef<Tool[]>([]);
     useEffect(() => { catalogToolsRef.current = catalogTools; }, [catalogTools]);
   const [searchCatalogTools, setSearchCatalogTools] = useState<Tool[]>([]);
+  const searchCatalogToolsRef = useRef<Tool[]>([]);
+  useEffect(() => { searchCatalogToolsRef.current = searchCatalogTools; }, [searchCatalogTools]);
   const [searchWorkflowFallbackTools, setSearchWorkflowFallbackTools] = useState<Tool[]>([]);
   const [searchWorkflowSucceeded, setSearchWorkflowSucceeded] = useState(false);
   const [queryIntent, setQueryIntent] = useState<QueryIntent | null>(null);
   const [recentlyReplacedToolId, setRecentlyReplacedToolId] = useState<number | null>(null);
   const [expandedWorkflowStep, setExpandedWorkflowStep] = useState(0);
 
-  const queryMode = useMemo<'stack' | 'search'>(() => classifyQueryMode(query, requestedMode), [query, requestedMode]);
+  const queryMode = useMemo<'stack' | 'search'>(() => resolveResultsQueryMode(query, requestedMode), [query, requestedMode]);
   const workflowPricingPreference = useMemo<PricingPreference>(() => {
     if (budgetParam !== 'any') return budgetToPricingPreference(budgetParam);
     return pricingParam;
@@ -973,8 +1067,8 @@ export default function Results() {
     if (queryIntent?.type === 'alternative_search') {
       const targetName = queryIntent.alternativeTargetName || queryIntent.interpretedQuery || displayQueryLabel;
       return {
-        label: 'Generate replacement workflow',
-        description: `Create a workflow that replaces ${targetName} with comparable tools.`,
+        label: 'See a replacement setup',
+        description: `See a simpler setup that replaces ${targetName} with comparable tools.`,
         workflowQuery: `replacement workflow for ${targetName}`,
       };
     }
@@ -982,23 +1076,23 @@ export default function Results() {
     if (queryIntent?.type === 'exact_tool') {
       const toolName = queryIntent.interpretedQuery || displayQueryLabel;
       return {
-        label: 'Build a workflow using this tool',
-        description: `Use ${toolName} as the core and complete the rest of the workflow around it.`,
+        label: 'Build your stack around this tool',
+        description: `Use ${toolName} as the starting point and add only the supporting tools you need.`,
         workflowQuery: `workflow using ${toolName}`,
       };
     }
 
     return {
-      label: 'Generate workflow',
-      description: 'Switch this goal into workflow generation and let Stackely assemble a structured stack for you.',
+      label: 'See recommended setup',
+      description: 'Turn this goal into a guided setup with the tools most people need first.',
       workflowQuery: queryIntent?.interpretedQuery || query,
     };
   }, [queryIntent, displayQueryLabel, query]);
 
-  const resultsToolOutboundSurfaceSource = useMemo(() => {
-    if (queryIntent?.type === 'alternative_search') return 'results_stack_alternative';
-    return 'results_tool_list';
-  }, [queryIntent?.type]);
+  const resultsToolOutboundSurfaceSource = useMemo(
+    () => resolveResultsToolOutboundSurfaceSource(queryIntent?.type),
+    [queryIntent?.type],
+  );
 
   usePageSeo({
     title: query
@@ -1120,13 +1214,12 @@ export default function Results() {
       setSearchError(null);
       setStackLoading(true);
 
-      const skillContextQuery = explicitSkillPreference
-        ? `${intent.interpretedQuery || query} for ${explicitSkillPreference} users`
-        : intent.inferredSkillPreference
-        ? `${intent.interpretedQuery || query} for ${intent.inferredSkillPreference} users`
-        : intent.interpretedQuery || query;
-      const budgetContextQuery =
-        budgetParam === 'any' ? skillContextQuery : `${skillContextQuery} with ${budgetParam} budget`;
+      const budgetContextQuery = buildWorkflowGoalQuery(
+        intent.interpretedQuery || query,
+        explicitSkillPreference,
+        intent.inferredSkillPreference,
+        budgetParam,
+      );
 
       const recentlyUsedTools = stackSelection
         .flatMap((tool) => [tool.name, tool.slug])
@@ -1159,13 +1252,14 @@ export default function Results() {
       setSearchError(null);
       setSearchLoading(true);
 
-      const intentSeed = deriveQueryIntent(query, searchCatalogTools);
+      const intentSeed = deriveQueryIntent(query, searchCatalogToolsRef.current);
       setQueryIntent(intentSeed);
       const interpretedQuery = intentSeed.interpretedQuery || query;
 
       searchTools(interpretedQuery, pricingParam, categoryParam || undefined, 24)
         .then((data) => {
-          const combined = uniqueById([...data, ...searchCatalogTools]);
+          const latestSearchCatalogTools = searchCatalogToolsRef.current;
+          const combined = uniqueById([...data, ...latestSearchCatalogTools]);
           const intentResolved = deriveQueryIntent(query, combined);
           setQueryIntent(intentResolved);
 
@@ -1175,15 +1269,12 @@ export default function Results() {
               .flatMap((tool) => [tool.name, tool.slug])
               .filter(Boolean);
             const workflowSkillPreference = explicitSkillPreference || intentResolved.inferredSkillPreference || null;
-            const workflowGoalQuery = explicitSkillPreference
-              ? `${intentResolved.interpretedQuery || query} for ${explicitSkillPreference} users`
-              : intentResolved.inferredSkillPreference
-              ? `${intentResolved.interpretedQuery || query} for ${intentResolved.inferredSkillPreference} users`
-              : intentResolved.interpretedQuery || query;
-            const budgetWorkflowGoalQuery =
-              budgetParam === 'any'
-                ? workflowGoalQuery
-                : `${workflowGoalQuery} with ${budgetParam} budget`;
+            const budgetWorkflowGoalQuery = buildWorkflowGoalQuery(
+              intentResolved.interpretedQuery || query,
+              explicitSkillPreference,
+              intentResolved.inferredSkillPreference,
+              budgetParam,
+            );
 
             recommendStackFromGoal(budgetWorkflowGoalQuery, workflowPricingPreference, {
               recentlyUsedTools,
@@ -1191,7 +1282,7 @@ export default function Results() {
             })
               .then((workflow) => {
                 const byName = new Map<string, Tool>();
-                for (const tool of uniqueById([...combined, ...searchCatalogTools])) {
+                for (const tool of uniqueById([...combined, ...latestSearchCatalogTools])) {
                   byName.set(normalizeToolName(tool.name), tool);
                   byName.set((tool.slug || '').toLowerCase(), tool);
                 }
@@ -1236,7 +1327,7 @@ export default function Results() {
           // Resolve the alternative target tool (used in alternative_search path below)
           const alternativeTarget = intentResolved.alternativeTargetSlug
             ? combined.find((tool) => tool.slug === intentResolved.alternativeTargetSlug) ||
-              searchCatalogTools.find((tool) => tool.slug === intentResolved.alternativeTargetSlug) ||
+              latestSearchCatalogTools.find((tool) => tool.slug === intentResolved.alternativeTargetSlug) ||
               null
             : null;
 
@@ -1248,8 +1339,8 @@ export default function Results() {
             // Always build from the full catalog so brand-name queries (e.g. "mailchimp
             // competitor") get complete coverage regardless of what the text search returned.
             const fullPool = searchCatalogTools.length > 0
-              ? searchCatalogTools
-              : uniqueById([...data, ...searchCatalogTools]);
+              ? latestSearchCatalogTools
+              : uniqueById([...data, ...latestSearchCatalogTools]);
             const targetId = alternativeTarget?.id;
 
             let altCandidates: Tool[];
@@ -1303,13 +1394,13 @@ export default function Results() {
             // Non-alternative search: augment API results with catalog, enforce diversity
             candidatePool = data;
 
-            if (searchCatalogTools.length > 0) {
+            if (latestSearchCatalogTools.length > 0) {
               if (creatorWorkflowIntent) {
                 const creatorCategories = getGoalCategoryPriority(query);
                 const categoryPriority = new Map<string, number>();
                 creatorCategories.forEach((category, index) => categoryPriority.set(category, index));
 
-                const creatorTools = [...searchCatalogTools]
+                const creatorTools = [...latestSearchCatalogTools]
                   .filter((tool) => creatorCategories.includes(tool.category))
                   .sort((a, b) => {
                     const aPriority = categoryPriority.get(a.category) ?? 999;
@@ -1324,7 +1415,7 @@ export default function Results() {
               }
 
               const relevantCategories = inferRelevantCategories(query);
-              const sorted = [...searchCatalogTools].sort(
+              const sorted = [...latestSearchCatalogTools].sort(
                 (a, b) => (b.internal_score || 0) - (a.internal_score || 0)
               );
 
@@ -1385,7 +1476,6 @@ export default function Results() {
     queryMode,
     pricingParam,
     categoryParam,
-    searchCatalogTools,
     navigate,
     explicitSkillPreference,
     budgetParam,
@@ -1590,6 +1680,32 @@ export default function Results() {
       .sort((a, b) => pricingModelRank(getToolPricingModel(a.tool)) - pricingModelRank(getToolPricingModel(b.tool)))
       .slice(0, 3);
   }, [workflowBudgetFallbackUsed, strictBudgetAiStackItems, aiStackItems]);
+
+  const affiliateVisibilityTool = useMemo(() => {
+    if (queryMode !== 'stack' || budgetParam === 'any' || !query) return null;
+
+    const anchor = resolveAffiliateVisibilityAnchor(query, intentType, workflowAffiliateAnchor);
+    if (!anchor) return null;
+
+    const anchorAliases = anchor === 'clickfunnels'
+      ? ['clickfunnels']
+      : ['beehiiv'];
+
+    const catalogMatch = catalogTools.find((tool) => {
+      const normalizedName = normalizeToolName(tool.name);
+      const normalizedSlug = (tool.slug || '').toLowerCase();
+      return anchorAliases.some((alias) => normalizedName.includes(alias) || normalizedSlug.includes(alias));
+    });
+
+    const candidate = catalogMatch || createAffiliateVisibilityFallbackTool(anchor);
+    const allowedByBudget = applyBudgetFilter([candidate], budgetParam).length > 0;
+    if (allowedByBudget) return null;
+
+    const alreadyVisibleInWorkflow = filteredAiStackItems.some((item) => normalizeToolName(item.tool.name) === normalizeToolName(candidate.name));
+    if (alreadyVisibleInWorkflow) return null;
+
+    return candidate;
+  }, [queryMode, budgetParam, query, intentType, workflowAffiliateAnchor, catalogTools, filteredAiStackItems]);
 
   useEffect(() => {
     if (queryMode === 'stack' && filteredAiStackItems.length > 0) {
@@ -1856,7 +1972,7 @@ export default function Results() {
         setSearchError(null);
         searchTools(retryIntent.interpretedQuery || query, pricingParam, categoryParam || undefined, 24)
           .then((data) => {
-            const combined = uniqueById([...data, ...searchCatalogTools]);
+            const combined = uniqueById([...data, ...searchCatalogToolsRef.current]);
             const resolvedIntent = deriveQueryIntent(query, combined);
             setQueryIntent(resolvedIntent);
 
@@ -2231,12 +2347,12 @@ export default function Results() {
                       <img src="/favicon-main.png" alt="Stackely" className="w-5 h-5 object-contain" />
                     </div>
                     <div className="min-w-0">
-                      <div className="eyebrow-label mb-1" style={{ color: '#2F80ED' }}>Workflow stack</div>
+                      <div className="eyebrow-label mb-1" style={{ color: '#2F80ED' }}>Recommended setup</div>
                       <h2 className="title ai-stack-title font-semibold text-slate-950 tracking-tight">
-                        Stack for: {displayQueryLabel}
+                        Best setup for: {displayQueryLabel}
                       </h2>
                       <p className="body-copy mt-1">
-                        Workflow recommendation with {stackData.stack.length} structured step{stackData.stack.length !== 1 ? 's' : ''}, one recommended tool per step
+                        A guided setup with {stackData.stack.length} recommended step{stackData.stack.length !== 1 ? 's' : ''}. Start with the first one, then add more only if needed.
                       </p>
                     </div>
                   </div>
@@ -2246,7 +2362,7 @@ export default function Results() {
                       Pricing: {stackPricingLabel}
                     </Badge>
                     <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
-                      Workflow Mode
+                      Guided setup
                     </Badge>
                     {stackSelection.length > 0 && (
                       <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
@@ -2274,30 +2390,28 @@ export default function Results() {
                   </div>
 
                   <p className="body-copy">
-                    This stack is ordered as a workflow so each tool plays a clear role from setup to optimization.
+                    Start with the first recommendation, then add the next tools only when they make the setup stronger.
                   </p>
                   <div className="mt-3 rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2.5">
                     <p className="text-[12px] leading-relaxed text-slate-600">
-                      This workflow selects the best tool for each step, including options outside your initial shortlist.
+                      This setup can include tools outside your initial shortlist when they are a better fit for the goal.
                     </p>
                   </div>
                 </div>
 
-                <div className="mb-10 panel-card p-4 sm:p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    {visibleStackStepLabels.map((label, index) => (
-                      <div key={`${label}-${index}`} className="flex items-center flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold text-white bg-slate-800"
-                          >
-                            {index + 1}
-                          </span>
-                          <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-700">{label}</span>
-                        </div>
-                        {index < 2 && <div className="h-px bg-slate-200 flex-1 ml-3" />}
+                <div className="mb-8 rounded-2xl border border-slate-200 bg-white/75 px-4 py-3 sm:px-5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Start with one strong tool</p>
+                      <p className="mt-1 text-[13px] text-slate-700">
+                        You do not need to set up everything at once. Start with the main recommendation, then add supporting tools only when they help.
+                      </p>
+                    </div>
+                    {visibleStackStepLabels.length > 1 && (
+                      <div className="text-[11px] text-slate-500">
+                        {visibleStackStepLabels.length - 1} supporting tool{visibleStackStepLabels.length - 1 !== 1 ? 's' : ''} available
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
@@ -2315,8 +2429,79 @@ export default function Results() {
 
                 <div className="mb-6 rounded-xl border border-slate-200 bg-white/80 px-4 py-3">
                   <p className="text-[13px] text-slate-700 leading-relaxed">{stackIntroCopy}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">Follow these steps to get results</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Keep it simple: start with the first recommendation</p>
                 </div>
+
+                {affiliateVisibilityTool && (
+                  <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/75 px-4 py-4 sm:px-5">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Upgrade option if budget opens up</p>
+                        <h3 className="mt-1 text-[16px] font-semibold text-slate-900">Strong paid-fit option kept visible separately</h3>
+                        <p className="mt-1 text-[13px] text-slate-700">
+                          {affiliateVisibilityTool.name} strongly matches this workflow, but it is outside your current budget filter, so it is not included in the selected stack.
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap justify-end">
+                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">Best paid option</Badge>
+                        <Badge className="text-[10px] bg-white text-slate-700 border border-slate-200 hover:bg-white">Top partner option</Badge>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-amber-200/70 bg-white/90 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
+                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+                        aria-label={`Open ${affiliateVisibilityTool.name}`}
+                      >
+                        <ToolLogo
+                          logoUrl={affiliateVisibilityTool.logo_url}
+                          websiteUrl={affiliateVisibilityTool.website_url}
+                          toolName={affiliateVisibilityTool.name}
+                          size={40}
+                        />
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
+                          className="text-left text-[15px] font-semibold text-slate-900 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 rounded-sm"
+                        >
+                          {affiliateVisibilityTool.name}
+                        </button>
+                        <p className="mt-1 text-[12px] text-slate-600">{affiliateVisibilityTool.short_description}</p>
+                      </div>
+
+                      <div className="flex gap-2 sm:justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 px-3 text-[12px] border-slate-300 bg-white"
+                          onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
+                        >
+                          View details
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-9 px-3 text-[12px] bg-slate-900 hover:bg-slate-800 text-white"
+                          onClick={() => {
+                            trackToolClick(affiliateVisibilityTool.id);
+                            openOutboundToolLink(affiliateVisibilityTool, location.pathname, '_blank', {
+                              surfaceSource: 'results_partner_upgrade_option',
+                              slotName: affiliateVisibilityTool.name,
+                              slotId: affiliateVisibilityTool.slug,
+                              userGoalQuery: query,
+                            });
+                          }}
+                        >
+                          {getOutboundCtaLabel(affiliateVisibilityTool, getActionCtaByCategory(affiliateVisibilityTool.category))}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-5">
                   {visibleStackItems.map((item, index) => {
@@ -2324,9 +2509,9 @@ export default function Results() {
                     const pickReason = item.why && item.why.trim().length > 0 ? item.why.trim() : getWhyRecommended(item.tool);
                     const avoidTradeoff = getAvoidIf(item.tool);
                     const stepTitle = visibleStackStepLabels[index] || deriveWorkflowStepLabel(item, index);
-                    const roleLabel = getRoleLabelFromCategory(item.tool.category);
                     const primaryFunction = getPrimaryFunctionByCategory(item.tool.category);
                     const isPrimaryTool = index === primaryStackToolIndex;
+                    const isOptionalStep = index === visibleStackItems.length - 1 && visibleStackItems.length >= 3;
                     const timeEstimates = ['⏱ 15–30 min setup', '⏱ 10–20 min setup', '⏱ 5–15 min setup'];
                     const howToUse =
                       index === 0
@@ -2337,23 +2522,28 @@ export default function Results() {
                     const openIdentityOutbound = () => {
                       trackToolClick(item.tool.id);
                       openOutboundToolLink(item.tool, location.pathname, '_blank', {
-                        surfaceSource: 'results_stack_identity',
-                        slotName: item.role,
-                        slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
-                        userGoalQuery: searchParams.get('q') || undefined,
+                        ...buildStackSlotOutboundContext('results_stack_identity', item.role, query),
                       });
                     };
                     return (
-                      <div
-                        key={`${item.tool.id}-${item.rank}`}
-                        className={`rounded-2xl border bg-white overflow-hidden ${
-                          recentlyReplacedToolId === item.tool.id
-                            ? 'border-emerald-200 ring-2 ring-emerald-100'
-                            : isPrimaryTool
-                            ? 'border-indigo-200 bg-[linear-gradient(180deg,rgba(79,70,229,0.06)_0%,rgba(255,255,255,0.98)_36%,rgba(255,255,255,1)_100%)]'
-                            : 'border-slate-200'
-                        }`}
-                      >
+                      <div key={`${item.tool.id}-${item.rank}`}>
+                        {!isPrimaryTool && index === 1 && (
+                          <div className="mb-3 px-1">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Supporting tools</p>
+                            <p className="mt-1 text-[12px] text-slate-500">Add these later if you want more automation, reach, or tracking.</p>
+                          </div>
+                        )}
+                        <div
+                          className={`rounded-2xl border bg-white overflow-hidden ${
+                            recentlyReplacedToolId === item.tool.id
+                              ? 'border-emerald-200 ring-2 ring-emerald-100'
+                              : isPrimaryTool
+                              ? 'border-indigo-200 bg-[linear-gradient(180deg,rgba(79,70,229,0.06)_0%,rgba(255,255,255,0.98)_36%,rgba(255,255,255,1)_100%)]'
+                              : isOptionalStep
+                              ? 'border-slate-200/80 bg-slate-50/45'
+                              : 'border-slate-200'
+                          }`}
+                        >
                         <div className="p-5 sm:p-6">
                           {/* Step header */}
                           <div className="flex items-center justify-between gap-2 mb-4">
@@ -2364,8 +2554,10 @@ export default function Results() {
                               >
                                 {index + 1}
                               </span>
-                              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Step {index + 1}</span>
-                              <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-700">{stepTitle}</span>
+                              <span className={`text-[11px] font-semibold uppercase tracking-wide ${isPrimaryTool ? 'text-emerald-700' : isOptionalStep ? 'text-slate-500' : 'text-slate-600'}`}>
+                                {isPrimaryTool ? 'Start here' : isOptionalStep ? 'Optional step' : 'Next step'}
+                              </span>
+                              <span className="text-[12px] font-semibold text-slate-700">{stepTitle}</span>
                             </div>
                             <span className="text-[11px] text-slate-400">{timeEstimates[index]}</span>
                           </div>
@@ -2400,9 +2592,13 @@ export default function Results() {
                               >
                                 {item.tool.name}
                               </button>
-                              <p className="text-[12px] text-slate-500 truncate">{item.role}</p>
-                              <p className="text-[11px] text-slate-600">{roleLabel}</p>
-                              <p className="text-[11px] text-slate-500">Used to {primaryFunction}</p>
+                              <p className="text-[12px] text-slate-500">
+                                {isPrimaryTool
+                                  ? `Best first tool to ${primaryFunction}`
+                                  : isOptionalStep
+                                  ? `Optional if you want to ${primaryFunction}`
+                                  : `Use this next to ${primaryFunction}`}
+                              </p>
                             </div>
                           </div>
 
@@ -2413,39 +2609,51 @@ export default function Results() {
                                 Recommended
                               </Badge>
                             )}
-                            <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
-                              {item.tool.pricing_model}
-                            </Badge>
-                            <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
-                              {item.tool.skill_level}
-                            </Badge>
-                          </div>
-
-                          {/* Why this pick + Trade-off */}
-                          <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5 mb-3">
-                            <div className="flex items-start gap-1.5">
-                              <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: accent.strong }} />
-                              <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Why this pick</p>
-                                <p className="text-[12px] text-slate-700 leading-relaxed">{pickReason}</p>
-                              </div>
-                            </div>
-                            {avoidTradeoff && (
-                              <div className="mt-2.5 pt-2 border-t border-amber-200/70 flex items-start gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
-                                <div className="min-w-0">
-                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-0.5">Trade-off</p>
-                                  <p className="text-[12px] text-amber-800 leading-relaxed">{avoidTradeoff}</p>
-                                </div>
-                              </div>
+                            {!isOptionalStep && (
+                              <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
+                                {item.tool.pricing_model}
+                              </Badge>
+                            )}
+                            {isPrimaryTool && (
+                              <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
+                                {item.tool.skill_level}
+                              </Badge>
                             )}
                           </div>
 
-                          {/* How to use this step */}
-                          <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5 mb-4">
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 mb-0.5">How to use this step</p>
-                            <p className="text-[12px] text-blue-900 leading-relaxed">{howToUse}</p>
-                          </div>
+                          {isPrimaryTool ? (
+                            <>
+                              <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5 mb-3">
+                                <div className="flex items-start gap-1.5">
+                                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: accent.strong }} />
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Why start here</p>
+                                    <p className="text-[12px] text-slate-700 leading-relaxed">{pickReason}</p>
+                                  </div>
+                                </div>
+                                {avoidTradeoff && (
+                                  <div className="mt-2.5 pt-2 border-t border-amber-200/70 flex items-start gap-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
+                                    <div className="min-w-0">
+                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-0.5">Trade-off</p>
+                                      <p className="text-[12px] text-amber-800 leading-relaxed">{avoidTradeoff}</p>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5 mb-4">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 mb-0.5">How to use this step</p>
+                                <p className="text-[12px] text-blue-900 leading-relaxed">{howToUse}</p>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="mb-4 rounded-lg border border-slate-200/80 bg-slate-50/55 px-3 py-2.5">
+                              <p className="text-[12px] text-slate-700 leading-relaxed">
+                                {isOptionalStep ? `Add this later if needed: ${pickReason}` : pickReason}
+                              </p>
+                            </div>
+                          )}
 
                           {/* Action buttons */}
                           <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -2485,10 +2693,7 @@ export default function Results() {
                                     e.stopPropagation();
                                     trackToolClick(item.tool.id);
                                     openOutboundToolLink(item.tool, location.pathname, '_blank', {
-                                      surfaceSource: 'results_stack_primary',
-                                      slotName: item.role,
-                                      slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
-                                      userGoalQuery: searchParams.get('q') || undefined,
+                                      ...buildStackSlotOutboundContext('results_stack_primary', item.role, query),
                                     });
                                   }}
                                 >
@@ -2502,7 +2707,7 @@ export default function Results() {
                           </div>
 
                           {/* Alternatives — always visible */}
-                          {(stackData.alternatives?.[item.tool.name] || []).slice(0, 3).length > 0 && (
+                          {!isOptionalStep && (stackData.alternatives?.[item.tool.name] || []).slice(0, 3).length > 0 && (
                             <div className="pt-3 border-t border-slate-100">
                               <div className="flex items-center justify-between gap-2 mb-2">
                                 <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Alternatives</span>
@@ -2529,10 +2734,7 @@ export default function Results() {
                                               e.stopPropagation();
                                               trackToolClick(alt.id);
                                               openOutboundToolLink(alt, location.pathname, '_blank', {
-                                                surfaceSource: 'results_stack_alternative',
-                                                slotName: item.role,
-                                                slotId: item.role.toLowerCase().replace(/\s+/g, '_'),
-                                                userGoalQuery: searchParams.get('q') || undefined,
+                                                ...buildStackSlotOutboundContext('results_stack_alternative', item.role, query),
                                               });
                                             }}
                                             className="truncate text-[12px] text-slate-700 font-medium hover:text-indigo-700 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/60 rounded-sm"
@@ -2566,6 +2768,7 @@ export default function Results() {
                               </div>
                             </div>
                           )}
+                        </div>
                         </div>
                       </div>
                     );

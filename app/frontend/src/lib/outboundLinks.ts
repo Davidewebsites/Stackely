@@ -103,23 +103,42 @@ export function trackOutboundToolClick(data: OutboundLinkTracking): void {
   }
 
   // Persist to Supabase (fire-and-forget — never blocks navigation)
+  const dbPayload = {
+    tool_id: event.tool_id ?? null,
+    tool_name: event.tool_name,
+    tool_slug: event.tool_slug,
+    category: event.category,
+    destination_type: event.destination_type,
+    has_affiliate: event.has_affiliate,
+    destination_url: event.destination_url,
+    source_page: event.source_page,
+    surface_source: event.surface_source ?? null,
+    slot_id: event.slot_id ?? null,
+    slot_name: event.slot_name ?? null,
+    user_goal_query: event.user_goal_query ?? null,
+    entry_source: event.entry_source ?? null,
+    timestamp: event.timestamp,
+  };
+
   supabase
     .from('affiliate_clicks')
-    .insert({
-      tool_name: data.tool_name,
-      tool_slug: data.tool_slug,
-      has_affiliate: data.has_affiliate,
-      surface_source: data.surface_source ?? null,
-      entry_source: data.entry_source ?? null,
-      destination_url: data.destination_url,
-    })
+    .insert(dbPayload)
     .then(({ error }) => {
       if (error) {
-        console.warn('[affiliate_clicks] Insert failed:', error.message);
+        console.warn('[affiliate_clicks] Insert failed (non-blocking)', {
+          reason: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          tool: event.tool_slug,
+        });
       }
     })
     .catch((err: unknown) => {
-      console.warn('[affiliate_clicks] Insert error:', err);
+      console.warn('[affiliate_clicks] Insert error (non-blocking)', {
+        tool: event.tool_slug,
+        error: err,
+      });
     });
 
   // TODO: Wire to your analytics service

@@ -833,40 +833,21 @@ function scoreToolForSlot(
     score += 7;
   }
 
-  if (
-    affiliateToolKey === 'clickfunnels' &&
-    (affiliateIntentTargets.has('clickfunnels') || funnelSemanticIntent) &&
-    slot.categories.includes('landing_pages')
-  ) {
-    // Hard priority: funnel flows should strongly prefer ClickFunnels in landing-page slots.
-    score += 80;
-  } else if (
-    affiliateToolKey === 'clickfunnels' &&
-    !affiliateIntentTargets.has('clickfunnels') &&
-    !funnelSemanticIntent &&
-    !broadGenericBusinessIntent &&
-    slot.categories.includes('landing_pages')
-  ) {
-    // Baseline fallback: keep ClickFunnels visible in landing-page slots when intent is weak.
-    score += 20;
-  }
-
-  if (
-    affiliateToolKey === 'beehiiv' &&
-    (affiliateIntentTargets.has('beehiiv') || newsletterSemanticIntent) &&
-    slot.categories.includes('email_marketing')
-  ) {
-    // Soft priority: newsletter flows should surface Beehiiv consistently without overpowering all signals.
-    score += 40;
-  } else if (
-    affiliateToolKey === 'beehiiv' &&
-    !affiliateIntentTargets.has('beehiiv') &&
-    !newsletterSemanticIntent &&
-    !broadGenericBusinessIntent &&
-    slot.categories.includes('email_marketing')
-  ) {
-    // Baseline fallback: keep Beehiiv visible in email-marketing slots for ambiguous goals.
-    score += 15;
+  // Algorithmic ranking must stay relevance-first.
+  // We still compute affiliate-intent context (for consistency with existing intent detection),
+  // but core scoring no longer applies affiliate-specific boosts.
+  const hasAffiliateIntentContext = Boolean(
+    affiliateToolKey &&
+    isAffiliateSlotCompatible(affiliateToolKey, slot) &&
+    (
+      affiliateIntentTargets.has(affiliateToolKey) ||
+      (affiliateToolKey === 'clickfunnels' && funnelSemanticIntent) ||
+      (affiliateToolKey === 'beehiiv' && newsletterSemanticIntent) ||
+      broadGenericBusinessIntent
+    )
+  );
+  if (hasAffiliateIntentContext) {
+    // No score mutation here: editorial/monetized placement belongs to explicit non-algorithmic surfaces.
   }
 
   // Beginner-friendly

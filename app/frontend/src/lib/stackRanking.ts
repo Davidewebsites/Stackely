@@ -1,5 +1,6 @@
 import { LEADERBOARD_SEED_STACKS } from '@/data/leaderboardSeedStacks';
 import { normalizeStackDisplayName } from '@/lib/stackNames';
+import { supabase } from './supabase';
 
 interface StackSignalRecord {
   stackId: string;
@@ -34,6 +35,19 @@ export interface StackRankingSnapshot {
 export type TimeWindow = 'today' | 'week' | 'alltime';
 
 const STORAGE_KEY = 'stackely:stack-ranking-signals:v1';
+const RANKING_TABLE = 'stack_ranking_signals';
+
+interface StackSignalDbRow {
+  stack_id: string;
+  stack_name: string;
+  category_id?: string | null;
+  votes_by_date?: Record<string, number> | null;
+  add_to_stack?: number | null;
+  views?: number | null;
+  updated_at?: string | null;
+}
+
+let remoteHydrationAttempted = false;
 
 function normalizeCategoryId(categoryId?: string): string | undefined {
   if (!categoryId) return undefined;
@@ -153,6 +167,112 @@ function buildSeedStore(): StackSignalStore {
   return { version: 1, stacks };
 }
 
+function toDbRow(record: StackSignalRecord): StackSignalDbRow {
+  return {
+    stack_id: record.stackId,
+    stack_name: record.stackName,
+    category_id: record.categoryId ?? null,
+    votes_by_date: sanitizeVotesByDate(record.votesByDate),
+    add_to_stack: Math.max(0, Math.floor(record.addToStack)),
+    views: Math.max(0, Math.floor(record.views)),
+    updated_at: record.updatedAt,
+  };
+}
+
+function fromDbRow(row: StackSignalDbRow): StackSignalRecord | null {
+  return sanitizeRecord(row.stack_id, {
+    stackId: row.stack_id,
+    stackName: row.stack_name,
+    categoryId: row.category_id ?? undefined,
+    votesByDate: row.votes_by_date ?? {},
+    addToStack: row.add_to_stack ?? 0,
+    views: row.views ?? 0,
+    updatedAt: row.updated_at ?? new Date().toISOString(),
+  });
+}
+
+function mergeStoresPreferMax(localStore: StackSignalStore, remoteRecords: StackSignalRecord[]): StackSignalStore {
+  const merged: StackSignalStore = {
+    version: 1,
+    stacks: { ...localStore.stacks },
+  };
+
+  for (const remote of remoteRecords) {
+    const existing = merged.stacks[remote.stackId];
+    if (!existing) {
+      merged.stacks[remote.stackId] = remote;
+      continue;
+    }
+
+    const nextVotes = sanitizeVotesByDate(existing.votesByDate);
+    const remoteVotes = sanitizeVotesByDate(remote.votesByDate);
+    for (const [dateKey, votes] of Object.entries(remoteVotes)) {
+      nextVotes[dateKey] = Math.max(nextVotes[dateKey] || 0, votes);
+    }
+
+    merged.stacks[remote.stackId] = {
+      ...existing,
+      stackName: remote.stackName || existing.stackName,
+      categoryId: remote.categoryId || existing.categoryId,
+      votesByDate: nextVotes,
+      addToStack: Math.max(existing.addToStack, remote.addToStack),
+      views: Math.max(existing.views, remote.views),
+      updatedAt: remote.updatedAt || existing.updatedAt,
+    };
+  }
+
+  return merged;
+}
+
+async function hydrateStoreFromRemote(localStore: StackSignalStore): Promise<void> {
+  if (typeof window === 'undefined' || remoteHydrationAttempted) return;
+  remoteHydrationAttempted = true;
+
+  try {
+    const { data, error } = await supabase
+      .from(RANKING_TABLE)
+      .select('stack_id, stack_name, category_id, votes_by_date, add_to_stack, views, updated_at')
+      .limit(5000);
+
+    if (error || !data) {
+      // Persistent table is optional; keep local mode if unavailable.
+      if (error) {
+        console.warn('[stackRanking] Remote hydrate unavailable, continuing with local signals.', error.message);
+      }
+      return;
+    }
+
+    const remoteRecords = (data as StackSignalDbRow[])
+      .map(fromDbRow)
+      .filter((row): row is StackSignalRecord => !!row);
+
+    if (remoteRecords.length === 0) return;
+
+    const merged = mergeStoresPreferMax(localStore, remoteRecords);
+    saveStore(merged);
+  } catch (error) {
+    // Non-blocking fallback by design.
+    console.warn('[stackRanking] Remote hydrate failed, using local signals only.', error);
+  }
+}
+
+function persistRecordToRemote(record: StackSignalRecord): void {
+  if (typeof window === 'undefined') return;
+
+  // Fire-and-forget persistence. Local storage remains the fallback source of truth.
+  void supabase
+    .from(RANKING_TABLE)
+    .upsert(toDbRow(record), { onConflict: 'stack_id' })
+    .then(({ error }) => {
+      if (error) {
+        console.warn('[stackRanking] Remote persist failed, keeping local-only signal update.', error.message);
+      }
+    })
+    .catch((error: unknown) => {
+      console.warn('[stackRanking] Remote persist error, keeping local-only signal update.', error);
+    });
+}
+
 function getStore(): StackSignalStore {
   if (typeof window === 'undefined') {
     return buildSeedStore();
@@ -160,11 +280,17 @@ function getStore(): StackSignalStore {
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return buildSeedStore();
+    if (!raw) {
+      const seed = buildSeedStore();
+      void hydrateStoreFromRemote(seed);
+      return seed;
+    }
 
     const parsed = JSON.parse(raw) as Partial<StackSignalStore>;
     if (!parsed || parsed.version !== 1 || !parsed.stacks || typeof parsed.stacks !== 'object') {
-      return buildSeedStore();
+      const seed = buildSeedStore();
+      void hydrateStoreFromRemote(seed);
+      return seed;
     }
 
     const safeStacks: Record<string, StackSignalRecord> = {};
@@ -175,15 +301,21 @@ function getStore(): StackSignalStore {
     }
 
     if (Object.keys(safeStacks).length === 0) {
-      return buildSeedStore();
+      const seed = buildSeedStore();
+      void hydrateStoreFromRemote(seed);
+      return seed;
     }
 
-    return {
+    const safeStore = {
       version: 1,
       stacks: safeStacks,
     };
+    void hydrateStoreFromRemote(safeStore);
+    return safeStore;
   } catch {
-    return buildSeedStore();
+    const seed = buildSeedStore();
+    void hydrateStoreFromRemote(seed);
+    return seed;
   }
 }
 
@@ -332,6 +464,7 @@ export function recordStackVote(signal: {
   record.updatedAt = new Date().toISOString();
 
   saveStore(store);
+  persistRecordToRemote(record);
   return toSnapshot(record, Object.values(store.stacks), getDateKey());
 }
 
@@ -347,6 +480,7 @@ export function recordStackAddToStack(signal: {
   record.updatedAt = new Date().toISOString();
 
   saveStore(store);
+  persistRecordToRemote(record);
   return toSnapshot(record, Object.values(store.stacks), getDateKey());
 }
 
@@ -362,6 +496,7 @@ export function recordStackView(signal: {
   record.updatedAt = new Date().toISOString();
 
   saveStore(store);
+  persistRecordToRemote(record);
   return toSnapshot(record, Object.values(store.stacks), getDateKey());
 }
 

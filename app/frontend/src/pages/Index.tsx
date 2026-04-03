@@ -1043,7 +1043,7 @@ export default function Index() {
                 Find the right tools for your workflow
               </h1>
               <p className="mx-auto mb-6 max-w-[560px] text-[15px] text-slate-700 leading-relaxed">
-                Search once and get a focused shortlist aligned with your budget and skill level.
+                Describe one goal and get a focused shortlist aligned with your budget and skill level.
               </p>
             </div>
 
@@ -1086,20 +1086,20 @@ export default function Index() {
                   className="h-11 px-5 rounded-lg text-white text-[13px] font-semibold transition-all disabled:opacity-40 disabled:shadow-none flex-shrink-0 whitespace-nowrap shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:translate-y-[-1px] hover:shadow-[0_14px_30px_rgba(79,70,229,0.35)]"
                   style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
                 >
-                  Search tools
+                  Get recommendations
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             </form>
 
             <div className="w-full mt-4">
-              <p className="text-[12px] text-center text-slate-600 mb-0.5">Start with what works</p>
-              <p className="text-[11px] text-center text-slate-500 mb-1.5">Pre-built setups used to launch faster</p>
+              <p className="text-[12px] text-center text-slate-600 mb-0.5">Start with proven presets</p>
+              <p className="text-[11px] text-center text-slate-500 mb-1.5">Fastest path from idea to results</p>
               <p className="eyebrow-label mb-2 text-center" style={{ color: '#2F80ED' }}>
                 Start faster
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {orderedStartFasterPresets.map((preset) => {
+                {orderedStartFasterPresets.slice(0, 3).map((preset) => {
                   const PRESET_INTENT: Record<string, string> = { funnel: 'funnel', newsletter: 'newsletter', automation: 'automation' };
                   const presetIntentType = PRESET_INTENT[preset.key];
                   let presetPath = appendQueryParam(buildResultsPathFromPreset(preset), 'surface_source', 'homepage_start_faster');
@@ -1118,6 +1118,7 @@ export default function Index() {
                   );
                 })}
               </div>
+              <p className="mt-2 text-center text-[11px] text-slate-500">Or type your own goal above</p>
             </div>
 
             <div className="w-full mt-3 opacity-75">
@@ -1280,15 +1281,15 @@ export default function Index() {
       {step === 1 && (
         <>
           {/* Daily Stack Comparison */}
-          <section className="border-t border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(241,245,249,0.72)_100%)]">
+          <section className="border-t border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(241,245,249,0.62)_100%)]">
             <div className="page-shell page-section">
-              <div className="rounded-2xl border border-slate-200/90 bg-white/85 p-5 md:p-7 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+              <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 md:p-6 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div className="min-w-0 max-w-[70ch] lg:flex-1 lg:max-w-none">
-                    <p className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>USE CASE MATCH OF THE DAY</p>
-                    <h2 className="section-heading mb-2 lg:whitespace-nowrap">Which approach fits this use case better?</h2>
-                    <p className="body-copy lg:[text-wrap:pretty]">
-                      Compare two stack approaches built for the same outcome, choose the better fit, then confirm your decision.
+                    <p className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>OPTIONAL EXPLORATION</p>
+                    <h2 className="section-heading mb-2 lg:whitespace-nowrap">Compare two stack approaches for this use case</h2>
+                    <p className="body-copy text-slate-600 lg:[text-wrap:pretty]">
+                      Helpful if you want to evaluate alternatives before running your own goal search.
                     </p>
                   </div>
 
@@ -1535,18 +1536,18 @@ export default function Index() {
 
           {/* Top ranked stacks */}
           {shouldShowTopRankedSection && (
-          <section className="border-t border-slate-200 bg-slate-50/35">
+          <section className="border-t border-slate-200 bg-slate-50/25">
             <div className="page-shell page-section">
               <div className="mb-5 max-w-[72ch]">
-                <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Ranking</div>
+                <div className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Optional ranking</div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="section-heading mb-2">Top ranked stacks</h2>
-                    <p className="body-copy">Most active stacks based on real interactions this week.</p>
+                    <h2 className="section-heading mb-2">Top ranked stacks this week</h2>
+                    <p className="body-copy text-slate-600">Secondary view for trend checking after goal discovery.</p>
                   </div>
                   <Link
                     to="/stack-leaderboard"
-                    className="text-[12px] font-semibold text-[#2F80ED] hover:text-[#4F46E5] transition-colors"
+                    className="text-[12px] font-medium text-slate-600 hover:text-[#4F46E5] transition-colors"
                   >
                     See full leaderboard
                   </Link>
@@ -1703,9 +1704,9 @@ export default function Index() {
             <section className="border-t border-slate-200 bg-white/60">
               <div className="page-shell page-section">
                 <div className="mb-7 max-w-[72ch]">
-                  <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Featured tools</div>
+                  <div className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Explore later</div>
                   <h2 className="section-heading mb-2">Top tools used in stacks today</h2>
-                  <p className="body-copy">Based on real workflow combinations and usage patterns</p>
+                  <p className="body-copy text-slate-600">Useful for browsing, after running your main goal search.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

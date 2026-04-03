@@ -163,7 +163,7 @@ function humanizeWorkflowStepLabel(role: string, category: string, index: number
     case 'video':
       return 'Create your content';
     default:
-      return index === 0 ? 'Start here' : index >= 2 ? 'Optional next step' : 'Next step';
+      return index >= 2 ? 'Optional support' : 'Supporting step';
   }
 }
 
@@ -1044,6 +1044,7 @@ export default function Results() {
     // Ref so async .then() callbacks always see the latest catalog tools
     const catalogToolsRef = useRef<Tool[]>([]);
     useEffect(() => { catalogToolsRef.current = catalogTools; }, [catalogTools]);
+  const rawStackDataRef = useRef<StackResponseWithAlternatives | null>(null);
   const [searchCatalogTools, setSearchCatalogTools] = useState<Tool[]>([]);
   const searchCatalogToolsRef = useRef<Tool[]>([]);
   useEffect(() => { searchCatalogToolsRef.current = searchCatalogTools; }, [searchCatalogTools]);
@@ -1188,6 +1189,12 @@ export default function Results() {
     openCompareDrawer();
   };
 
+  const applyResolvedStackData = (stack: StackResponseWithAlternatives) => {
+    const anchoredStack = ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor);
+    rawStackDataRef.current = anchoredStack;
+    setStackData(ensureIntentCoherence(anchoredStack, intentType, catalogToolsRef.current));
+  };
+
   useEffect(() => {
     setExpandedWorkflowStep(0);
   }, [query, stackData?.stack?.length]);
@@ -1208,6 +1215,7 @@ export default function Results() {
     if (queryMode === 'stack') {
       const intent = deriveQueryIntent(query, []);
       setQueryIntent(intent);
+      rawStackDataRef.current = null;
       setStackData(null);
       setSearchResults([]);
       setSearchLoading(false);
@@ -1231,11 +1239,7 @@ export default function Results() {
         skillPreference: workflowSkillPreference,
       })
         .then((stack) => {
-            setStackData(ensureIntentCoherence(
-              ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor),
-              intentType,
-              catalogToolsRef.current,
-            ));
+            applyResolvedStackData(stack);
         })
         .catch((err) => {
           console.error('Stack recommendation failed:', err);
@@ -1539,6 +1543,16 @@ export default function Results() {
     };
   }, [queryMode, query]);
 
+  useEffect(() => {
+    if (queryMode !== 'stack' || !rawStackDataRef.current || catalogTools.length === 0) return;
+
+    setStackData((prev) => {
+      const next = ensureIntentCoherence(rawStackDataRef.current!, intentType, catalogTools);
+      if (!prev) return next;
+      return JSON.stringify(prev.stack) === JSON.stringify(next.stack) ? prev : next;
+    });
+  }, [queryMode, catalogTools, intentType]);
+
   const isDirectBrowse = !!categoryParam && !query;
   const isKeywordSearch = !!query && queryMode === 'search';
   const isStackMode = !!query && queryMode === 'stack';
@@ -1683,6 +1697,7 @@ export default function Results() {
 
   const affiliateVisibilityTool = useMemo(() => {
     if (queryMode !== 'stack' || budgetParam === 'any' || !query) return null;
+    if (workflowBudgetFallbackUsed) return null;
 
     const anchor = resolveAffiliateVisibilityAnchor(query, intentType, workflowAffiliateAnchor);
     if (!anchor) return null;
@@ -1691,13 +1706,20 @@ export default function Results() {
       ? ['clickfunnels']
       : ['beehiiv'];
 
+    const generatedStackMatch = aiStackItems.find((item) => {
+      const normalizedName = normalizeToolName(item.tool.name);
+      const normalizedSlug = (item.tool.slug || '').toLowerCase();
+      return anchorAliases.some((alias) => normalizedName.includes(alias) || normalizedSlug.includes(alias));
+    });
+    if (!generatedStackMatch) return null;
+
     const catalogMatch = catalogTools.find((tool) => {
       const normalizedName = normalizeToolName(tool.name);
       const normalizedSlug = (tool.slug || '').toLowerCase();
       return anchorAliases.some((alias) => normalizedName.includes(alias) || normalizedSlug.includes(alias));
     });
 
-    const candidate = catalogMatch || createAffiliateVisibilityFallbackTool(anchor);
+    const candidate = catalogMatch || generatedStackMatch.tool;
     const allowedByBudget = applyBudgetFilter([candidate], budgetParam).length > 0;
     if (allowedByBudget) return null;
 
@@ -1705,7 +1727,7 @@ export default function Results() {
     if (alreadyVisibleInWorkflow) return null;
 
     return candidate;
-  }, [queryMode, budgetParam, query, intentType, workflowAffiliateAnchor, catalogTools, filteredAiStackItems]);
+  }, [queryMode, budgetParam, query, intentType, workflowAffiliateAnchor, workflowBudgetFallbackUsed, aiStackItems, catalogTools, filteredAiStackItems]);
 
   useEffect(() => {
     if (queryMode === 'stack' && filteredAiStackItems.length > 0) {
@@ -1931,35 +1953,33 @@ export default function Results() {
 
   const handleRetry = () => {
     if (query) {
-      const retryIntent = deriveQueryIntent(query, searchCatalogTools);
+      const retryIntent = deriveQueryIntent(query, queryMode === 'stack' ? [] : searchCatalogTools);
       if (queryMode === 'stack') {
         // Clear stale stack data before retry
+        rawStackDataRef.current = null;
         setStackData(null);
         setStackLoading(true);
         setSearchError(null);
 
         // Retry stack recommendation
-        const retrySkillContextQuery = explicitSkillPreference
-          ? `${retryIntent.interpretedQuery || query} for ${explicitSkillPreference} users`
-          : retryIntent.inferredSkillPreference
-          ? `${retryIntent.interpretedQuery || query} for ${retryIntent.inferredSkillPreference} users`
-          : retryIntent.interpretedQuery || query;
+        const retryWorkflowGoalQuery = buildWorkflowGoalQuery(
+          retryIntent.interpretedQuery || query,
+          explicitSkillPreference,
+          retryIntent.inferredSkillPreference,
+          budgetParam,
+        );
 
         const recentlyUsedTools = stackSelection
           .flatMap((tool) => [tool.name, tool.slug])
           .filter(Boolean);
         const workflowSkillPreference = explicitSkillPreference || retryIntent.inferredSkillPreference || null;
 
-        recommendStackFromGoal(retrySkillContextQuery, pricingParam, {
+        recommendStackFromGoal(retryWorkflowGoalQuery, workflowPricingPreference, {
           recentlyUsedTools,
           skillPreference: workflowSkillPreference,
         })
           .then((stack) => {
-            setStackData(ensureIntentCoherence(
-              ensureAffiliateBrandedWorkflowAnchor(stack, workflowSource, workflowAffiliateAnchor),
-              intentType,
-              catalogToolsRef.current,
-            ));
+            applyResolvedStackData(stack);
           })
           .catch((err) => {
             console.error('Stack recommendation retry failed:', err);
@@ -2352,7 +2372,7 @@ export default function Results() {
                         Best setup for: {displayQueryLabel}
                       </h2>
                       <p className="body-copy mt-1">
-                        A guided setup with {stackData.stack.length} recommended step{stackData.stack.length !== 1 ? 's' : ''}. Start with the first one, then add more only if needed.
+                        A guided setup with {stackData.stack.length} recommended step{stackData.stack.length !== 1 ? 's' : ''}. Start with the card marked Start here, then add more only if needed.
                       </p>
                     </div>
                   </div>
@@ -2390,7 +2410,7 @@ export default function Results() {
                   </div>
 
                   <p className="body-copy">
-                    Start with the first recommendation, then add the next tools only when they make the setup stronger.
+                    Start with the card marked Start here, then add supporting tools only when they make the setup stronger.
                   </p>
                   <div className="mt-3 rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2.5">
                     <p className="text-[12px] leading-relaxed text-slate-600">
@@ -2402,9 +2422,9 @@ export default function Results() {
                 <div className="mb-8 rounded-2xl border border-slate-200 bg-white/75 px-4 py-3 sm:px-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Start with one strong tool</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Start with the highlighted recommendation</p>
                       <p className="mt-1 text-[13px] text-slate-700">
-                        You do not need to set up everything at once. Start with the main recommendation, then add supporting tools only when they help.
+                        You do not need to set up everything at once. Start with the card marked Start here, then add supporting tools only when they help.
                       </p>
                     </div>
                     {visibleStackStepLabels.length > 1 && (
@@ -2429,22 +2449,22 @@ export default function Results() {
 
                 <div className="mb-6 rounded-xl border border-slate-200 bg-white/80 px-4 py-3">
                   <p className="text-[13px] text-slate-700 leading-relaxed">{stackIntroCopy}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">Keep it simple: start with the first recommendation</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Keep it simple: start with the card marked Start here</p>
                 </div>
 
                 {affiliateVisibilityTool && (
                   <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/75 px-4 py-4 sm:px-5">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Upgrade option if budget opens up</p>
-                        <h3 className="mt-1 text-[16px] font-semibold text-slate-900">Strong paid-fit option kept visible separately</h3>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Worth a look if your budget changes</p>
+                        <h3 className="mt-1 text-[16px] font-semibold text-slate-900">Higher-budget option kept separate from this setup</h3>
                         <p className="mt-1 text-[13px] text-slate-700">
-                          {affiliateVisibilityTool.name} strongly matches this workflow, but it is outside your current budget filter, so it is not included in the selected stack.
+                          {affiliateVisibilityTool.name} was relevant enough to appear in the broader recommendation set, but it is outside your current budget filter, so it is not included in this setup.
                         </p>
                       </div>
                       <div className="flex gap-1.5 flex-wrap justify-end">
-                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">Best paid option</Badge>
-                        <Badge className="text-[10px] bg-white text-slate-700 border border-slate-200 hover:bg-white">Top partner option</Badge>
+                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">Outside current budget</Badge>
+                        <Badge className="text-[10px] bg-white text-slate-700 border border-slate-200 hover:bg-white">Shown separately</Badge>
                       </div>
                     </div>
 
@@ -2776,7 +2796,7 @@ export default function Results() {
                 </div>
 
                 <p className="mt-4 text-center text-[11px] text-slate-500">
-                  Start with the first step to get results faster
+                  Start with the card marked Start here to get results faster
                 </p>
 
                 {workflowBudgetFallbackUsed && (

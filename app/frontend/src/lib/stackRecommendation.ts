@@ -46,6 +46,8 @@ interface WorkflowGenerationOptions {
   recentToolTokens?: Set<string>;
   enforceArchetypeTargets?: boolean;
   rotationIntent?: string;
+  deterministicSelection?: boolean;
+  deterministicSeed?: string;
 }
 
 const CATEGORY_COMPLEMENTS: Record<string, string[]> = {
@@ -62,6 +64,7 @@ const CATEGORY_COMPLEMENTS: Record<string, string[]> = {
 export interface StackRecommendationOptions {
   recentlyUsedTools?: string[];
   skillPreference?: 'beginner' | 'intermediate' | 'advanced' | null;
+  deterministicSelection?: boolean;
 }
 
 type ToolArchetype = 'safe' | 'alternative' | 'innovative' | 'any';
@@ -144,7 +147,7 @@ function detectGoalDomain(normalized: string): string | null {
   if (/\b(youtube|start[a-z\s]*channel|content[_\s-]?creator|vlogger|streamer|twitch)\b/.test(normalized)) return 'youtube_creator';
   if (/\b(ecommerce|e-commerce|e commerce|online store|shopify|sell online|dropshipping|product store)\b/.test(normalized)) return 'ecommerce';
   if (/\b(saas landing|saas page|software landing|app landing|startup landing)\b/.test(normalized)) return 'saas_landing';
-  if (/\b(grow newsletter|launch newsletter|start newsletter|newsletter audience|email list|build newsletter)\b/.test(normalized)) return 'newsletter';
+  if (/\b(grow newsletter|launch newsletter|start(?:\s+a)?\s+newsletter(?:\s+business)?|build(?:\s+a)?\s+newsletter(?:\s+business)?|newsletter audience|email list|newsletter business)\b/.test(normalized)) return 'newsletter';
   if (/\b(automate marketing|marketing automation|marketing workflow|marketing pipeline)\b/.test(normalized)) return 'marketing_automation';
   return null;
 }
@@ -311,12 +314,50 @@ function detectAffiliateIntentTargets(goal: string): Set<AffiliateToolKey> {
 
 function detectFunnelSemanticIntent(goal: string): boolean {
   const normalized = normalizeQueryTypos(goal);
-  return /\bsales funnel\b|\blanding page\b|\blead generation\b|\bget leads\b|\bconversion funnel\b/.test(normalized);
+  return /\bsales funnel\b|\bfunnel builder\b|\blanding page\b|\blead generation\b|\bget leads\b|\bconversion funnel\b/.test(normalized);
 }
 
 function detectNewsletterSemanticIntent(goal: string): boolean {
   const normalized = normalizeQueryTypos(goal);
-  return /\bnewsletter\b|\bgrow subscribers\b|\baudience\b|\bcreator newsletter\b/.test(normalized);
+  return /\bnewsletter\b|\bnewsletter business\b|\bgrow subscribers\b|\baudience\b|\bcreator newsletter\b/.test(normalized);
+}
+
+function detectStrongFunnelCommercialIntent(goal: string): boolean {
+  const normalized = normalizeQueryTypos(goal);
+  return /\b(best|top|recommended|premium)\s+funnel\s+builder\b|\bfunnel\s+builder\b|\bsales\s+funnel\s+software\b|\bhigh\s+converting\s+funnel\b/.test(normalized);
+}
+
+function detectStrongNewsletterCommercialIntent(goal: string): boolean {
+  const normalized = normalizeQueryTypos(goal);
+  return /\bstart\s+a\s+newsletter\s+business\b|\bbest\s+newsletter\s+platform\b|\bnewsletter\s+business\b|\bgrow\s+a\s+newsletter\b|\bmonetize\s+(?:a\s+)?newsletter\b/.test(normalized);
+}
+
+function shouldPreferClickFunnelsInRotation(
+  goal: string,
+  slot: WorkflowSlot,
+  options: WorkflowGenerationOptions,
+): boolean {
+  if (options.budgetBand !== 'none' && options.budgetBand !== 'high') return false;
+  if (!isAffiliateSlotCompatible('clickfunnels', slot)) return false;
+  return detectFunnelSemanticIntent(goal) && detectStrongFunnelCommercialIntent(goal);
+}
+
+function getClickFunnelsSelectionWindowCandidate(scored: ScoredTool[], slot: WorkflowSlot): ScoredTool | null {
+  if (slot.role !== 'Conversion Layer') return null;
+  const clickFunnelsIndex = scored.findIndex(
+    (entry) => normalizeAffiliateToolName((entry.tool.name || '').toLowerCase()) === 'clickfunnels'
+  );
+  if (clickFunnelsIndex < 0 || clickFunnelsIndex > 9) return null;
+
+  const clickFunnelsEntry = scored[clickFunnelsIndex];
+  if (!isSemanticallyValidForCriticalSlot(slot, clickFunnelsEntry.tool)) return null;
+
+  const naturalCutoff = scored[Math.min(3, scored.length - 1)];
+  if (!naturalCutoff) return null;
+  const scoreGapFromCutoff = naturalCutoff.score - clickFunnelsEntry.score;
+  if (scoreGapFromCutoff > 9) return null;
+
+  return clickFunnelsEntry;
 }
 
 function detectBroadGenericBusinessIntent(goal: string): boolean {
@@ -793,6 +834,8 @@ function scoreToolForSlot(
   const skillLevel = String(tool.skill_level || '').toLowerCase();
   const toolName = (tool.name || '').trim().toLowerCase();
   const affiliateToolKey = normalizeAffiliateToolName(toolName);
+  const strongFunnelCommercialIntent = funnelSemanticIntent && detectStrongFunnelCommercialIntent(goalTokens.join(' '));
+  const strongNewsletterCommercialIntent = newsletterSemanticIntent && detectStrongNewsletterCommercialIntent(goalTokens.join(' '));
 
   const cat = tool.category;
 
@@ -826,7 +869,8 @@ function scoreToolForSlot(
   }
 
   // Slot-level semantic fit: reward tools whose metadata clearly matches the slot's exact job.
-  score += getSlotSemanticAdjustment(slot, tool);
+  const slotSemanticAdjustment = getSlotSemanticAdjustment(slot, tool);
+  score += slotSemanticAdjustment;
 
   // Long-tail visibility: if relevance is strong, boost less obvious options.
   if ((tool.popularity_score || 0) <= 5 && matchedTokens >= 2) {
@@ -847,7 +891,24 @@ function scoreToolForSlot(
     )
   );
   if (hasAffiliateIntentContext) {
-    // No score mutation here: editorial/monetized placement belongs to explicit non-algorithmic surfaces.
+    const isBeehiivEmailPlatformSlot =
+      affiliateToolKey === 'beehiiv' && slot.role === 'Email Platform' && slot.categories.includes('email_marketing');
+    const categoryStrongFit =
+      (cat === slot.categories[0] && matchedTokens >= 1 && (slotSemanticAdjustment > 0 || (isBeehiivEmailPlatformSlot && slotSemanticAdjustment >= 0))) ||
+      (slot.categories.includes(cat) && matchedTokens >= 2 && (slotSemanticAdjustment > 0 || (isBeehiivEmailPlatformSlot && slotSemanticAdjustment >= 0)));
+    const compatibleCommercialIntent =
+      (affiliateToolKey === 'clickfunnels' && strongFunnelCommercialIntent) ||
+      (affiliateToolKey === 'beehiiv' && strongNewsletterCommercialIntent);
+    const budgetCompatible =
+      affiliateToolKey === 'clickfunnels'
+        ? options.budgetBand === 'none' || options.budgetBand === 'high'
+        : affiliateToolKey === 'beehiiv'
+        ? options.budgetBand !== 'low' || tool.pricing_model === 'free' || tool.pricing_model === 'freemium'
+        : false;
+
+    if (compatibleCommercialIntent && budgetCompatible && categoryStrongFit) {
+      score += affiliateToolKey === 'clickfunnels' ? 6 : 5;
+    }
   }
 
   // Beginner-friendly
@@ -1034,12 +1095,33 @@ function fillBlueprint(
 
     // Session-to-session rotation: alternate choices across top valid candidates per role.
     const rotationWindow = Math.min(4, scored.length);
+    const preferClickFunnels = shouldPreferClickFunnelsInRotation(goal, slot, options);
+    const clickFunnelsSelectionWindowCandidate = preferClickFunnels
+      ? getClickFunnelsSelectionWindowCandidate(scored, slot)
+      : null;
+    let selectionWindow = scored.slice(0, rotationWindow);
+    if (clickFunnelsSelectionWindowCandidate && rotationWindow > 0) {
+      const alreadyInWindow = selectionWindow.some((entry) => entry.tool.id === clickFunnelsSelectionWindowCandidate.tool.id);
+      if (!alreadyInWindow) {
+        selectionWindow = [
+          ...selectionWindow.slice(0, Math.max(0, rotationWindow - 1)),
+          clickFunnelsSelectionWindowCandidate,
+        ];
+      }
+    }
     const intentKey = options.rotationIntent || 'global';
-    const roleCursor = loadRotationCursor(intentKey, slot.role);
-    const seed = hashString(`${goal}:${slot.role}:${options.diversitySalt || 0}`) % Math.max(1, rotationWindow);
+    const roleCursor = options.deterministicSelection ? 0 : loadRotationCursor(intentKey, slot.role);
+    const deterministicSeedBase = options.deterministicSeed || goal;
+    const seed = hashString(`${deterministicSeedBase}:${slot.role}:${options.diversitySalt || 0}`) % Math.max(1, rotationWindow);
     const rotation = rotationWindow > 0 ? (roleCursor + seed) % rotationWindow : 0;
-    const best = scored[rotation] || scored[0];
-    bumpRotationCursor(intentKey, slot.role);
+    const clickFunnelsRotationCandidate = preferClickFunnels
+      ? selectionWindow
+          .find((entry) => normalizeAffiliateToolName((entry.tool.name || '').toLowerCase()) === 'clickfunnels')
+      : null;
+    const best = clickFunnelsRotationCandidate || selectionWindow[rotation] || scored[0];
+    if (!options.deterministicSelection) {
+      bumpRotationCursor(intentKey, slot.role);
+    }
     selectedIds.add(best.tool.id);
     selectedCategoriesCount.set(best.tool.category, (selectedCategoriesCount.get(best.tool.category) || 0) + 1);
     coveredStages.add(slot.stage);
@@ -1686,8 +1768,9 @@ export async function recommendStackFromGoal(
   }
 
   const uniqueTools = dedupeByIdAndSlug(tools);
-  const recentToolSlugs = loadRecentWorkflowToolSlugs(intent);
-  const recentToolTokens = buildRecentToolTokens(options?.recentlyUsedTools);
+  const deterministicSelection = options?.deterministicSelection === true;
+  const recentToolSlugs = deterministicSelection ? new Set<string>() : loadRecentWorkflowToolSlugs(intent);
+  const recentToolTokens = deterministicSelection ? new Set<string>() : buildRecentToolTokens(options?.recentlyUsedTools);
   const baseOptions: WorkflowGenerationOptions = {
     budgetBand,
     skillPreference: options?.skillPreference ?? null,
@@ -1697,6 +1780,8 @@ export async function recommendStackFromGoal(
     recentToolTokens,
     enforceArchetypeTargets: true,
     rotationIntent: intent,
+    deterministicSelection,
+    deterministicSeed: `${normalizeQueryTypos(goal)}|${pricingPreference}|${options?.skillPreference ?? 'none'}|${intent}`,
   };
 
   const isTemplateFlow = !!matchedTemplate;
@@ -1776,7 +1861,9 @@ export async function recommendStackFromGoal(
   const summary = buildSummary(stack, filledSlots.map((slot) => slot.tool), pricingPreference);
   const internal_stack_score = computeInternalStackScore(filledSlots.map((slot) => slot.tool));
 
-  saveRecentWorkflowToolSlugs(intent, filledSlots.map((slot) => slot.tool));
+  if (!deterministicSelection) {
+    saveRecentWorkflowToolSlugs(intent, filledSlots.map((slot) => slot.tool));
+  }
 
   return { goal, stack, comparison, notes, summary, alternatives, internal_stack_score };
 }

@@ -229,6 +229,126 @@ function getPrimaryFunctionByCategory(category: string): string {
   }
 }
 
+function getStepExecutionChecklist(
+  toolName: string,
+  category: string,
+  role: string,
+  primaryFunction: string,
+  intentType: string,
+): string[] {
+  const roleHint = role.toLowerCase();
+  const intent = intentType.toLowerCase();
+
+  if (intent === 'funnel') {
+    if (category === 'landing_pages' || /builder|landing|conversion layer|page/.test(roleHint)) {
+      return [
+        `Do: Build one landing page in ${toolName} with a single CTA`,
+        'Create: Hero section, lead-capture form, and CTA button',
+        'Move on when: Test lead submission reaches your destination',
+      ];
+    }
+
+    if (category === 'copywriting' || /copy|writing|script/.test(roleHint)) {
+      return [
+        `Do: Draft funnel copy in ${toolName} for your core offer`,
+        'Create: Final headline, offer line, and CTA text',
+        'Move on when: Copy is placed on the live page',
+      ];
+    }
+
+    if (category === 'analytics' || /analytic|tracking|measurement|reporting/.test(roleHint)) {
+      return [
+        `Do: Configure conversion tracking in ${toolName} for your CTA`,
+        'Create: One conversion event tied to form submit or checkout click',
+        'Move on when: First conversion event appears in reports',
+      ];
+    }
+  }
+
+  if (intent === 'newsletter') {
+    if (category === 'email_marketing' || /email platform|newsletter|distribution|audience|subscriber/.test(roleHint)) {
+      return [
+        `Do: Set up your newsletter base in ${toolName}`,
+        'Create: Signup form, first issue draft, and welcome email',
+        'Move on when: Test subscriber gets welcome + first issue',
+      ];
+    }
+
+    if (category === 'copywriting' || /copy|writing|script/.test(roleHint)) {
+      return [
+        `Do: Write your first newsletter message in ${toolName}`,
+        'Create: Subject line options and first-email draft',
+        'Move on when: Final subject + body are ready to send',
+      ];
+    }
+
+    if (category === 'analytics' || /analytic|tracking|measurement|reporting/.test(roleHint)) {
+      return [
+        `Do: Set up newsletter metrics in ${toolName}`,
+        'Create: Dashboard for opens, clicks, and subscriber growth',
+        'Move on when: You can read first performance signals',
+      ];
+    }
+  }
+
+  switch (category) {
+    case 'landing_pages':
+      return [
+        `Do: Build one landing page in ${toolName} for your main offer`,
+        'Create: A live page with one headline and one CTA',
+        'Move on when: The page URL is published and clickable',
+      ];
+    case 'email_marketing':
+      return [
+        `Do: Set up one audience list and draft one email in ${toolName}`,
+        'Create: A ready-to-send campaign for the page offer',
+        'Move on when: Test email delivery works end to end',
+      ];
+    case 'automation':
+      return [
+        `Do: Create one automation that connects your key tools in ${toolName}`,
+        'Create: A single trigger-action workflow for your funnel',
+        'Move on when: A test event runs successfully',
+      ];
+    case 'analytics':
+      return [
+        `Do: Connect tracking in ${toolName} for your main CTA or signup`,
+        'Create: One tracked conversion event with a clear name',
+        'Move on when: You can see first visits or clicks in reports',
+      ];
+    case 'copywriting':
+      return [
+        `Do: Generate and refine headline + CTA copy in ${toolName}`,
+        'Create: Final headline, subheadline, and CTA text',
+        'Move on when: The final copy is pasted into the live page',
+      ];
+    case 'design':
+      return [
+        `Do: Create one hero visual in ${toolName} for your page`,
+        'Create: Exported asset in the page-ready size',
+        'Move on when: The visual is uploaded and visible on page',
+      ];
+    case 'ads':
+      return [
+        `Do: Build one traffic campaign in ${toolName} to your main page`,
+        'Create: Ad set with one audience and one ad creative',
+        'Move on when: Campaign is active with destination URL set',
+      ];
+    case 'video':
+      return [
+        `Do: Produce one short explainer video in ${toolName}`,
+        'Create: A published draft with CTA mention',
+        'Move on when: Video is embedded or linked in your funnel',
+      ];
+    default:
+      return [
+        `Do: Complete the core ${roleHint || 'workflow'} action in ${toolName}`,
+        `Create: One concrete output that helps you ${primaryFunction}`,
+        'Move on when: This step output is ready to use in the next step',
+      ];
+  }
+}
+
 function getActionCtaByCategory(category: string): string {
   switch (category) {
     case 'landing_pages':
@@ -249,6 +369,56 @@ function getActionCtaByCategory(category: string): string {
       return 'Publish your video flow';
     default:
       return 'Use this tool now';
+  }
+}
+
+function getStepDeliverable(category: string, role: string, intentType: string): string {
+  const roleHint = role.toLowerCase();
+  const intent = intentType.toLowerCase();
+
+  if (intent === 'funnel') {
+    if (category === 'landing_pages' || /builder|landing|conversion layer|page/.test(roleHint)) {
+      return 'Publish one landing page with a clear CTA.';
+    }
+    if (category === 'copywriting' || /copy|writing|script/.test(roleHint)) {
+      return 'Finalize headline, offer line, and CTA text for your page.';
+    }
+    if (category === 'analytics' || /analytic|tracking|measurement|reporting/.test(roleHint)) {
+      return 'Set up one conversion event for your page.';
+    }
+  }
+
+  if (intent === 'newsletter') {
+    if (category === 'email_marketing' || /email platform|newsletter|distribution|audience|subscriber/.test(roleHint)) {
+      return 'Write your first newsletter issue and signup flow.';
+    }
+    if (category === 'copywriting' || /copy|writing|script/.test(roleHint)) {
+      return 'Complete your first email draft and subject line.';
+    }
+    if (category === 'analytics' || /analytic|tracking|measurement|reporting/.test(roleHint)) {
+      return 'Track opens, clicks, and early subscriber growth.';
+    }
+  }
+
+  switch (category) {
+    case 'landing_pages':
+      return 'Publish one live page with one primary CTA.';
+    case 'email_marketing':
+      return 'Prepare one send-ready email campaign and audience list.';
+    case 'automation':
+      return 'Launch one working automation for your core workflow.';
+    case 'analytics':
+      return 'Track one key event tied to your primary action.';
+    case 'copywriting':
+      return 'Finalize the core copy you will publish first.';
+    case 'design':
+      return 'Ship one hero visual ready for your live page.';
+    case 'ads':
+      return 'Launch one traffic campaign to your main destination.';
+    case 'video':
+      return 'Publish one short video with a clear CTA.';
+    default:
+      return 'Complete one concrete output for this step.';
   }
 }
 
@@ -1053,8 +1223,23 @@ export default function Results() {
   const [queryIntent, setQueryIntent] = useState<QueryIntent | null>(null);
   const [recentlyReplacedToolId, setRecentlyReplacedToolId] = useState<number | null>(null);
   const [expandedWorkflowStep, setExpandedWorkflowStep] = useState(0);
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [expandedAlternativeOptions, setExpandedAlternativeOptions] = useState<Record<string, boolean>>({});
+  const [showFirstStepExtraActions, setShowFirstStepExtraActions] = useState(false);
 
   const queryMode = useMemo<'stack' | 'search'>(() => resolveResultsQueryMode(query, requestedMode), [query, requestedMode]);
+  const stackBudgetLabel = useMemo(() => {
+    switch (budgetParam) {
+      case 'free':
+        return 'Free';
+      case 'freemium':
+        return 'Freemium';
+      case 'paid':
+        return 'Paid';
+      default:
+        return 'Any';
+    }
+  }, [budgetParam]);
   const workflowPricingPreference = useMemo<PricingPreference>(() => {
     if (budgetParam !== 'any') return budgetToPricingPreference(budgetParam);
     return pricingParam;
@@ -1197,6 +1382,9 @@ export default function Results() {
 
   useEffect(() => {
     setExpandedWorkflowStep(0);
+    setShowMoreInfo(false);
+    setExpandedAlternativeOptions({});
+    setShowFirstStepExtraActions(false);
   }, [query, stackData?.stack?.length]);
 
   useEffect(() => {
@@ -1237,6 +1425,7 @@ export default function Results() {
       recommendStackFromGoal(budgetContextQuery, workflowPricingPreference, {
         recentlyUsedTools,
         skillPreference: workflowSkillPreference,
+        deterministicSelection: true,
       })
         .then((stack) => {
             applyResolvedStackData(stack);
@@ -1977,6 +2166,7 @@ export default function Results() {
         recommendStackFromGoal(retryWorkflowGoalQuery, workflowPricingPreference, {
           recentlyUsedTools,
           skillPreference: workflowSkillPreference,
+          deterministicSelection: true,
         })
           .then((stack) => {
             applyResolvedStackData(stack);
@@ -2360,185 +2550,33 @@ export default function Results() {
             {/* Stack Recommendation Section */}
             {queryMode === 'stack' && stackData && (
               <div className="mt-12">
-                <p className="mb-2 text-[11px] text-slate-500">Recommended setup for your goal</p>
-                <div className="mb-10 panel-card p-6 sm:p-7">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-8 h-8 rounded-lg border border-[#2F80ED]/20 bg-white flex items-center justify-center flex-shrink-0">
-                      <img src="/favicon-main.png" alt="Stackely" className="w-5 h-5 object-contain" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="eyebrow-label mb-1" style={{ color: '#2F80ED' }}>Recommended setup</div>
-                      <h2 className="title ai-stack-title font-semibold text-slate-950 tracking-tight">
-                        Best setup for: {displayQueryLabel}
-                      </h2>
-                      <p className="body-copy mt-1">
-                        A guided setup with {stackData.stack.length} recommended step{stackData.stack.length !== 1 ? 's' : ''}. Start with the card marked Start here, then add more only if needed.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="meta-row mb-3">
-                    <Badge variant="outline" className="text-[11px] border-slate-300 bg-white">
-                      Pricing: {stackPricingLabel}
-                    </Badge>
-                    <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
-                      Guided setup
-                    </Badge>
-                    {stackSelection.length > 0 && (
-                      <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
-                        Progress: {stackProgressPercentage}% ({stackProgressLabel})
-                      </Badge>
-                    )}
-                    {stackSelection.length > 0 && (
-                      <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
-                        {completedCount}/{stackSelection.length} completed · {missingCount} missing roles
-                      </Badge>
-                    )}
-                    <div className="ml-auto">
-                      <Select value={budgetParam} onValueChange={(value) => handleBudgetFilterChange(value as BudgetFilter)}>
-                        <SelectTrigger className="stackely-select-trigger w-[180px]">
-                          <SelectValue placeholder="Budget" />
-                        </SelectTrigger>
-                        <SelectContent className="stackely-select-content">
-                          <SelectItem value="any">Budget: Any</SelectItem>
-                          <SelectItem value="free">Budget: Free</SelectItem>
-                          <SelectItem value="freemium">Budget: Freemium</SelectItem>
-                          <SelectItem value="paid">Budget: Paid</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <p className="body-copy">
-                    Start with the card marked Start here, then add supporting tools only when they make the setup stronger.
+                <div className="mb-3 px-1">
+                  <p className="text-[13px] font-semibold text-slate-900">
+                    Setup for: <span className="font-medium text-slate-700">{queryIntent?.interpretedLabel || displayQueryLabel || query}</span>
                   </p>
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-white/80 px-3.5 py-2.5">
-                    <p className="text-[12px] leading-relaxed text-slate-600">
-                      This setup can include tools outside your initial shortlist when they are a better fit for the goal.
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Budget: {stackBudgetLabel} · Mode: AI Stack
+                  </p>
                 </div>
-
-                <div className="mb-8 rounded-2xl border border-slate-200 bg-white/75 px-4 py-3 sm:px-5">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Start with the highlighted recommendation</p>
-                      <p className="mt-1 text-[13px] text-slate-700">
-                        You do not need to set up everything at once. Start with the card marked Start here, then add supporting tools only when they help.
-                      </p>
-                    </div>
-                    {visibleStackStepLabels.length > 1 && (
-                      <div className="text-[11px] text-slate-500">
-                        {visibleStackStepLabels.length - 1} supporting tool{visibleStackStepLabels.length - 1 !== 1 ? 's' : ''} available
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {stackData.summary && (
-                  <div className="mb-10 rounded-2xl border border-slate-300 bg-slate-100/80 p-5 sm:p-6">
-                    <div className="flex items-center gap-2 mb-2.5">
-                      <Sparkles className="w-4 h-4 text-slate-700" />
-                      <h3 className="text-[13px] font-semibold uppercase tracking-wide text-slate-700">
-                        Why this stack is optimal
-                      </h3>
-                    </div>
-                    <p className="text-[15px] leading-relaxed text-slate-700">{stackData.summary}</p>
-                  </div>
-                )}
-
-                <div className="mb-6 rounded-xl border border-slate-200 bg-white/80 px-4 py-3">
-                  <p className="text-[13px] text-slate-700 leading-relaxed">{stackIntroCopy}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">Keep it simple: start with the card marked Start here</p>
-                </div>
-
-                {affiliateVisibilityTool && (
-                  <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/75 px-4 py-4 sm:px-5">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Worth a look if your budget changes</p>
-                        <h3 className="mt-1 text-[16px] font-semibold text-slate-900">Higher-budget option kept separate from this setup</h3>
-                        <p className="mt-1 text-[13px] text-slate-700">
-                          {affiliateVisibilityTool.name} was relevant enough to appear in the broader recommendation set, but it is outside your current budget filter, so it is not included in this setup.
-                        </p>
-                      </div>
-                      <div className="flex gap-1.5 flex-wrap justify-end">
-                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">Outside current budget</Badge>
-                        <Badge className="text-[10px] bg-white text-slate-700 border border-slate-200 hover:bg-white">Shown separately</Badge>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-amber-200/70 bg-white/90 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
-                        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-                        aria-label={`Open ${affiliateVisibilityTool.name}`}
-                      >
-                        <ToolLogo
-                          logoUrl={affiliateVisibilityTool.logo_url}
-                          websiteUrl={affiliateVisibilityTool.website_url}
-                          toolName={affiliateVisibilityTool.name}
-                          size={40}
-                        />
-                      </button>
-
-                      <div className="min-w-0 flex-1">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
-                          className="text-left text-[15px] font-semibold text-slate-900 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 rounded-sm"
-                        >
-                          {affiliateVisibilityTool.name}
-                        </button>
-                        <p className="mt-1 text-[12px] text-slate-600">{affiliateVisibilityTool.short_description}</p>
-                      </div>
-
-                      <div className="flex gap-2 sm:justify-end">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 px-3 text-[12px] border-slate-300 bg-white"
-                          onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
-                        >
-                          View details
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-9 px-3 text-[12px] bg-slate-900 hover:bg-slate-800 text-white"
-                          onClick={() => {
-                            trackToolClick(affiliateVisibilityTool.id);
-                            openOutboundToolLink(affiliateVisibilityTool, location.pathname, '_blank', {
-                              surfaceSource: 'results_partner_upgrade_option',
-                              slotName: affiliateVisibilityTool.name,
-                              slotId: affiliateVisibilityTool.slug,
-                              userGoalQuery: query,
-                            });
-                          }}
-                        >
-                          {getOutboundCtaLabel(affiliateVisibilityTool, getActionCtaByCategory(affiliateVisibilityTool.category))}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className="space-y-5">
                   {visibleStackItems.map((item, index) => {
                     const accent = getStackAccent(item.tool);
                     const pickReason = item.why && item.why.trim().length > 0 ? item.why.trim() : getWhyRecommended(item.tool);
-                    const avoidTradeoff = getAvoidIf(item.tool);
                     const stepTitle = visibleStackStepLabels[index] || deriveWorkflowStepLabel(item, index);
                     const primaryFunction = getPrimaryFunctionByCategory(item.tool.category);
-                    const isPrimaryTool = index === primaryStackToolIndex;
-                    const isOptionalStep = index === visibleStackItems.length - 1 && visibleStackItems.length >= 3;
+                    const isFirstStep = index === 0;
+                    const isSecondStep = index === 1;
+                    const isOptionalStep = index >= 2;
+                    const isStepExpanded = !isOptionalStep || expandedWorkflowStep === index;
                     const timeEstimates = ['⏱ 15–30 min setup', '⏱ 10–20 min setup', '⏱ 5–15 min setup'];
-                    const howToUse =
-                      index === 0
-                        ? `Connect ${item.tool.name} and complete the initial configuration before running your workflow.`
-                        : index === 1
-                        ? `Use ${item.tool.name} to execute the core of your process and automate key tasks.`
-                        : `Monitor ${item.tool.name} regularly to measure results and improve performance over time.`;
+                    const stepDeliverable = getStepDeliverable(item.tool.category, item.role, intentType);
+                    const actionBullets = getStepExecutionChecklist(
+                      item.tool.name,
+                      item.tool.category,
+                      item.role,
+                      primaryFunction,
+                      intentType,
+                    );
                     const openIdentityOutbound = () => {
                       trackToolClick(item.tool.id);
                       openOutboundToolLink(item.tool, location.pathname, '_blank', {
@@ -2547,40 +2585,82 @@ export default function Results() {
                     };
                     return (
                       <div key={`${item.tool.id}-${item.rank}`}>
-                        {!isPrimaryTool && index === 1 && (
-                          <div className="mb-3 px-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Supporting tools</p>
-                            <p className="mt-1 text-[12px] text-slate-500">Add these later if you want more automation, reach, or tracking.</p>
+                        {!isFirstStep && index === 1 && (
+                          <div className="mb-2 px-1">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Supporting tools</p>
                           </div>
                         )}
                         <div
                           className={`rounded-2xl border bg-white overflow-hidden ${
                             recentlyReplacedToolId === item.tool.id
                               ? 'border-emerald-200 ring-2 ring-emerald-100'
-                              : isPrimaryTool
+                              : isFirstStep
                               ? 'border-indigo-200 bg-[linear-gradient(180deg,rgba(79,70,229,0.06)_0%,rgba(255,255,255,0.98)_36%,rgba(255,255,255,1)_100%)]'
+                              : isSecondStep
+                              ? 'border-slate-200/90 bg-slate-50/35'
                               : isOptionalStep
                               ? 'border-slate-200/80 bg-slate-50/45'
                               : 'border-slate-200'
                           }`}
                         >
-                        <div className="p-5 sm:p-6">
+                        <div className={`${isFirstStep ? 'p-5 sm:p-6' : isSecondStep ? 'p-4 sm:p-5' : 'p-3.5 sm:p-4'}`}>
                           {/* Step header */}
-                          <div className="flex items-center justify-between gap-2 mb-4">
+                          <div className={`flex items-center justify-between gap-2 ${isFirstStep ? 'mb-4' : isSecondStep ? 'mb-3' : 'mb-2'}`}>
                             <div className="flex items-center gap-2">
                               <span
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[12px] font-semibold"
+                                className={`${isOptionalStep ? 'inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-[11px] font-semibold' : 'inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[12px] font-semibold'}`}
                                 style={{ background: accent.strong }}
                               >
                                 {index + 1}
                               </span>
-                              <span className={`text-[11px] font-semibold uppercase tracking-wide ${isPrimaryTool ? 'text-emerald-700' : isOptionalStep ? 'text-slate-500' : 'text-slate-600'}`}>
-                                {isPrimaryTool ? 'Start here' : isOptionalStep ? 'Optional step' : 'Next step'}
+                              <span className={`text-[11px] font-semibold uppercase tracking-wide ${isFirstStep ? 'text-emerald-700' : isOptionalStep ? 'text-slate-500' : 'text-slate-600'}`}>
+                                {isFirstStep ? 'Start here' : isSecondStep ? 'Next step' : 'Optional'}
                               </span>
                               <span className="text-[12px] font-semibold text-slate-700">{stepTitle}</span>
                             </div>
-                            <span className="text-[11px] text-slate-400">{timeEstimates[index]}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-medium ${isFirstStep ? 'text-emerald-700' : isSecondStep ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {isFirstStep ? 'Active' : isSecondStep ? 'Pending' : 'Optional'}
+                              </span>
+                              {isOptionalStep && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-[11px] border-slate-300 bg-white"
+                                  onClick={() => setExpandedWorkflowStep((prev) => (prev === index ? 0 : index))}
+                                >
+                                  {isStepExpanded ? (
+                                    <>
+                                      Hide <ChevronUp className="ml-1 h-3.5 w-3.5" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      Show <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              <span className="text-[11px] text-slate-400">{timeEstimates[index]}</span>
+                            </div>
                           </div>
+
+                          {isFirstStep && (
+                            <p className="-mt-2 mb-3 text-[12px] text-slate-700">
+                              <span className="font-semibold text-slate-800">Your goal for this step:</span>{' '}
+                              {stepDeliverable}
+                            </p>
+                          )}
+
+                          {!isStepExpanded && isOptionalStep && (
+                            <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-2">
+                              <p className="text-[12px] font-medium text-slate-700 truncate">{item.tool.name}</p>
+                              <p className="text-[11px] text-slate-600">Use this to {primaryFunction}.</p>
+                            </div>
+                          )}
+
+                          {isStepExpanded && (
+                            <>
 
                           {/* Tool identity */}
                           <div className="flex items-center gap-3 mb-3">
@@ -2596,7 +2676,7 @@ export default function Results() {
                               <ToolLogo logoUrl={item.tool.logo_url} websiteUrl={item.tool.website_url} toolName={item.tool.name} size={38} />
                             </button>
                             <div className="min-w-0">
-                              {isPrimaryTool && (
+                              {isFirstStep && (
                                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 mb-1">
                                   Start here
                                 </span>
@@ -2613,92 +2693,79 @@ export default function Results() {
                                 {item.tool.name}
                               </button>
                               <p className="text-[12px] text-slate-500">
-                                {isPrimaryTool
+                                {isFirstStep
                                   ? `Best first tool to ${primaryFunction}`
                                   : isOptionalStep
                                   ? `Optional if you want to ${primaryFunction}`
-                                  : `Use this next to ${primaryFunction}`}
+                                  : `Use this next for ${primaryFunction}`}
                               </p>
                             </div>
                           </div>
 
                           {/* Tags */}
                           <div className="flex flex-wrap gap-1.5 mb-4">
-                            {isPrimaryTool && (
+                            {isFirstStep && (
                               <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600 text-white border-0">
                                 Recommended
                               </Badge>
                             )}
-                            {!isOptionalStep && (
+                            {isFirstStep && (
                               <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
                                 {item.tool.pricing_model}
                               </Badge>
                             )}
-                            {isPrimaryTool && (
+                            {isFirstStep && (
                               <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-700 bg-white capitalize">
                                 {item.tool.skill_level}
                               </Badge>
                             )}
                           </div>
 
-                          {isPrimaryTool ? (
-                            <>
-                              <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5 mb-3">
-                                <div className="flex items-start gap-1.5">
-                                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: accent.strong }} />
-                                  <div className="min-w-0">
-                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Why start here</p>
-                                    <p className="text-[12px] text-slate-700 leading-relaxed">{pickReason}</p>
-                                  </div>
-                                </div>
-                                {avoidTradeoff && (
-                                  <div className="mt-2.5 pt-2 border-t border-amber-200/70 flex items-start gap-1.5">
-                                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
-                                    <div className="min-w-0">
-                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-0.5">Trade-off</p>
-                                      <p className="text-[12px] text-amber-800 leading-relaxed">{avoidTradeoff}</p>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5 mb-4">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 mb-0.5">How to use this step</p>
-                                <p className="text-[12px] text-blue-900 leading-relaxed">{howToUse}</p>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="mb-4 rounded-lg border border-slate-200/80 bg-slate-50/55 px-3 py-2.5">
-                              <p className="text-[12px] text-slate-700 leading-relaxed">
-                                {isOptionalStep ? `Add this later if needed: ${pickReason}` : pickReason}
-                              </p>
-                            </div>
-                          )}
+                          <div className="mb-4 rounded-lg border border-slate-200/80 bg-slate-50/60 px-3 py-2.5">
+                            {isSecondStep && (
+                              <p className="text-[11px] font-medium text-slate-600 mb-1.5">After completing step 1</p>
+                            )}
+                            {index >= 2 && (
+                              <p className="text-[11px] font-medium text-slate-600 mb-1.5">After completing previous steps</p>
+                            )}
+                            <ul className="space-y-1 text-[12px] text-slate-700">
+                              {actionBullets.map((bullet) => (
+                                <li key={bullet} className="flex items-start gap-1.5">
+                                  <span className="mt-[6px] inline-block h-1.5 w-1.5 rounded-full bg-slate-500" />
+                                  <span>{bullet}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
 
                           {/* Action buttons */}
                           <div className="flex flex-wrap items-center gap-2 mb-4">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2.5 text-[11px] border-slate-300 bg-white"
-                              onClick={() => handleFlowCompareToggle(item.tool, 'stack')}
-                              disabled={compareTools.length >= 4 && !isSelectedForCompare(item.tool.id)}
-                            >
-                              Compare
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2.5 text-[11px] border-slate-300 bg-white"
-                              onClick={() => toggleStackWithFeedback(item.tool)}
-                            >
-                              {stackSelection.some((t) => t.id === item.tool.id) ? 'Remove from stack' : 'Add to stack'}
-                            </Button>
+                            {(!isFirstStep || showFirstStepExtraActions) && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2.5 text-[11px] border-slate-300 bg-white"
+                                  onClick={() => handleFlowCompareToggle(item.tool, 'stack')}
+                                  disabled={compareTools.length >= 4 && !isSelectedForCompare(item.tool.id)}
+                                >
+                                  Compare
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2.5 text-[11px] border-slate-300 bg-white"
+                                  onClick={() => toggleStackWithFeedback(item.tool)}
+                                >
+                                  {stackSelection.some((t) => t.id === item.tool.id) ? 'Remove from stack' : 'Add to stack'}
+                                </Button>
+                              </>
+                            )}
                             {!item.isSynthesized && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 px-2.5 text-[11px] border-slate-300 bg-white"
+                                className={`${isFirstStep ? 'h-8 px-2.5 text-[11px] border-slate-300 bg-white text-slate-500 hover:text-slate-700' : 'h-8 px-2.5 text-[11px] border-slate-300 bg-white'}`}
                                 onClick={() => navigate(`/tools/${item.tool.slug}`)}
                               >
                                 View tool
@@ -2708,7 +2775,7 @@ export default function Results() {
                               <div className="flex flex-col">
                                 <Button
                                   size="sm"
-                                  className={`${isPrimaryTool ? 'h-9 px-3.5 text-[12px] bg-indigo-600 hover:bg-indigo-700 shadow-[0_10px_22px_rgba(79,70,229,0.38)] text-white ring-1 ring-indigo-400/30' : 'h-8 px-3 text-[11px] bg-slate-600/75 hover:bg-slate-600/85 text-white/85 opacity-80 shadow-none'}`}
+                                  className={`${isFirstStep ? 'h-9 px-3.5 text-[12px] bg-indigo-600 hover:bg-indigo-700 shadow-[0_10px_22px_rgba(79,70,229,0.38)] text-white ring-1 ring-indigo-400/30' : isSecondStep ? 'h-8 px-3 text-[11px] bg-slate-700/80 hover:bg-slate-700/90 text-white/90' : 'h-8 px-3 text-[11px] bg-slate-600/75 hover:bg-slate-600/85 text-white/85 opacity-80 shadow-none'}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     trackToolClick(item.tool.id);
@@ -2719,21 +2786,42 @@ export default function Results() {
                                 >
                                   {getOutboundCtaLabel(item.tool, getActionCtaByCategory(item.tool.category))}
                                 </Button>
-                                {isPrimaryTool && (
-                                  <p className="mt-1 text-[10px] text-slate-500">↳ This is where most setups begin</p>
-                                )}
                               </div>
+                            )}
+                            {isFirstStep && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2 text-[11px] text-slate-500 hover:text-slate-700"
+                                onClick={() => setShowFirstStepExtraActions((prev) => !prev)}
+                              >
+                                {showFirstStepExtraActions ? 'Hide extra actions' : 'More actions'}
+                              </Button>
                             )}
                           </div>
 
-                          {/* Alternatives — always visible */}
+                          {/* Alternatives */}
                           {!isOptionalStep && (stackData.alternatives?.[item.tool.name] || []).slice(0, 3).length > 0 && (
                             <div className="pt-3 border-t border-slate-100">
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Alternatives</span>
-                                <span className="text-[10px] text-slate-400">Switch this step decision</span>
+                              <div className="flex items-center justify-end gap-2 mb-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-[10px] border-slate-300 bg-white text-slate-600"
+                                  onClick={() =>
+                                    setExpandedAlternativeOptions((prev) => ({
+                                      ...prev,
+                                      [item.tool.name]: !prev[item.tool.name],
+                                    }))
+                                  }
+                                >
+                                  {expandedAlternativeOptions[item.tool.name] ? 'Hide options' : 'Show options'}
+                                </Button>
                               </div>
-                              <div className="space-y-2">
+                              {expandedAlternativeOptions[item.tool.name] && (
+                                <div className="space-y-2">
                                 {(stackData.alternatives?.[item.tool.name] || [])
                                   .slice(0, 3)
                                   .map((alt) => {
@@ -2785,8 +2873,11 @@ export default function Results() {
                                       </div>
                                     );
                                   })}
-                              </div>
+                                </div>
+                              )}
                             </div>
+                          )}
+                          </>
                           )}
                         </div>
                         </div>
@@ -2795,9 +2886,169 @@ export default function Results() {
                   })}
                 </div>
 
-                <p className="mt-4 text-center text-[11px] text-slate-500">
-                  Start with the card marked Start here to get results faster
-                </p>
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 px-3 text-[12px] border-slate-300 bg-white"
+                    onClick={() => setShowMoreInfo((prev) => !prev)}
+                  >
+                    {showMoreInfo ? 'Hide info' : 'More info'}
+                  </Button>
+                </div>
+
+                {showMoreInfo && (
+                  <div className="mt-6 space-y-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <Badge variant="outline" className="text-[11px] border-slate-300 bg-white">
+                          Pricing: {stackPricingLabel}
+                        </Badge>
+                        <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
+                          {stackData.stack.length} steps
+                        </Badge>
+                        {stackSelection.length > 0 && (
+                          <Badge variant="outline" className="text-[11px] border-slate-300 text-slate-700 bg-white">
+                            Progress: {stackProgressPercentage}% ({stackProgressLabel})
+                          </Badge>
+                        )}
+                        <div className="ml-auto">
+                          <Select value={budgetParam} onValueChange={(value) => handleBudgetFilterChange(value as BudgetFilter)}>
+                            <SelectTrigger className="stackely-select-trigger w-[180px]">
+                              <SelectValue placeholder="Budget" />
+                            </SelectTrigger>
+                            <SelectContent className="stackely-select-content">
+                              <SelectItem value="any">Budget: Any</SelectItem>
+                              <SelectItem value="free">Budget: Free</SelectItem>
+                              <SelectItem value="freemium">Budget: Freemium</SelectItem>
+                              <SelectItem value="paid">Budget: Paid</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <p className="text-[13px] text-slate-700 leading-relaxed">{stackIntroCopy}</p>
+                    </div>
+
+                    {stackData.summary && (
+                      <div className="rounded-2xl border border-slate-300 bg-slate-100/80 p-5 sm:p-6">
+                        <div className="flex items-center gap-2 mb-2.5">
+                          <Sparkles className="w-4 h-4 text-slate-700" />
+                          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-slate-700">
+                            Why this stack is optimal
+                          </h3>
+                        </div>
+                        <p className="text-[15px] leading-relaxed text-slate-700">{stackData.summary}</p>
+                      </div>
+                    )}
+
+                    {affiliateVisibilityTool && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50/75 px-4 py-4 sm:px-5">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Worth a look if your budget changes</p>
+                            <h3 className="mt-1 text-[16px] font-semibold text-slate-900">Higher-budget option kept separate from this setup</h3>
+                            <p className="mt-1 text-[13px] text-slate-700">
+                              {affiliateVisibilityTool.name} was relevant enough to appear in the broader recommendation set, but it is outside your current budget filter, so it is not included in this setup.
+                            </p>
+                          </div>
+                          <div className="flex gap-1.5 flex-wrap justify-end">
+                            <Badge className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">Outside current budget</Badge>
+                            <Badge className="text-[10px] bg-white text-slate-700 border border-slate-200 hover:bg-white">Shown separately</Badge>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-amber-200/70 bg-white/90 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
+                            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+                            aria-label={`Open ${affiliateVisibilityTool.name}`}
+                          >
+                            <ToolLogo
+                              logoUrl={affiliateVisibilityTool.logo_url}
+                              websiteUrl={affiliateVisibilityTool.website_url}
+                              toolName={affiliateVisibilityTool.name}
+                              size={40}
+                            />
+                          </button>
+
+                          <div className="min-w-0 flex-1">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
+                              className="text-left text-[15px] font-semibold text-slate-900 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 rounded-sm"
+                            >
+                              {affiliateVisibilityTool.name}
+                            </button>
+                            <p className="mt-1 text-[12px] text-slate-600">{affiliateVisibilityTool.short_description}</p>
+                          </div>
+
+                          <div className="flex gap-2 sm:justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 px-3 text-[12px] border-slate-300 bg-white"
+                              onClick={() => navigate(`/tools/${affiliateVisibilityTool.slug}`)}
+                            >
+                              View details
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-9 px-3 text-[12px] bg-slate-900 hover:bg-slate-800 text-white"
+                              onClick={() => {
+                                trackToolClick(affiliateVisibilityTool.id);
+                                openOutboundToolLink(affiliateVisibilityTool, location.pathname, '_blank', {
+                                  surfaceSource: 'results_partner_upgrade_option',
+                                  slotName: affiliateVisibilityTool.name,
+                                  slotId: affiliateVisibilityTool.slug,
+                                  userGoalQuery: query,
+                                });
+                              }}
+                            >
+                              {getOutboundCtaLabel(affiliateVisibilityTool, getActionCtaByCategory(affiliateVisibilityTool.category))}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comparison Section */}
+                    {stackData.comparison && stackData.comparison.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Tool Comparisons</h3>
+                        <div className="space-y-4">
+                          {stackData.comparison.map((comp, index) => (
+                            <div key={index} className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-[12px] font-medium text-slate-600">
+                                  {comp.toolA} vs {comp.toolB}
+                                </span>
+                                <Badge variant="outline" className="text-[10px]">
+                                  Winner: {comp.winner}
+                                </Badge>
+                              </div>
+                              <p className="text-[14px] text-slate-700">{comp.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes Section */}
+                    {cleanedStackNotes.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Additional Notes</h3>
+                        <div className="space-y-3">
+                          {cleanedStackNotes.map((note, index) => (
+                            <div key={index} className="p-4 rounded-lg border border-amber-200 bg-amber-50">
+                              <p className="text-[14px] text-amber-800">{note}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {workflowBudgetFallbackUsed && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
@@ -2812,40 +3063,6 @@ export default function Results() {
                   </div>
                 )}
 
-                {/* Comparison Section */}
-                {stackData.comparison && stackData.comparison.length > 0 && (
-                  <div className="mt-14 pt-8 border-t border-slate-200">
-                    <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Tool Comparisons</h3>
-                    <div className="space-y-4">
-                      {stackData.comparison.map((comp, index) => (
-                        <div key={index} className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[12px] font-medium text-slate-600">
-                              {comp.toolA} vs {comp.toolB}
-                            </span>
-                            <Badge variant="outline" className="text-[10px]">
-                              Winner: {comp.winner}
-                            </Badge>
-                          </div>
-                          <p className="text-[14px] text-slate-700">{comp.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Notes Section */}
-                {cleanedStackNotes.length > 0 && (
-                  <div className="mt-14 pt-8 border-t border-slate-200">
-                    <h3 className="text-[18px] font-semibold text-slate-900 mb-6">Additional Notes</h3>
-                    <div className="space-y-3">
-                      {cleanedStackNotes.map((note, index) => (
-                        <div key={index} className="p-4 rounded-lg border border-amber-200 bg-amber-50">
-                          <p className="text-[14px] text-amber-800">{note}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 

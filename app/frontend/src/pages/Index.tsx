@@ -810,6 +810,12 @@ export default function Index() {
     });
   }, []);
 
+  const heroPresetLabels: Record<string, string> = {
+    funnel: 'Get a funnel that captures emails',
+    newsletter: 'Launch your first newsletter',
+    automation: 'Automate your lead follow-up',
+  };
+
   const shouldShowTopRankedSection = topRankedHomepageStacks.length >= 2;
 
   const resolveQueryFlow = async (rawValue: string) => {
@@ -1132,7 +1138,7 @@ export default function Index() {
                       to={presetPath}
                       className="text-[13px] font-medium px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-[#4F46E5] hover:bg-indigo-100 hover:border-indigo-300 transition-all"
                     >
-                      {preset.title}
+                      {heroPresetLabels[preset.key] || preset.title}
                     </Link>
                   );
                 })}

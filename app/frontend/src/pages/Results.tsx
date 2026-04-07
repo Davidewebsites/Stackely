@@ -1219,6 +1219,18 @@ export default function Results() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const handleBackNavigation = () => {
+    reset();
+    const historyState = typeof window !== 'undefined' ? (window.history.state as { idx?: number } | null) : null;
+    const canNavigateBack = typeof historyState?.idx === 'number' && historyState.idx > 0;
+
+    if (canNavigateBack) {
+      navigate(-1);
+      return;
+    }
+
+    navigate('/');
+  };
   const query = searchParams.get('q') || '';
   const categoryParam = searchParams.get('category') || '';
   const budgetParam = normalizeBudgetFilter(searchParams.get('budget'));
@@ -2034,6 +2046,16 @@ export default function Results() {
     setSearchParams(next, { replace: true });
   };
 
+  const handleSkillFilterChange = (value: 'auto' | SkillPreference) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === 'auto') {
+      next.delete('skill');
+    } else {
+      next.set('skill', value);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
   const cleanedStackNotes = useMemo(() => {
     const rawNotes = (stackData?.notes || [])
       .map((note) => note.trim())
@@ -2266,7 +2288,7 @@ export default function Results() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { reset(); navigate('/'); }}
+              onClick={handleBackNavigation}
               className="h-8 px-2 text-[#2F80ED] hover:text-[#8A2BE2] hover:bg-indigo-50/70 shadow-none"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
@@ -2283,11 +2305,44 @@ export default function Results() {
       <div className="results-container page-section pt-8 relative">
         {/* Mode indicator */}
         {query && (
-          <div className="mb-4 flex items-center gap-2">
-            <span className="eyebrow-label">
-              {queryMode === 'stack' ? 'AI Stack Mode' : 'Tool Search Mode'}
-            </span>
-            <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-[#4F46E5]' : 'bg-[#4FD1C5]'}`} />
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="eyebrow-label">
+                {queryMode === 'stack' ? 'AI Stack Mode' : 'Tool Search Mode'}
+              </span>
+              <div className={`w-2 h-2 rounded-full ${queryMode === 'stack' ? 'bg-[#4F46E5]' : 'bg-[#4FD1C5]'}`} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-[#2F80ED]/15 bg-white/80 px-3 py-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.09em] text-slate-500">Refine</span>
+
+              <Select value={budgetParam} onValueChange={(value) => handleBudgetFilterChange(value as BudgetFilter)}>
+                <SelectTrigger className="h-8 w-[140px] border-slate-200 bg-white text-[12px]">
+                  <SelectValue placeholder="Budget" />
+                </SelectTrigger>
+                <SelectContent className="stackely-select-content">
+                  <SelectItem value="any">Any budget</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="freemium">Freemium</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={explicitSkillPreference || 'auto'}
+                onValueChange={(value) => handleSkillFilterChange(value as 'auto' | SkillPreference)}
+              >
+                <SelectTrigger className="h-8 w-[160px] border-slate-200 bg-white text-[12px]">
+                  <SelectValue placeholder="Skill" />
+                </SelectTrigger>
+                <SelectContent className="stackely-select-content">
+                  <SelectItem value="auto">Skill: Auto</SelectItem>
+                  <SelectItem value="beginner">Beginner</SelectItem>
+                  <SelectItem value="intermediate">Intermediate</SelectItem>
+                  <SelectItem value="advanced">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
         {/* Loading */}

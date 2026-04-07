@@ -332,32 +332,68 @@ function detectStrongNewsletterCommercialIntent(goal: string): boolean {
   return /\bstart\s+a\s+newsletter\s+business\b|\bbest\s+newsletter\s+platform\b|\bnewsletter\s+business\b|\bgrow\s+a\s+newsletter\b|\bmonetize\s+(?:a\s+)?newsletter\b/.test(normalized);
 }
 
-function shouldPreferClickFunnelsInRotation(
+function getAffiliateWindowCandidate(
   goal: string,
   slot: WorkflowSlot,
+  scored: ScoredTool[],
   options: WorkflowGenerationOptions,
-): boolean {
-  if (options.budgetBand !== 'none' && options.budgetBand !== 'high') return false;
-  if (!isAffiliateSlotCompatible('clickfunnels', slot)) return false;
-  return detectFunnelSemanticIntent(goal) && detectStrongFunnelCommercialIntent(goal);
+): ScoredTool | null {
+  const normalizedRole = (slot.role || '').trim();
+
+  let targetKey: AffiliateToolKey | null = null;
+  let maxRank = -1;
+
+  if (
+    normalizedRole === 'Conversion Layer' &&
+    (options.budgetBand === 'low' || options.budgetBand === 'medium' || options.budgetBand === 'high') &&
+    isAffiliateSlotCompatible('clickfunnels', slot) &&
+    detectFunnelSemanticIntent(goal) &&
+    detectStrongFunnelCommercialIntent(goal)
+  ) {
+    targetKey = 'clickfunnels';
+    maxRank = 12;
+  } else if (
+    normalizedRole === 'Email Platform' &&
+    isAffiliateSlotCompatible('beehiiv', slot) &&
+    detectNewsletterSemanticIntent(goal)
+  ) {
+    targetKey = 'beehiiv';
+    maxRank = 8;
+  }
+
+  if (!targetKey) return null;
+
+  const affiliateIndex = scored.findIndex(
+    (entry) => normalizeAffiliateToolName((entry.tool.name || '').toLowerCase()) === targetKey
+  );
+
+  if (affiliateIndex < 0 || affiliateIndex >= maxRank) return null;
+
+  const affiliateEntry = scored[affiliateIndex];
+  if (!isSemanticallyValidForCriticalSlot(slot, affiliateEntry.tool)) return null;
+
+  return affiliateEntry;
 }
 
-function getClickFunnelsSelectionWindowCandidate(scored: ScoredTool[], slot: WorkflowSlot): ScoredTool | null {
-  if (slot.role !== 'Conversion Layer') return null;
-  const clickFunnelsIndex = scored.findIndex(
-    (entry) => normalizeAffiliateToolName((entry.tool.name || '').toLowerCase()) === 'clickfunnels'
+function ensureSelectionWindowIncludesCandidate(
+  scored: ScoredTool[],
+  selectionWindowSize: number,
+  candidate: ScoredTool | null,
+): ScoredTool[] {
+  const naturalWindow = scored.slice(0, selectionWindowSize);
+  if (!candidate || selectionWindowSize <= 0) return naturalWindow;
+  if (naturalWindow.some((entry) => entry.tool.id === candidate.tool.id)) return naturalWindow;
+
+  const preservedIds = new Set(
+    naturalWindow
+      .slice(0, Math.max(0, selectionWindowSize - 1))
+      .map((entry) => entry.tool.id)
   );
-  if (clickFunnelsIndex < 0 || clickFunnelsIndex > 9) return null;
+  preservedIds.add(candidate.tool.id);
 
-  const clickFunnelsEntry = scored[clickFunnelsIndex];
-  if (!isSemanticallyValidForCriticalSlot(slot, clickFunnelsEntry.tool)) return null;
-
-  const naturalCutoff = scored[Math.min(3, scored.length - 1)];
-  if (!naturalCutoff) return null;
-  const scoreGapFromCutoff = naturalCutoff.score - clickFunnelsEntry.score;
-  if (scoreGapFromCutoff > 9) return null;
-
-  return clickFunnelsEntry;
+  return scored
+    .filter((entry) => preservedIds.has(entry.tool.id))
+    .slice(0, selectionWindowSize);
 }
 
 function detectBroadGenericBusinessIntent(goal: string): boolean {
@@ -1095,30 +1131,14 @@ function fillBlueprint(
 
     // Session-to-session rotation: alternate choices across top valid candidates per role.
     const rotationWindow = Math.min(4, scored.length);
-    const preferClickFunnels = shouldPreferClickFunnelsInRotation(goal, slot, options);
-    const clickFunnelsSelectionWindowCandidate = preferClickFunnels
-      ? getClickFunnelsSelectionWindowCandidate(scored, slot)
-      : null;
-    let selectionWindow = scored.slice(0, rotationWindow);
-    if (clickFunnelsSelectionWindowCandidate && rotationWindow > 0) {
-      const alreadyInWindow = selectionWindow.some((entry) => entry.tool.id === clickFunnelsSelectionWindowCandidate.tool.id);
-      if (!alreadyInWindow) {
-        selectionWindow = [
-          ...selectionWindow.slice(0, Math.max(0, rotationWindow - 1)),
-          clickFunnelsSelectionWindowCandidate,
-        ];
-      }
-    }
+    const affiliateWindowCandidate = getAffiliateWindowCandidate(goal, slot, scored, options);
+    const selectionWindow = ensureSelectionWindowIncludesCandidate(scored, rotationWindow, affiliateWindowCandidate);
     const intentKey = options.rotationIntent || 'global';
     const roleCursor = options.deterministicSelection ? 0 : loadRotationCursor(intentKey, slot.role);
     const deterministicSeedBase = options.deterministicSeed || goal;
     const seed = hashString(`${deterministicSeedBase}:${slot.role}:${options.diversitySalt || 0}`) % Math.max(1, rotationWindow);
     const rotation = rotationWindow > 0 ? (roleCursor + seed) % rotationWindow : 0;
-    const clickFunnelsRotationCandidate = preferClickFunnels
-      ? selectionWindow
-          .find((entry) => normalizeAffiliateToolName((entry.tool.name || '').toLowerCase()) === 'clickfunnels')
-      : null;
-    const best = clickFunnelsRotationCandidate || selectionWindow[rotation] || scored[0];
+    const best = selectionWindow[rotation] || scored[0];
     if (!options.deterministicSelection) {
       bumpRotationCursor(intentKey, slot.role);
     }

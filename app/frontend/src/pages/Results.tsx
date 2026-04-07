@@ -378,48 +378,96 @@ function getStepDeliverable(category: string, role: string, intentType: string):
 
   if (intent === 'funnel') {
     if (category === 'landing_pages' || /builder|landing|conversion layer|page/.test(roleHint)) {
-      return 'Publish one landing page with a clear CTA.';
+      return 'Publish a landing page with a working signup form';
     }
     if (category === 'copywriting' || /copy|writing|script/.test(roleHint)) {
-      return 'Finalize headline, offer line, and CTA text for your page.';
+      return 'Write your headline, offer text, and CTA — ready to go live';
     }
     if (category === 'analytics' || /analytic|tracking|measurement|reporting/.test(roleHint)) {
-      return 'Set up one conversion event for your page.';
+      return 'See your first conversion event firing on your live page';
     }
   }
 
   if (intent === 'newsletter') {
     if (category === 'email_marketing' || /email platform|newsletter|distribution|audience|subscriber/.test(roleHint)) {
-      return 'Write your first newsletter issue and signup flow.';
+      return 'Write and send your first newsletter to real subscribers';
     }
     if (category === 'copywriting' || /copy|writing|script/.test(roleHint)) {
-      return 'Complete your first email draft and subject line.';
+      return 'Write your first email subject and body — ready to send';
     }
     if (category === 'analytics' || /analytic|tracking|measurement|reporting/.test(roleHint)) {
-      return 'Track opens, clicks, and early subscriber growth.';
+      return 'See your first open rate and subscriber count update';
     }
   }
 
   switch (category) {
     case 'landing_pages':
-      return 'Publish one live page with one primary CTA.';
+      return 'Publish a live page with a working CTA button';
     case 'email_marketing':
-      return 'Prepare one send-ready email campaign and audience list.';
+      return 'Send your first email to a live audience list';
     case 'automation':
-      return 'Launch one working automation for your core workflow.';
+      return 'Run one end-to-end automation that actually triggers';
     case 'analytics':
-      return 'Track one key event tied to your primary action.';
+      return 'See your first real visitor or event in your dashboard';
     case 'copywriting':
-      return 'Finalize the core copy you will publish first.';
+      return 'Write and publish your final headline and CTA copy';
     case 'design':
-      return 'Ship one hero visual ready for your live page.';
+      return 'Export your hero visual and see it live on your page';
     case 'ads':
-      return 'Launch one traffic campaign to your main destination.';
+      return 'Get your first click from a paid campaign to your page';
     case 'video':
-      return 'Publish one short video with a clear CTA.';
+      return 'Publish your first video with a visible call to action';
     default:
-      return 'Complete one concrete output for this step.';
+      return 'Ship one concrete output and move to the next step';
   }
+}
+
+function getStackOutcomeByIntentAndRole(
+  category: string,
+  role: string,
+  intentType: string,
+): string {
+  const roleHint = role.toLowerCase();
+  const intent = intentType.toLowerCase();
+
+  if (intent === 'funnel' || /conversion layer|funnel/.test(roleHint)) {
+    return 'a working funnel capturing emails';
+  }
+  if (intent === 'newsletter' || /email platform|newsletter/.test(roleHint) || category === 'email_marketing') {
+    return 'your first newsletter ready to send';
+  }
+  if (intent === 'ecommerce') return 'a live product store ready to take orders';
+  if (intent === 'saas_landing') return 'a published SaaS page collecting signups';
+  if (intent === 'marketing_automation' || /automation hub/.test(roleHint)) {
+    return 'a working automation across your core tools';
+  }
+  if (intent === 'youtube_creator' || intent === 'video') return 'your first video published with a clear CTA';
+  if (category === 'landing_pages') return 'a live landing page collecting leads';
+  if (category === 'automation') return 'a working automation connecting your core tools';
+  if (category === 'analytics') return 'conversion tracking live from your page';
+  if (category === 'copywriting') return 'your core message written and ready to publish';
+  if (category === 'ads') return 'your first paid traffic flowing to your page';
+  if (category === 'video') return 'your first video live with a visible CTA';
+  return 'your first step complete and live';
+}
+
+function getStartHereLabel(category: string, role: string, intentType: string): string {
+  const roleHint = role.toLowerCase();
+  const intent = intentType.toLowerCase();
+
+  if (intent === 'funnel' || /conversion layer|funnel|landing/.test(roleHint) || category === 'landing_pages') {
+    return 'Start here — create your landing page';
+  }
+  if (intent === 'newsletter' || /email platform|newsletter/.test(roleHint) || category === 'email_marketing') {
+    return 'Start here — launch your newsletter';
+  }
+  if (intent === 'ecommerce') return 'Start here — build your store page';
+  if (intent === 'saas_landing') return 'Start here — create your signup page';
+  if (intent === 'marketing_automation' || category === 'automation') return 'Start here — connect your tools';
+  if (intent === 'youtube_creator' || category === 'video') return 'Start here — create your first video';
+  if (category === 'copywriting') return 'Start here — write your core message';
+  if (category === 'ads') return 'Start here — launch your first campaign';
+  return 'Start here — begin your first step';
 }
 
 function buildStackIntro(items: AdaptedStackItem[]): string {
@@ -2590,6 +2638,16 @@ export default function Results() {
                             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Supporting tools</p>
                           </div>
                         )}
+                        {isFirstStep && (
+                          <div className="mb-3 px-1">
+                            <p className="text-[13px] font-semibold text-slate-900">
+                              You will have:{' '}
+                              <span className="font-medium text-indigo-700">
+                                {getStackOutcomeByIntentAndRole(item.tool.category, item.role, intentType)}
+                              </span>
+                            </p>
+                          </div>
+                        )}
                         <div
                           className={`rounded-2xl border bg-white overflow-hidden ${
                             recentlyReplacedToolId === item.tool.id
@@ -2614,7 +2672,7 @@ export default function Results() {
                                 {index + 1}
                               </span>
                               <span className={`text-[11px] font-semibold uppercase tracking-wide ${isFirstStep ? 'text-emerald-700' : isOptionalStep ? 'text-slate-500' : 'text-slate-600'}`}>
-                                {isFirstStep ? 'Start here' : isSecondStep ? 'Next step' : 'Optional'}
+                                {isFirstStep ? getStartHereLabel(item.tool.category, item.role, intentType) : isSecondStep ? 'Next — improve results' : 'Optional — scale or optimize'}
                               </span>
                               <span className="text-[12px] font-semibold text-slate-700">{stepTitle}</span>
                             </div>
@@ -2646,8 +2704,14 @@ export default function Results() {
                           </div>
 
                           {isFirstStep && (
-                            <p className="-mt-2 mb-3 text-[12px] text-slate-700">
-                              <span className="font-semibold text-slate-800">Your goal for this step:</span>{' '}
+                            <p className="mb-2 text-[11px] text-slate-500">
+                              Most setups start here — this gets you live fastest.
+                            </p>
+                          )}
+
+                          {isFirstStep && (
+                            <p className="mb-3 text-[12px] text-slate-700">
+                              <span className="font-semibold text-indigo-700">→ </span>
                               {stepDeliverable}
                             </p>
                           )}

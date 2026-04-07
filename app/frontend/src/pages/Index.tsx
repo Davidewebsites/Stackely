@@ -661,15 +661,15 @@ export default function Index() {
   // STATIC: Editorially chosen workflows for homepage section
   const displayedLandingUseCases = [
     {
-      title: 'Build a sales funnel',
-      description: 'Start from a conversion-first funnel workflow anchored around ClickFunnels.',
+      title: 'Get a funnel that captures emails',
+      description: 'Live in ~15 min · Start collecting leads immediately',
       query: 'build a sales funnel with clickfunnels',
       categoryId: 'landing_pages',
       workflowAnchor: 'clickfunnels' as const,
     },
     {
-      title: 'Start a newsletter',
-      description: 'Use a newsletter-first workflow with Beehiiv for audience growth.',
+      title: 'Launch your first newsletter',
+      description: 'Send your first email today · No setup knowledge needed',
       query: 'start a newsletter with beehiiv',
       categoryId: 'email_marketing',
       workflowAnchor: 'beehiiv' as const,
@@ -1040,13 +1040,16 @@ export default function Index() {
 
             <div className="title-container py-1">
               <h1 className="title landing-hero-title hero-title mx-auto mb-4 brand-gradient-title text-center tracking-[-0.02em]">
-                Find the right tools for your workflow
+                Tell us what you want to build. We show you exactly what to use — and where to start.
               </h1>
               <p className="mx-auto mb-6 max-w-[560px] text-[15px] text-slate-700 leading-relaxed">
-                Describe one goal and get a focused shortlist aligned with your budget and skill level.
+                Get a ready-to-use setup with the exact tools and steps to launch.
               </p>
             </div>
 
+            <p className="mb-2 text-center text-[12px] font-medium text-slate-500">
+              Describe what you want to build
+            </p>
             <form onSubmit={handleQuerySubmit} className="w-full mt-6">
               <div className="rounded-xl border border-[#2F80ED]/25 bg-white/95 backdrop-blur-sm p-2 shadow-sm flex items-center gap-3 flex-nowrap transition-all duration-200 focus-within:border-[#4F46E5]/55 focus-within:shadow-[0_0_0_4px_rgba(79,70,229,0.14)] overflow-x-auto">
                 <div className="relative flex-1 min-w-0">
@@ -1054,7 +1057,7 @@ export default function Index() {
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Describe your goal — e.g. build a website, automate marketing..."
+                    placeholder="e.g. Build a sales funnel · Start a newsletter · Launch a landing page"
                     className="w-full h-11 pl-11 pr-4 text-[15px] rounded-lg border-0 bg-white placeholder:text-slate-500 focus:ring-0 outline-none"
                   />
                 </div>
@@ -1091,6 +1094,22 @@ export default function Index() {
                 </Button>
               </div>
             </form>
+
+            {/* What happens next */}
+            <div className="w-full mt-4 mb-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+              <span className="flex items-center gap-1 text-[11px] text-slate-600">
+                <span className="font-semibold text-[#4F46E5]">1.</span> We pick the right tools
+              </span>
+              <span className="text-slate-300 text-[11px] hidden sm:inline">→</span>
+              <span className="flex items-center gap-1 text-[11px] text-slate-600">
+                <span className="font-semibold text-[#4F46E5]">2.</span> We show you what to do first
+              </span>
+              <span className="text-slate-300 text-[11px] hidden sm:inline">→</span>
+              <span className="flex items-center gap-1 text-[11px] text-slate-600">
+                <span className="font-semibold text-[#4F46E5]">3.</span> You start building immediately
+              </span>
+            </div>
+            <p className="text-center text-[11px] text-slate-400 mb-1">No sign-up needed · Takes less than 10 seconds</p>
 
             <div className="w-full mt-4">
               <p className="text-[12px] text-center text-slate-600 mb-0.5">Start with proven presets</p>
@@ -1280,256 +1299,42 @@ export default function Index() {
       {/* Below-fold sections: only on step 1 */}
       {step === 1 && (
         <>
-          {/* Daily Stack Comparison */}
-          <section className="border-t border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(241,245,249,0.62)_100%)]">
-            <div className="page-shell page-section">
-              <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 md:p-6 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div className="min-w-0 max-w-[70ch] lg:flex-1 lg:max-w-none">
-                    <p className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>OPTIONAL EXPLORATION</p>
-                    <h2 className="section-heading mb-2 lg:whitespace-nowrap">Compare two stack approaches for this use case</h2>
-                    <p className="body-copy text-slate-600 lg:[text-wrap:pretty]">
-                      Helpful if you want to evaluate alternatives before running your own goal search.
-                    </p>
-                  </div>
+          {/* Use Cases */}
+          <section className="border-t border-slate-200 bg-slate-50/35">
+            <div className="page-shell py-10 md:py-12">
+              <div className="mb-6 max-w-[72ch]">
+                <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Quick start</div>
+                <h2 className="text-[24px] md:text-[30px] font-semibold tracking-tight text-slate-900 mb-2">Start faster with a proven setup</h2>
+                <p className="body-copy">Pick one path and get a ready setup with the tools and starting steps already lined up.</p>
+              </div>
 
-                  <p className="text-[12px] leading-relaxed text-slate-600 lg:text-right lg:max-w-[360px]">
-                    Yesterday: {yesterdayResult.winningStackName} led with {yesterdayResult.winningPercentage}%.
-                  </p>
-                </div>
-
-                <div className="mt-5 flex min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-2.5">
-                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#2F80ED]/90">Use case</span>
-                  <span
-                    className="text-[13px] font-medium text-slate-700 lg:min-w-0 lg:flex-1 lg:overflow-hidden lg:text-ellipsis lg:whitespace-nowrap"
-                    title={dailyMatchup.useCaseLabel}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {displayedLandingUseCases.map((useCase) => {
+                  const isTrendingUseCase = !!useCase.isTrending;
+                  const trustCue = useCase.workflowAnchor === 'clickfunnels'
+                    ? 'Fastest way to start'
+                    : 'Used by beginners';
+                  return (
+                  <button
+                    key={useCase.title}
+                    onClick={() => handleWorkflowCardClick(useCase)}
+                    className={`group text-left rounded-xl border bg-white/95 p-5 hover:-translate-y-[1px] hover:border-[#4F46E5]/35 hover:shadow-[0_10px_20px_rgba(79,70,229,0.12)] transition-all ${isTrendingUseCase ? 'border-slate-300 bg-slate-50/45' : 'border-slate-200'}`}
                   >
-                    {dailyMatchup.useCaseLabel}
-                  </span>
-                  <span className="shrink-0 text-[12px] px-2.5 py-1 rounded-full bg-indigo-50 text-[#4F46E5] font-semibold border border-indigo-100">
-                    {dailyMatchup.categoryLabel}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-                  {[dailyMatchup.stackA, dailyMatchup.stackB].map((stack) => {
-                    const stackId = stack.id;
-                    const isSelected = selectedDailyStack === stackId;
-                    const hasOtherSelected = !!selectedDailyStack && selectedDailyStack !== stackId;
-                    const votedForThis = dailyVoteSnapshot.userVote === stackId;
-                    const isLocked = hasConfirmedDailyVote;
-                    const isWinningStack = dailyVoteSnapshot.leadingStackId === stackId;
-                    const stackRanking = dailyRankingsBySide[stackId];
-                    const isTopRankedInCategory = stackRanking.rankInCategory === 1 && stackRanking.rawScore > 0;
-                    return (
-                      <div
-                        key={stack.id}
-                        role="button"
-                        tabIndex={isLocked ? -1 : 0}
-                        onClick={() => handleDailyStackSelect(stackId)}
-                        onKeyDown={(e) => {
-                          if (isLocked) return;
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleDailyStackSelect(stackId);
-                          }
-                        }}
-                        className={`text-left rounded-xl border p-4 transition-all duration-200 flex flex-col min-h-[252px] ${
-                          isSelected
-                            ? 'border-2 border-[#4F46E5]/75 bg-[linear-gradient(165deg,rgba(47,128,237,0.05)_0%,rgba(79,70,229,0.06)_100%)] shadow-[0_0_0_2px_rgba(79,70,229,0.10),0_6px_14px_rgba(79,70,229,0.08)]'
-                            : (hasOtherSelected || (isLocked && !votedForThis))
-                              ? 'border-slate-200 bg-white opacity-50'
-                              : 'border-slate-200 bg-white cursor-pointer hover:border-[#4F46E5]/38 hover:shadow-[0_10px_20px_rgba(79,70,229,0.12)]'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3 min-h-[30px]">
-                          <div className="min-w-0">
-                            {isWinningStack && (
-                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 mb-1.5">
-                                Community pick
-                              </span>
-                            )}
-                            <p className="text-[16px] font-semibold tracking-tight text-slate-900">{stack.name}</p>
-                            {isTopRankedInCategory && (
-                              <p className="mt-1 text-[11px] text-slate-500">Top ranked in {dailyMatchup.categoryLabel}</p>
-                            )}
-                          </div>
-                          {isSelected && !isLocked && (
-                            <span className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] font-semibold text-[#4F46E5] bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                              Selected
-                            </span>
-                          )}
-                          {votedForThis && isLocked && (
-                            <span className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] font-semibold text-[#2F80ED] bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                              Your choice
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-3 min-h-[36px]">
-                          <p className="text-[11px] font-medium text-slate-500 line-clamp-1"><span className="font-semibold text-slate-700">Best for:</span> {stack.bestForLine.replace(/^Best for\s*/i, '')}</p>
-                        </div>
-
-                        <div className="mt-2 min-h-[36px]">
-                          <p className="text-[11px] font-medium text-slate-500 line-clamp-1"><span className="font-semibold text-slate-700">Trade-off:</span> {stack.tradeOffLine.replace(/^Trade-off:\s*/i, '')}</p>
-                        </div>
-
-                        <div className="mt-3 min-h-[42px]">
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Includes</p>
-                            <button
-                              type="button"
-                              className="text-[10px] font-semibold text-[#4F46E5] hover:text-[#2F80ED] underline-offset-2 hover:underline"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleOpenDailyStackDetails(stackId);
-                              }}
-                              onKeyDown={(event) => {
-                                event.stopPropagation();
-                              }}
-                              aria-label={`Open stack details for ${stack.name}`}
-                            >
-                              Open stack details
-                            </button>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {stack.tools.slice(0, 3).map((tool) => (
-                              <ToolLogo
-                                key={`${stackId}-${tool.name}`}
-                                logoUrl={tool.logoUrl}
-                                websiteUrl={tool.websiteUrl}
-                                toolName={tool.name}
-                                size={26}
-                              />
-                            ))}
-                            {stack.tools.length > 3 && (
-                              <span className="inline-flex h-[26px] min-w-[26px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-500">
-                                +{stack.tools.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 min-h-[28px] flex flex-wrap gap-1.5">
-                          {stack.badges.slice(0, 2).map((badge) => (
-                            <span key={badge} className="text-[10px] font-medium px-2 py-1 rounded-md bg-white text-slate-600 border border-slate-200">
-                              {badge}
-                            </span>
-                          ))}
-                        </div>
-
-                        <div className="mt-auto pt-3 flex items-center justify-end min-h-[28px]">
-                          <span className="text-[11px] font-medium text-slate-400">{dailyVoteSnapshot.counts[stackId].toLocaleString()} votes</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-4">
-                  {!hasConfirmedDailyVote ? (
-                    <>
-                      <div
-                        className="flex flex-col items-center gap-2"
-                        onClick={() => { if (!selectedDailyStack) setShowSelectHint(true); }}
-                      >
-                        <Button
-                          type="button"
-                          onClick={handleConfirmDailyVote}
-                          disabled={!selectedDailyStack}
-                          className="h-14 px-10 w-full sm:w-80 rounded-xl text-white text-[15px] font-semibold shadow-lg shadow-indigo-500/20 disabled:opacity-40 disabled:shadow-none"
-                          style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
-                        >
-                          Confirm your choice
-                        </Button>
-                        {showSelectHint && !selectedDailyStack && (
-                          <p className="text-xs text-red-500 text-center">Select a stack first</p>
-                        )}
-                      </div>
-                      <p className="mt-3 text-center text-[12px] text-slate-400">
-                        {dailyVoteSnapshot.totalVotes.toLocaleString()} votes today
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      {/* Your choice line */}
-                      {dailyVoteSnapshot.userVote && (
-                        <div className="flex items-center gap-2 text-[13px] font-semibold text-[#4F46E5] mb-4">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                          Your selected direction:{' '}
-                          {dailyVoteSnapshot.userVote === 'A' ? dailyMatchup.stackA.name : dailyMatchup.stackB.name}
-                        </div>
+                    <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3" />
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[15px] font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">{useCase.title}</p>
+                      {isTrendingUseCase ? (
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">Trending today</span>
+                      ) : (
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#2F80ED]/85">Ready setup</span>
                       )}
-
-                      {/* Result bars */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {([
-                          { id: 'A' as StackSide, label: dailyMatchup.stackA.name },
-                          { id: 'B' as StackSide, label: dailyMatchup.stackB.name },
-                        ]).map((entry) => {
-                          const isWinner = dailyVoteSnapshot.leadingStackId === entry.id;
-                          return (
-                            <div
-                              key={entry.id}
-                              className={`rounded-lg p-2.5 transition-colors ${isWinner ? 'border border-[#4F46E5]/30 bg-indigo-50/50' : ''}`}
-                            >
-                              <div className="flex items-center justify-between text-[12px] mb-1.5">
-                                <span className="flex items-center gap-1.5 text-slate-700 font-medium line-clamp-1 pr-2">
-                                  {entry.label}
-                                  {isWinner && (
-                                    <span className="text-[10px] font-semibold text-[#4F46E5] bg-indigo-100 px-1.5 py-0.5 rounded-full border border-indigo-200 shrink-0">
-                                      Best-fit choice today
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="font-bold text-slate-900 shrink-0">{dailyVoteSnapshot.percentages[entry.id]}%</span>
-                              </div>
-                              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                                <div
-                                  className="h-2 rounded-full"
-                                  style={{
-                                    width: `${dailyVoteSnapshot.percentages[entry.id]}%`,
-                                    background: isWinner
-                                      ? 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)'
-                                      : '#cbd5e1',
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* CTAs */}
-                      <div className="mt-5 flex flex-col items-center gap-3">
-                        <Button
-                          type="button"
-                          onClick={handleOpenWinningStack}
-                          className="h-11 px-8 w-full sm:w-64 rounded-xl text-white text-[13px] font-semibold shadow-sm"
-                          style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
-                        >
-                            View the winning stack
-                        </Button>
-                        <button
-                          type="button"
-                          onClick={handleOpenFullComparison}
-                          className="h-10 px-6 w-full sm:w-64 rounded-xl text-[13px] font-semibold text-slate-700 border border-slate-300 bg-white hover:border-[#4F46E5]/50 hover:text-[#4F46E5] transition-colors"
-                        >
-                            Compare both approaches
-                        </button>
-                      </div>
-
-                      {/* Footer meta */}
-                      <div className="mt-5 pt-3 border-t border-slate-200/80">
-                        <p className="text-[11px] text-slate-500">
-                          {dailyVoteSnapshot.totalVotes.toLocaleString()} decisions today &middot; Most chosen approach: {communityPick.stackName} ({communityPick.voteShare}%)
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
+                    </div>
+                    <p className="text-[12px] font-medium text-slate-600 leading-relaxed mb-2 line-clamp-2">{useCase.description}</p>
+                    <p className="text-[11px] text-slate-500/90 mb-3">{trustCue}</p>
+                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-[#2F80ED] group-hover:border-[#4F46E5]/40 group-hover:text-[#4F46E5]">Start this setup</span>
+                  </button>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -1537,13 +1342,13 @@ export default function Index() {
           {/* Top ranked stacks */}
           {shouldShowTopRankedSection && (
           <section className="border-t border-slate-200 bg-slate-50/25">
-            <div className="page-shell page-section">
+            <div className="page-shell py-10 md:py-12">
               <div className="mb-5 max-w-[72ch]">
-                <div className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Optional ranking</div>
+                <div className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Trust signal</div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="section-heading mb-2">Top ranked stacks this week</h2>
-                    <p className="body-copy text-slate-600">Secondary view for trend checking after goal discovery.</p>
+                    <h2 className="text-[22px] md:text-[28px] font-semibold tracking-tight text-slate-900 mb-2">Top ranked stacks this week</h2>
+                    <p className="body-copy text-slate-600">A quick proof point that real setups are already being ranked and reused.</p>
                   </div>
                   <Link
                     to="/stack-leaderboard"
@@ -1617,13 +1422,263 @@ export default function Index() {
           </section>
           )}
 
+          {/* Daily Stack Comparison */}
+          <section className="border-t border-slate-200 bg-white/70">
+            <div className="page-shell py-8 md:py-10">
+              <div className="rounded-2xl border border-slate-200/60 bg-white/75 p-4 md:p-5 shadow-[0_6px_14px_rgba(15,23,42,0.04)]">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div className="min-w-0 max-w-[70ch] lg:flex-1 lg:max-w-none">
+                    <p className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Optional exploration</p>
+                    <h2 className="text-[20px] md:text-[24px] font-semibold tracking-tight text-slate-900 mb-2 lg:whitespace-nowrap">Compare two stack approaches for this use case</h2>
+                    <p className="text-[14px] leading-relaxed text-slate-600 lg:[text-wrap:pretty]">
+                      Helpful if you want to evaluate alternatives after you have a starting setup.
+                    </p>
+                  </div>
+
+                  <p className="text-[12px] leading-relaxed text-slate-500 lg:text-right lg:max-w-[360px]">
+                    Yesterday: {yesterdayResult.winningStackName} led with {yesterdayResult.winningPercentage}%.
+                  </p>
+                </div>
+
+                <div className="mt-5 flex min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-2.5">
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Use case</span>
+                  <span
+                    className="text-[13px] font-medium text-slate-700 lg:min-w-0 lg:flex-1 lg:overflow-hidden lg:text-ellipsis lg:whitespace-nowrap"
+                    title={dailyMatchup.useCaseLabel}
+                  >
+                    {dailyMatchup.useCaseLabel}
+                  </span>
+                  <span className="shrink-0 text-[12px] px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                    {dailyMatchup.categoryLabel}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+                  {[dailyMatchup.stackA, dailyMatchup.stackB].map((stack) => {
+                    const stackId = stack.id;
+                    const isSelected = selectedDailyStack === stackId;
+                    const hasOtherSelected = !!selectedDailyStack && selectedDailyStack !== stackId;
+                    const votedForThis = dailyVoteSnapshot.userVote === stackId;
+                    const isLocked = hasConfirmedDailyVote;
+                    const isWinningStack = dailyVoteSnapshot.leadingStackId === stackId;
+                    const stackRanking = dailyRankingsBySide[stackId];
+                    const isTopRankedInCategory = stackRanking.rankInCategory === 1 && stackRanking.rawScore > 0;
+                    return (
+                      <div
+                        key={stack.id}
+                        role="button"
+                        tabIndex={isLocked ? -1 : 0}
+                        onClick={() => handleDailyStackSelect(stackId)}
+                        onKeyDown={(e) => {
+                          if (isLocked) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleDailyStackSelect(stackId);
+                          }
+                        }}
+                        className={`text-left rounded-xl border p-4 transition-all duration-200 flex flex-col min-h-[252px] ${
+                          isSelected
+                            ? 'border-2 border-[#4F46E5]/65 bg-[linear-gradient(165deg,rgba(47,128,237,0.04)_0%,rgba(79,70,229,0.05)_100%)] shadow-[0_0_0_2px_rgba(79,70,229,0.08),0_4px_10px_rgba(79,70,229,0.06)]'
+                            : (hasOtherSelected || (isLocked && !votedForThis))
+                              ? 'border-slate-200 bg-white opacity-50'
+                              : 'border-slate-200 bg-white cursor-pointer hover:border-slate-300 hover:shadow-[0_8px_16px_rgba(15,23,42,0.06)]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3 min-h-[30px]">
+                          <div className="min-w-0">
+                            {isWinningStack && (
+                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 mb-1.5">
+                                Community pick
+                              </span>
+                            )}
+                            <p className="text-[16px] font-semibold tracking-tight text-slate-900">{stack.name}</p>
+                            {isTopRankedInCategory && (
+                              <p className="mt-1 text-[11px] text-slate-500">Top ranked in {dailyMatchup.categoryLabel}</p>
+                            )}
+                          </div>
+                          {isSelected && !isLocked && (
+                            <span className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] font-semibold text-[#4F46E5] bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                              Selected
+                            </span>
+                          )}
+                          {votedForThis && isLocked && (
+                            <span className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] font-semibold text-[#2F80ED] bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                              Your choice
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-3 min-h-[36px]">
+                          <p className="text-[11px] font-medium text-slate-500 line-clamp-1"><span className="font-semibold text-slate-700">Best for:</span> {stack.bestForLine.replace(/^Best for\s*/i, '')}</p>
+                        </div>
+
+                        <div className="mt-2 min-h-[36px]">
+                          <p className="text-[11px] font-medium text-slate-500 line-clamp-1"><span className="font-semibold text-slate-700">Trade-off:</span> {stack.tradeOffLine.replace(/^Trade-off:\s*/i, '')}</p>
+                        </div>
+
+                        <div className="mt-3 min-h-[42px]">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Includes</p>
+                            <button
+                              type="button"
+                              className="text-[10px] font-semibold text-slate-600 hover:text-[#2F80ED] underline-offset-2 hover:underline"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleOpenDailyStackDetails(stackId);
+                              }}
+                              onKeyDown={(event) => {
+                                event.stopPropagation();
+                              }}
+                              aria-label={`Open stack details for ${stack.name}`}
+                            >
+                              Open stack details
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {stack.tools.slice(0, 3).map((tool) => (
+                              <ToolLogo
+                                key={`${stackId}-${tool.name}`}
+                                logoUrl={tool.logoUrl}
+                                websiteUrl={tool.websiteUrl}
+                                toolName={tool.name}
+                                size={26}
+                              />
+                            ))}
+                            {stack.tools.length > 3 && (
+                              <span className="inline-flex h-[26px] min-w-[26px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-500">
+                                +{stack.tools.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 min-h-[28px] flex flex-wrap gap-1.5">
+                          {stack.badges.slice(0, 2).map((badge) => (
+                            <span key={badge} className="text-[10px] font-medium px-2 py-1 rounded-md bg-white text-slate-600 border border-slate-200">
+                              {badge}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="mt-auto pt-3 flex items-center justify-end min-h-[28px]">
+                          <span className="text-[11px] font-medium text-slate-400">{dailyVoteSnapshot.counts[stackId].toLocaleString()} votes</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-4">
+                  {!hasConfirmedDailyVote ? (
+                    <>
+                      <div
+                        className="flex flex-col items-center gap-2"
+                        onClick={() => { if (!selectedDailyStack) setShowSelectHint(true); }}
+                      >
+                        <Button
+                          type="button"
+                          onClick={handleConfirmDailyVote}
+                          disabled={!selectedDailyStack}
+                          className="h-12 px-8 w-full sm:w-72 rounded-xl text-white text-[14px] font-semibold shadow-sm shadow-indigo-500/15 disabled:opacity-40 disabled:shadow-none"
+                          style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
+                        >
+                          Confirm your choice
+                        </Button>
+                        {showSelectHint && !selectedDailyStack && (
+                          <p className="text-xs text-red-500 text-center">Select a stack first</p>
+                        )}
+                      </div>
+                      <p className="mt-3 text-center text-[12px] text-slate-400">
+                        {dailyVoteSnapshot.totalVotes.toLocaleString()} votes today
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      {dailyVoteSnapshot.userVote && (
+                        <div className="flex items-center gap-2 text-[13px] font-semibold text-[#4F46E5] mb-4">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                          Your selected direction:{' '}
+                          {dailyVoteSnapshot.userVote === 'A' ? dailyMatchup.stackA.name : dailyMatchup.stackB.name}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {([
+                          { id: 'A' as StackSide, label: dailyMatchup.stackA.name },
+                          { id: 'B' as StackSide, label: dailyMatchup.stackB.name },
+                        ]).map((entry) => {
+                          const isWinner = dailyVoteSnapshot.leadingStackId === entry.id;
+                          return (
+                            <div
+                              key={entry.id}
+                              className={`rounded-lg p-2.5 transition-colors ${isWinner ? 'border border-[#4F46E5]/30 bg-indigo-50/50' : ''}`}
+                            >
+                              <div className="flex items-center justify-between text-[12px] mb-1.5">
+                                <span className="flex items-center gap-1.5 text-slate-700 font-medium line-clamp-1 pr-2">
+                                  {entry.label}
+                                  {isWinner && (
+                                    <span className="text-[10px] font-semibold text-[#4F46E5] bg-indigo-100 px-1.5 py-0.5 rounded-full border border-indigo-200 shrink-0">
+                                      Best-fit choice today
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="font-bold text-slate-900 shrink-0">{dailyVoteSnapshot.percentages[entry.id]}%</span>
+                              </div>
+                              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                                <div
+                                  className="h-2 rounded-full"
+                                  style={{
+                                    width: `${dailyVoteSnapshot.percentages[entry.id]}%`,
+                                    background: isWinner
+                                      ? 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)'
+                                      : '#cbd5e1',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-5 flex flex-col items-center gap-3">
+                        <Button
+                          type="button"
+                          onClick={handleOpenWinningStack}
+                          className="h-10 px-7 w-full sm:w-56 rounded-xl text-white text-[12px] font-semibold shadow-sm"
+                          style={{ background: 'linear-gradient(135deg, #2F80ED 0%, #4F46E5 58%, #8A2BE2 100%)' }}
+                        >
+                            View the winning stack
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={handleOpenFullComparison}
+                          className="h-9 px-5 w-full sm:w-56 rounded-xl text-[12px] font-semibold text-slate-700 border border-slate-300 bg-white hover:border-[#4F46E5]/50 hover:text-[#4F46E5] transition-colors"
+                        >
+                            Compare both approaches
+                        </button>
+                      </div>
+
+                      <div className="mt-5 pt-3 border-t border-slate-200/80">
+                        <p className="text-[11px] text-slate-500">
+                          {dailyVoteSnapshot.totalVotes.toLocaleString()} decisions today &middot; Most chosen approach: {communityPick.stackName} ({communityPick.voteShare}%)
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Popular Categories */}
-          <section className="border-t border-slate-200 bg-white/60">
-            <div className="page-shell page-section">
-              <div className="mb-7 max-w-[72ch]">
-                <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Popular categories</div>
-                <h2 className="section-heading mb-2">Browse by category</h2>
-                <p className="body-copy">Explore the same category structure used in results.</p>
+          <section className="border-t border-slate-200 bg-white/40">
+            <div className="page-shell py-8 md:py-10">
+              <div className="mb-5 max-w-[72ch]">
+                <div className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Explore later</div>
+                <h2 className="text-[20px] md:text-[24px] font-semibold tracking-tight text-slate-900 mb-2">Browse by category</h2>
+                <p className="text-[14px] leading-relaxed text-slate-600">Optional if you want to browse the catalog after getting a setup.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1638,9 +1693,9 @@ export default function Index() {
                     key={cat.id}
                     to={`/categories/${cat.id}`}
                     state={{ from: routerLocation.pathname + routerLocation.search }}
-                    className={`group rounded-xl border bg-white p-5 hover:border-[#4F46E5]/40 hover:shadow-[0_10px_22px_rgba(79,70,229,0.14)] transition-all ${isCommunityPickCat ? 'border-slate-300 bg-slate-50/50' : 'border-slate-200'}`}
+                    className={`group rounded-xl border bg-white/85 p-4 hover:border-slate-300 hover:shadow-[0_8px_16px_rgba(15,23,42,0.06)] transition-all ${isCommunityPickCat ? 'border-slate-300 bg-slate-50/45' : 'border-slate-200/80'}`}
                   >
-                    <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3" />
+                    <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3 opacity-80" />
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-[15px] font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">
                         {cat.label}
@@ -1648,7 +1703,7 @@ export default function Index() {
                       {isCommunityPickCat ? (
                         <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">Community pick</span>
                       ) : (
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#2F80ED]/85">Category</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Category</span>
                       )}
                     </div>
                     <p className="text-[13px] text-slate-500 leading-relaxed line-clamp-2">{cat.description}</p>
@@ -1662,51 +1717,14 @@ export default function Index() {
             </div>
           </section>
 
-          {/* Use Cases */}
-          <section className="border-t border-slate-200 bg-slate-50/35">
-            <div className="page-shell page-section">
-              <div className="mb-7 max-w-[72ch]">
-                <div className="eyebrow-label mb-1.5" style={{ color: '#2F80ED' }}>Use cases</div>
-                <h2 className="section-heading mb-2">Start from a real workflow</h2>
-                <p className="body-copy">Use one of these common goals to jump straight into results.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {displayedLandingUseCases.map((useCase) => {
-                  const isTrendingUseCase = !!useCase.isTrending;
-                  return (
-                  <button
-                    key={useCase.title}
-                    onClick={() => handleWorkflowCardClick(useCase)}
-                    className={`group text-left rounded-xl border bg-white/95 p-4 hover:border-[#4F46E5]/30 hover:shadow-[0_8px_16px_rgba(79,70,229,0.1)] transition-all ${isTrendingUseCase ? 'border-slate-300 bg-slate-50/45' : 'border-slate-200'}`}
-                  >
-                    <div className="h-1.5 w-14 rounded-full bg-[linear-gradient(135deg,#2F80ED_0%,#8A2BE2_100%)] mb-3" />
-                    <div className="flex items-center justify-between mb-2.5">
-                      <p className="text-[15px] font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">{useCase.title}</p>
-                      {isTrendingUseCase ? (
-                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">Trending today</span>
-                      ) : (
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#2F80ED]/85">Use case</span>
-                      )}
-                    </div>
-                    <p className="text-[13px] text-slate-500 leading-relaxed mb-2.5 line-clamp-2">{useCase.description}</p>
-                    <p className="text-[11px] text-slate-500/90 mb-3">See how this setup works step-by-step</p>
-                    <span className="text-[11px] font-medium text-[#2F80ED] group-hover:text-[#4F46E5]">Run this use case</span>
-                  </button>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-
           {/* Featured Tools */}
           {topPicksSourcePool.length > 0 && (
-            <section className="border-t border-slate-200 bg-white/60">
-              <div className="page-shell page-section">
-                <div className="mb-7 max-w-[72ch]">
+            <section className="border-t border-slate-200 bg-white/45">
+              <div className="page-shell py-8 md:py-10">
+                <div className="mb-5 max-w-[72ch]">
                   <div className="eyebrow-label mb-1.5" style={{ color: '#64748b' }}>Explore later</div>
-                  <h2 className="section-heading mb-2">Top tools used in stacks today</h2>
-                  <p className="body-copy text-slate-600">Useful for browsing, after running your main goal search.</p>
+                  <h2 className="text-[20px] md:text-[24px] font-semibold tracking-tight text-slate-900 mb-2">Top tools used in stacks today</h2>
+                  <p className="text-[14px] leading-relaxed text-slate-600">Useful for browsing after you have already picked a setup.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

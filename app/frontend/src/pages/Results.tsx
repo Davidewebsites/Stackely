@@ -44,7 +44,7 @@ import { useCompare } from '@/contexts/CompareContext';
 import StackCard from '@/components/StackCard';
 import ToolCard from '@/components/ToolCard';
 import { trackToolClick } from '@/components/ToolCard';
-import { getOutboundCtaLabel, openOutboundToolLink } from '@/lib/outboundLinks';
+import { getOutboundCtaLabel, openOutboundToolLink, trackMonetizationInteraction } from '@/lib/outboundLinks';
 import ToolLogo from '@/components/ToolLogo';
 import StackelyLogo from '@/components/StackelyLogo';
 import SiteFooter from '@/components/SiteFooter';
@@ -1286,6 +1286,7 @@ export default function Results() {
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [expandedAlternativeOptions, setExpandedAlternativeOptions] = useState<Record<string, boolean>>({});
   const [showFirstStepExtraActions, setShowFirstStepExtraActions] = useState(false);
+  const trackedPresetEntryRef = useRef<string | null>(null);
 
   const queryMode = useMemo<'stack' | 'search'>(() => resolveResultsQueryMode(query, requestedMode), [query, requestedMode]);
   const stackBudgetLabel = useMemo(() => {
@@ -1446,6 +1447,26 @@ export default function Results() {
     setExpandedAlternativeOptions({});
     setShowFirstStepExtraActions(false);
   }, [query, stackData?.stack?.length]);
+
+  useEffect(() => {
+    const surfaceSource = searchParams.get('surface_source') || undefined;
+    if (surfaceSource !== 'homepage_start_faster') return;
+
+    const presetKey = searchParams.get('intent_type') || undefined;
+    const trackingKey = `${surfaceSource}:${presetKey || 'unknown'}:${query}`;
+    if (trackedPresetEntryRef.current === trackingKey) return;
+
+    trackedPresetEntryRef.current = trackingKey;
+    trackMonetizationInteraction({
+      event: 'homepage_preset_click',
+      source_page: location.pathname,
+      surface_source: surfaceSource,
+      user_goal_query: query || undefined,
+      intent_type: searchParams.get('intent_type') || undefined,
+      intent_origin: searchParams.get('intent_origin') || undefined,
+      preset_key: presetKey,
+    });
+  }, [searchParams, query, location.pathname]);
 
   useEffect(() => {
     if (categoryParam && !query) {
@@ -2859,6 +2880,11 @@ export default function Results() {
 
                           {/* Action buttons */}
                           <div className="flex flex-wrap items-center gap-2 mb-4">
+                            {isFirstStep && (
+                              <p className="w-full text-[11px] font-medium text-slate-600">
+                                Live in ~10 minutes · Start collecting emails immediately
+                              </p>
+                            )}
                             {(!isFirstStep || showFirstStepExtraActions) && (
                               <>
                                 <Button
@@ -2894,16 +2920,27 @@ export default function Results() {
                               <div className="flex flex-col">
                                 <Button
                                   size="sm"
-                                  className={`${isFirstStep ? 'h-9 px-3.5 text-[12px] bg-indigo-600 hover:bg-indigo-700 shadow-[0_10px_22px_rgba(79,70,229,0.38)] text-white ring-1 ring-indigo-400/30' : isSecondStep ? 'h-8 px-3 text-[11px] bg-slate-700/80 hover:bg-slate-700/90 text-white/90' : 'h-8 px-3 text-[11px] bg-slate-600/75 hover:bg-slate-600/85 text-white/85 opacity-80 shadow-none'}`}
+                                  className={`${isFirstStep ? 'h-10 px-4 text-[12px] font-semibold bg-indigo-600 hover:bg-indigo-700 shadow-[0_14px_30px_rgba(79,70,229,0.46)] text-white ring-2 ring-indigo-400/35' : isSecondStep ? 'h-8 px-3 text-[11px] bg-slate-700/80 hover:bg-slate-700/90 text-white/90' : 'h-8 px-3 text-[11px] bg-slate-600/75 hover:bg-slate-600/85 text-white/85 opacity-80 shadow-none'}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (isFirstStep) {
+                                      trackMonetizationInteraction({
+                                        event: 'results_primary_cta_click',
+                                        source_page: location.pathname,
+                                        surface_source: 'results_stack_primary',
+                                        user_goal_query: query || undefined,
+                                        tool_slug: item.tool.slug,
+                                        tool_name: item.tool.name,
+                                        slot_name: item.role,
+                                      });
+                                    }
                                     trackToolClick(item.tool.id);
                                     openOutboundToolLink(item.tool, location.pathname, '_blank', {
                                       ...buildStackSlotOutboundContext('results_stack_primary', item.role, query),
                                     });
                                   }}
                                 >
-                                  {getOutboundCtaLabel(item.tool, getActionCtaByCategory(item.tool.category))}
+                                  {isFirstStep ? 'Build your funnel' : getOutboundCtaLabel(item.tool, getActionCtaByCategory(item.tool.category))}
                                 </Button>
                               </div>
                             )}

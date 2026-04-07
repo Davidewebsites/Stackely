@@ -85,6 +85,41 @@ export interface OutboundTrackingContext {
   userGoalQuery?: string;
 }
 
+export interface MonetizationInteractionTracking {
+  event: 'homepage_preset_click' | 'results_primary_cta_click';
+  source_page: string;
+  surface_source?: string;
+  user_goal_query?: string;
+  intent_type?: string;
+  intent_origin?: string;
+  preset_key?: string;
+  tool_slug?: string;
+  tool_name?: string;
+  slot_name?: string;
+}
+
+/**
+ * Lightweight monetization interaction tracking hook.
+ * Keeps tracking internal (console + custom event/dataLayer) and never blocks UI.
+ */
+export function trackMonetizationInteraction(data: MonetizationInteractionTracking): void {
+  const event = {
+    ...data,
+    timestamp: new Date().toISOString(),
+  };
+
+  console.log('[Monetization Interaction]', event);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('stackely:monetization_interaction', { detail: event }));
+
+    const dataLayer = (window as Window & { dataLayer?: Array<Record<string, unknown>> }).dataLayer;
+    if (Array.isArray(dataLayer)) {
+      dataLayer.push(event as unknown as Record<string, unknown>);
+    }
+  }
+}
+
 /**
  * Track an outbound tool link click.
  * Sends event to analytics (if configured) and logs to console in debug mode.

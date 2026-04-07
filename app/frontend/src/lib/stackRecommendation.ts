@@ -372,6 +372,14 @@ function getAffiliateWindowCandidate(
   const affiliateEntry = scored[affiliateIndex];
   if (!isSemanticallyValidForCriticalSlot(slot, affiliateEntry.tool)) return null;
 
+  if (targetKey === 'clickfunnels') {
+    const naturalCutoff = scored[Math.min(3, scored.length - 1)];
+    if (!naturalCutoff) return null;
+    const scoreGapFromCutoff = naturalCutoff.score - affiliateEntry.score;
+    // Keep inclusion bounded to competitive candidates while allowing broader visibility.
+    if (scoreGapFromCutoff > 14) return null;
+  }
+
   return affiliateEntry;
 }
 
